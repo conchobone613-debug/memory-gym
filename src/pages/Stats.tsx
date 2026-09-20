@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { confusionPairs, dailyRows, heatmap, movers } from '../db/analytics';
+import { confusionPairs, dailyRows, heatmap, mappingCells, movers } from '../db/analytics';
+import { mastery } from '../db/mapping';
 import { db, type ImageSet } from '../db/db';
 import { weeklyMarkdown } from '../lib/markdown';
 import { download } from '../lib/io';
@@ -19,6 +20,9 @@ export default function Stats() {
   const rows = useLiveQuery(() => dailyRows(days), [days], []);
   const pairs = useLiveQuery(() => confusionPairs(10), [], []);
   const mv = useLiveQuery(() => movers(5), [], { slowest: [], worst: [] });
+  const map1 = useLiveQuery(() => mappingCells(1), [], []);
+  const m1 = useLiveQuery(() => mastery(1), []);
+  const m2 = useLiveQuery(() => mastery(2), []);
 
   const measured = useMemo(() => cells.filter((c) => c.attempts > 0), [cells]);
   const maxRt = useMemo(() => Math.max(1, ...measured.map((c) => c.medianRt)), [measured]);
@@ -65,6 +69,41 @@ export default function Stats() {
         <Stat label="측정된 이미지" value={`${measured.length}/${cells.length}`} />
       </div>
 
+      {(m1?.attempts || m2?.attempts) ? (
+        <Panel title="자음 매핑 숙련도 (초급 1·2단계)">
+          <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
+            {map1.map((c) => (
+              <div
+                key={c.unit}
+                title={`${c.unit} · 시도 ${c.attempts} · 정확도 ${fmtPct(c.accuracy)} · ${fmtMs(c.medianRt)}`}
+                className="rounded-md border border-line/70 px-1 py-1.5 text-center"
+                style={{
+                  background: c.attempts === 0
+                    ? 'transparent'
+                    : c.accuracy < 0.9
+                      ? 'color-mix(in srgb, var(--color-bad) 55%, var(--color-panel2))'
+                      : `color-mix(in srgb, var(--color-warn) ${Math.round(Math.min(1, c.medianRt / 4000) * 75)}%, var(--color-good) 55%)`,
+                }}
+              >
+                <div className={`tnum text-sm font-semibold ${c.attempts ? 'text-ink' : ''}`}>{c.unit}</div>
+                <div className={`tnum text-[10px] ${c.attempts ? 'text-ink/70' : 'text-muted'}`}>
+                  {c.attempts ? (c.medianRt / 1000).toFixed(1) : '·'}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <Stat label="1단계 정확도" value={m1?.attempts ? fmtPct(m1.accuracy) : '—'} sub={`안 본 숫자 ${m1?.unseen ?? 10}개`} />
+            <Stat label="1단계 반응" value={fmtMs(m1?.medianRt ?? 0)} />
+            <Stat label="2단계 정확도" value={m2?.attempts ? fmtPct(m2.accuracy) : '—'} sub={`안 본 칸 ${m2?.unseen ?? 100}개`} />
+            <Stat label="2단계 반응" value={fmtMs(m2?.medianRt ?? 0)} />
+          </div>
+          <p className="mt-2 text-[11px] text-muted">
+            위 칸은 1단계(숫자 한 자리)입니다. 붉은 칸은 아직 틀리는 숫자, 숫자는 중앙 반응시간(초)입니다.
+          </p>
+        </Panel>
+      ) : null}
+
       <Panel
         title="반응시간 히트맵"
         right={
@@ -85,8 +124,8 @@ export default function Stats() {
                   className="rounded-md border border-line/70 px-1 py-1 text-center"
                   style={{ background: color(c.medianRt, c.attempts, c.errRate) }}
                 >
-                  <div className="tnum text-[10px] text-muted">{label(c.key)}</div>
-                  <div className="tnum text-[11px]">
+                  <div className={`tnum text-[10px] ${c.attempts ? 'text-ink/70' : 'text-muted'}`}>{label(c.key)}</div>
+                  <div className={`tnum text-[11px] ${c.attempts ? 'text-ink font-medium' : ''}`}>
                     {c.medianRt ? (c.medianRt / 1000).toFixed(1) : c.attempts ? '✕' : '·'}
                   </div>
                 </div>

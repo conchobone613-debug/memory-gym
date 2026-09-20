@@ -146,6 +146,46 @@ export interface AppSettings {
   seededAt?: number;
 }
 
+/* ── 초급 단계 (자음 매핑 외우기) ── */
+
+export interface MappingSession {
+  id: string;
+  stage: 1 | 2;
+  startedAt: number;
+  endedAt?: number;
+  itemCount: number;
+}
+
+export interface MappingAttempt {
+  id: string;
+  sessionId: string;
+  order: number;
+  stage: 1 | 2;
+  /** '7' 또는 '47' — 통계를 쌓는 단위 */
+  unit: string;
+  direction: 'toConsonant' | 'toDigit';
+  prompt: string;
+  answer: string;
+  given: string;
+  isCorrect: boolean;
+  rtMs: number;
+  shownAt: number;
+}
+
+export interface MappingStat {
+  /** 's1:7' | 's2:47' */
+  key: string;
+  stage: 1 | 2;
+  unit: string;
+  attempts: number;
+  correct: number;
+  wrong: number;
+  rtSamples: number[];
+  medianRt: number;
+  wrongStreak: number;
+  lastSeenAt: number;
+}
+
 /* ───────────────── DB ───────────────── */
 
 class MemoryGymDB extends Dexie {
@@ -159,6 +199,9 @@ class MemoryGymDB extends Dexie {
   loci!: Table<Locus, string>;
   imageStats!: Table<ImageStat, string>;
   settings!: Table<AppSettings, string>;
+  mappingSessions!: Table<MappingSession, string>;
+  mappingAttempts!: Table<MappingAttempt, string>;
+  mappingStats!: Table<MappingStat, string>;
 
   constructor() {
     super('memory-gym');
@@ -173,6 +216,13 @@ class MemoryGymDB extends Dexie {
       loci: 'id, palaceId, [palaceId+order]',
       imageStats: 'imageId, setId, medianRt, lastSeenAt',
       settings: 'key',
+    });
+
+    /* v2: 자음 매핑을 외우는 초급 단계. 기존 표는 그대로 넘어온다. */
+    this.version(2).stores({
+      mappingSessions: 'id, startedAt, stage',
+      mappingAttempts: 'id, sessionId, shownAt, unit',
+      mappingStats: 'key, stage, lastSeenAt',
     });
   }
 }

@@ -9,6 +9,9 @@ import { buildQueue, median, rank } from '../lib/srs';
 import { matchName, type MatchKind } from '../lib/hangul';
 import { cardLabel, fullDeck, resolveCard } from '../lib/cards';
 import { pickOne, randBelow, uid } from '../lib/random';
+import MappingDrill from './MappingDrill';
+import { type Stage } from '../lib/mapping';
+import { mastery } from '../db/mapping';
 import { isTyping } from '../App';
 import { useNavLock } from '../lib/navlock';
 import { Btn, Empty, Field, LinkBtn, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
@@ -43,7 +46,10 @@ export default function Drill() {
   const images = useLiveQuery(() => db.images.toArray(), [], [] as MemoImage[]);
   const stats = useLiveQuery(() => db.imageStats.toArray(), [], [] as ImageStat[]);
   const settings = useLiveQuery(() => getSettings(), []);
+  const m1 = useLiveQuery(() => mastery(1), []);
+  const m2 = useLiveQuery(() => mastery(2), []);
 
+  const [stage, setStage] = useState<Stage | 3>(3);
   const [selected, setSelected] = useState<string[]>([]);
   const [mode, setMode] = useState<PickMode>('srs');
   const [style, setStyle] = useState<Style>('key');
@@ -170,8 +176,9 @@ export default function Drill() {
       if (isTyping(e.target)) return;
       if (phase === 'showing' && (e.code === 'Space' || e.key === ' ')) { e.preventDefault(); onSpace(); }
       else if (phase === 'reveal') {
+        /* 화면 왼쪽이 맞음, 오른쪽이 틀림. 키보드에서도 D 가 F 왼쪽이라 순서가 맞는다. */
         const k = e.key.toLowerCase();
-        if (k === 'j') { e.preventDefault(); commit('correct'); }
+        if (k === 'd') { e.preventDefault(); commit('correct'); }
         else if (k === 'f') { e.preventDefault(); commit('wrong'); }
       }
     };
@@ -188,12 +195,54 @@ export default function Drill() {
     setPhase('reveal');
   };
 
+  const stageTabs = (
+    <div className="flex flex-col gap-2">
+      <div className="grid gap-2 sm:grid-cols-3">
+        {([
+          { n: 1 as const, title: '1단계 · 자음 하나', desc: '숫자 ↔ ㄱㄴㄷ', m: m1 },
+          { n: 2 as const, title: '2단계 · 자음 두 개', desc: '두 자리 ↔ 자음 두 개', m: m2 },
+          { n: 3 as const, title: '3단계 · 이미지', desc: '자극 → 이미지 (본 훈련)', m: undefined },
+        ]).map((t) => (
+          <button
+            key={t.n}
+            onClick={() => setStage(t.n)}
+            className={`rounded-xl border px-3 py-2.5 text-left transition ${
+              stage === t.n ? 'border-accent bg-accent/15' : 'border-line bg-panel hover:border-accent/50'
+            }`}
+          >
+            <div className="text-sm font-semibold">{t.title}</div>
+            <div className="text-xs text-muted">{t.desc}</div>
+            {t.m && t.m.attempts > 0 && (
+              <div className="tnum mt-1 text-[11px] text-muted">
+                정확도 {fmtPct(t.m.accuracy)} · {fmtMs(t.m.medianRt)}
+                {t.m.ready && <span className="text-good"> · 통과</span>}
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted">
+        자음 매핑이 아직 안 붙으셨으면 1단계부터 하십시오. 이미지 드릴은 매핑이 자동으로 나온 뒤에 효과가 납니다.
+      </p>
+    </div>
+  );
+
+  if (stage !== 3) {
+    return (
+      <div className="flex flex-col gap-4">
+        {stageTabs}
+        <MappingDrill stage={stage} />
+      </div>
+    );
+  }
+
   /* ───────── 설정 화면 ───────── */
   if (phase === 'setup') {
     const namedCount = pool.length;
     return (
       <div className="flex flex-col gap-4">
-        <Panel title="변환 드릴 설정">
+        {stageTabs}
+        <Panel title="3단계 · 이미지 변환 드릴">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="세트">
               <div className="flex flex-col gap-1">
@@ -247,7 +296,7 @@ export default function Drill() {
           <div className="mt-4 flex items-center gap-3">
             <Btn variant="primary" size="lg" disabled={namedCount === 0} onClick={start}>시작</Btn>
             <span className="text-xs text-muted">
-              출제 가능한 이미지 {namedCount}개 · <kbd>Space</kbd> 떠올림 · <kbd>J</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단
+              출제 가능한 이미지 {namedCount}개 · <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단
             </span>
           </div>
           {namedCount === 0 && (
@@ -369,7 +418,7 @@ export default function Drill() {
             <div className="tnum text-xs text-muted">{fmtMs(rtRef.current)}</div>
             <div className="flex gap-2">
               <Btn variant="good" size="lg" onClick={(e) => { e.stopPropagation(); commit('correct'); }}>
-                맞음 (J)
+                맞음 (D)
               </Btn>
               <Btn variant="danger" size="lg" onClick={(e) => { e.stopPropagation(); commit('wrong'); }}>
                 틀림 (F)

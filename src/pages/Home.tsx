@@ -5,7 +5,7 @@ import { dailyRows, localDayKey } from '../db/analytics';
 import { Panel, Stat, fmtMs, fmtPct } from '../components/ui';
 
 const CARDS = [
-  { to: '/drill', key: '3', title: '변환 드릴', desc: '자극 → 이미지. 반응시간을 재고 약점을 먼저 낸다.' },
+  { to: '/drill', key: '3', title: '변환 드릴', desc: '1단계 자음 → 2단계 자음 두 개 → 3단계 이미지.' },
   { to: '/practice', key: '4', title: '실전', desc: '숫자 80자리 · 카드 52장. 암기 → 회상 → 채점.' },
   { to: '/palaces', key: '5', title: '궁전 워크스루', desc: '장소 순서를 소리 없이 한 바퀴 돈다.' },
 ];
@@ -71,7 +71,8 @@ export default function Home() {
         <Panel title="조작">
           <ul className="flex flex-col gap-1.5 text-sm text-muted">
             <li><kbd>1</kbd>–<kbd>7</kbd> 화면 이동</li>
-            <li>드릴: <kbd>Space</kbd> 떠올림 · <kbd>J</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단</li>
+            <li>드릴 3단계: <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단</li>
+            <li>드릴 1·2단계: 보기는 <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> · 숫자 답은 숫자 키</li>
             <li>세트 편집: 방향키 이동 · <kbd>Enter</kbd> 저장·다음 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 다음 빈칸</li>
             <li>실전: 암기 중 <kbd>Enter</kbd> 조기 종료 · 회상 중 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 제출</li>
             <li>채점: <kbd>1</kbd>–<kbd>4</kbd> 원인 태그 · <kbd>↑</kbd><kbd>↓</kbd> 칸 이동</li>

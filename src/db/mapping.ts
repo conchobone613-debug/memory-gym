@@ -1,0 +1,93 @@
+import { db, type MappingAttempt, type MappingStat } from './db';
+import { allUnits, statKey, type Stage } from '../lib/mapping';
+import { median } from '../lib/srs';
+import { sample, shuffle } from '../lib/random';
+
+const MAX_SAMPLES = 20;
+const DAY = 86_400_000;
+
+export async function recordMapping(a: MappingAttempt): Promise<void> {
+  await db.transaction('rw', db.mappingAttempts, db.mappingStats, async () => {
+    await db.mappingAttempts.add(a);
+    const key = statKey(a.stage, a.unit);
+    const prev = await db.mappingStats.get(key);
+    const base: MappingStat = prev ?? {
+      key, stage: a.stage, unit: a.unit,
+      attempts: 0, correct: 0, wrong: 0, rtSamples: [], medianRt: 0, wrongStreak: 0, lastSeenAt: 0,
+    };
+    const samples = [...base.rtSamples, a.rtMs].slice(-MAX_SAMPLES);
+    await db.mappingStats.put({
+      ...base,
+      attempts: base.attempts + 1,
+      correct: base.correct + (a.isCorrect ? 1 : 0),
+      wrong: base.wrong + (a.isCorrect ? 0 : 1),
+      rtSamples: samples,
+      medianRt: Math.round(median(samples)),
+      wrongStreak: a.isCorrect ? 0 : base.wrongStreak + 1,
+      lastSeenAt: a.shownAt,
+    });
+  });
+}
+
+export async function mappingStatsFor(stage: Stage): Promise<Map<string, MappingStat>> {
+  const rows = await db.mappingStats.where('stage').equals(stage).toArray();
+  return new Map(rows.map((r) => [r.unit, r]));
+}
+
+/**
+ * 출제 순서. 아직 안 본 것 · 틀린 것 · 느린 것을 앞으로 당긴다.
+ * 이미지 드릴의 SRS 와 같은 생각이되, 단위가 숫자라 훨씬 단순하다.
+ */
+export async function buildMappingQueue(stage: Stage, count: number): Promise<string[]> {
+  const units = allUnits(stage);
+  const stats = await mappingStatsFor(stage);
+  const now = Date.now();
+
+  const scored = units.map((unit) => {
+    const s = stats.get(unit);
+    if (!s || s.attempts === 0) return { unit, p: 2 };
+    const errRate = s.wrong / s.attempts;
+    const slow = Math.min(1, s.medianRt / 4000);
+    const stale = 1 - Math.exp(-(now - s.lastSeenAt) / DAY);
+    return { unit, p: 0.45 * errRate + 0.35 * slow + 0.2 * stale + (s.wrongStreak > 0 ? 0.8 : 0) };
+  });
+
+  const sorted = [...scored].sort((a, b) => b.p - a.p);
+  const nTop = Math.round(count * 0.7);
+  const band = sorted.slice(0, Math.max(nTop, Math.ceil(sorted.length * 0.4)));
+  const rest = sorted.slice(band.length);
+
+  const take = (list: typeof sorted, n: number): string[] => {
+    const out: string[] = [];
+    while (out.length < n && list.length) out.push(...sample(list, Math.min(n - out.length, list.length)).map((x) => x.unit));
+    return out;
+  };
+
+  return shuffle([...take(band, nTop), ...take(rest.length ? rest : sorted, count - nTop)]);
+}
+
+export interface Mastery {
+  attempts: number;
+  accuracy: number;
+  medianRt: number;
+  /** 한 번도 안 본 단위 수 */
+  unseen: number;
+  /** 정확도 95% 이상 + 중앙 반응시간 2초 이하면 다음 단계로 */
+  ready: boolean;
+}
+
+export async function mastery(stage: Stage): Promise<Mastery> {
+  const units = allUnits(stage);
+  const stats = await mappingStatsFor(stage);
+  const rows = [...stats.values()];
+  const attempts = rows.reduce((s, r) => s + r.attempts, 0);
+  const correct = rows.reduce((s, r) => s + r.correct, 0);
+  const rts = rows.filter((r) => r.rtSamples.length).map((r) => r.medianRt);
+  const accuracy = attempts ? correct / attempts : 0;
+  const medianRt = Math.round(median(rts));
+  const unseen = units.filter((u) => !stats.get(u)?.attempts).length;
+  return {
+    attempts, accuracy, medianRt, unseen,
+    ready: unseen === 0 && attempts >= units.length * 3 && accuracy >= 0.95 && medianRt > 0 && medianRt <= 2000,
+  };
+}

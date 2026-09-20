@@ -112,3 +112,23 @@ export async function movers(limit = 5): Promise<{ slowest: MoverRow[]; worst: M
     worst: stats.filter((s) => s.wrong > 0).sort((a, b) => b.wrong / b.attempts - a.wrong / a.attempts).slice(0, limit).map(row),
   };
 }
+
+export interface MappingCell { unit: string; attempts: number; accuracy: number; medianRt: number }
+
+/** 초급 단계 숙련도. 어느 숫자가 아직 안 붙었는지 한눈에 보려는 것. */
+export async function mappingCells(stage: 1 | 2): Promise<MappingCell[]> {
+  const rows = await db.mappingStats.where('stage').equals(stage).toArray();
+  const byUnit = new Map(rows.map((r) => [r.unit, r]));
+  const units = stage === 1
+    ? Array.from({ length: 10 }, (_, i) => String(i))
+    : Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0'));
+  return units.map((unit) => {
+    const r = byUnit.get(unit);
+    return {
+      unit,
+      attempts: r?.attempts ?? 0,
+      accuracy: r && r.attempts ? r.correct / r.attempts : 0,
+      medianRt: r?.medianRt ?? 0,
+    };
+  });
+}
