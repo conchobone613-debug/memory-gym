@@ -4,6 +4,7 @@ import { db } from '../db/db';
 import { dailyRows, localDayKey } from '../db/analytics';
 import { goalFor, type GoalStatus } from '../db/goals';
 import { LinkBtn, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
+import BackupNudge from '../components/BackupNudge';
 
 interface NextStep {
   eyebrow: string;
@@ -88,6 +89,7 @@ export default function Home() {
 
   return (
     <div className="mg-rise flex flex-col gap-5">
+      <BackupNudge />
       {/* 오늘 할 일 한 가지 */}
       <section className="relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-panel2 via-panel to-panel p-6 md:p-8">
         <div

@@ -22,8 +22,11 @@ export default function Settings() {
     setMsg('저장됨');
   };
 
-  const doBackup = async () =>
+  const doBackup = async () => {
     download(`memory-gym-backup-${new Date().toISOString().slice(0, 10)}.json`, await exportBackup(), 'application/json');
+    await commit({ lastBackupAt: Date.now() });
+    setMsg('백업 파일을 내려받았습니다.');
+  };
 
   const doRestore = async () => {
     const text = await pickFile('.json,application/json');

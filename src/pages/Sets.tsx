@@ -5,6 +5,7 @@ import { db, ensureKeys, type ImageSet } from '../db/db';
 import { uid } from '../lib/random';
 import { loadStarter } from '../data/starter';
 import { Btn, ConfirmBtn, Empty, LinkBtn, Panel } from '../components/ui';
+import BackupNudge from '../components/BackupNudge';
 
 export default function Sets() {
   const sets = useLiveQuery(() => db.imageSets.toArray(), [], [] as ImageSet[]);
@@ -58,6 +59,7 @@ export default function Sets() {
 
   return (
     <div className="flex flex-col gap-4">
+      <BackupNudge />
       <Panel
         title="이미지 세트"
         right={
@@ -74,6 +76,11 @@ export default function Sets() {
           <b className="text-fg">추천 이미지 112개 채우기</b> — 숫자 00–99 와 인물 카드 12장에 제가 고른 이미지를
           한 번에 넣습니다. <b className="text-fg">비어 있는 칸에만</b> 들어가고 회장님이 직접 쓰신 칸은 건드리지
           않습니다. 마음에 안 드는 칸은 편집에서 바꾸시면 됩니다.
+        </p>
+        <p className="mb-3 rounded-lg border border-line/70 px-3 py-2 text-xs text-muted">
+          이미지는 <b className="text-fg">브라우저마다 따로</b> 저장됩니다. 다른 기기나 다른 브라우저에서 열면
+          빈 칸으로 시작하는 것이 정상입니다. 옮기실 땐 설정의 백업 파일을 쓰시거나, 위 버튼으로 추천 목록을
+          다시 넣으십시오.
         </p>
 
         {sets.length === 0 ? (

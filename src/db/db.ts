@@ -151,6 +151,8 @@ export interface AppSettings {
   drillCount: number;
   /** 초급 단계에서 낼 방향. 기본은 외울 때 쓰는 숫자 → 자음. */
   mappingDirection: 'toConsonant' | 'toDigit' | 'mix';
+  /** 마지막으로 백업 파일을 받은 때. 데이터는 이 브라우저 안에만 있어 백업이 유일한 보험이다. */
+  lastBackupAt?: number;
   seededAt?: number;
 }
 
