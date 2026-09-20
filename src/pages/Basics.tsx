@@ -57,6 +57,12 @@ export default function Drill() {
 
   const [stage, setStage] = useState<Stage | 3>(3);
   const [selected, setSelected] = useState<string[]>([]);
+  /**
+   * 숫자 세트는 앞자리로 열 묶음을 낸다 (00–09, 10–19 …).
+   * 100칸을 한꺼번에 돌리면 오늘 뭘 외웠는지가 흐려진다. 한 줄씩 끊어 붙이는 쪽이 는다.
+   * 비어 있으면 '전부'를 뜻한다.
+   */
+  const [decades, setDecades] = useState<Record<string, string[]>>({});
   const [mode, setMode] = useState<PickMode>('srs');
   const [style, setStyle] = useState<Style>('key');
   const [count, setCount] = useState(30);
@@ -94,8 +100,13 @@ export default function Drill() {
   }, [settings?.typedCheckRate, settings?.drillCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(
-    () => images.filter((i) => selected.includes(i.setId) && i.name.trim()),
-    [images, selected],
+    () =>
+      images.filter((i) => {
+        if (!selected.includes(i.setId) || !i.name.trim()) return false;
+        const picked = decades[i.setId];
+        return !picked || picked.length === 0 || picked.includes(i.key[0]);
+      }),
+    [images, selected, decades],
   );
 
   /** 이미지 키 -> 그 이미지를 가리키는 카드들 */
@@ -270,21 +281,75 @@ export default function Drill() {
         <Panel title="3단계 · 이미지 변환 드릴">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="세트">
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-2">
                 {sets.map((s) => {
-                  const n = images.filter((i) => i.setId === s.id && i.name.trim()).length;
+                  const mine = images.filter((i) => i.setId === s.id && i.name.trim());
+                  const on = selected.includes(s.id);
+                  const isDigits = s.domain === 'digit2' || s.domain === 'digit3';
+                  const width = s.domain === 'digit3' ? 3 : 2;
+                  const picked = decades[s.id] ?? [];
+                  const toggleDecade = (d: string) =>
+                    setDecades((cur) => {
+                      const now = cur[s.id] ?? [];
+                      const next = now.includes(d) ? now.filter((x) => x !== d) : [...now, d];
+                      return { ...cur, [s.id]: next };
+                    });
+
                   return (
-                    <label key={s.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        className="size-4"
-                        checked={selected.includes(s.id)}
-                        onChange={(e) =>
-                          setSelected((cur) => (e.target.checked ? [...cur, s.id] : cur.filter((x) => x !== s.id)))
-                        }
-                      />
-                      {s.name} <span className="text-xs text-muted">({n}개)</span>
-                    </label>
+                    <div key={s.id}>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="size-4"
+                          checked={on}
+                          onChange={(e) =>
+                            setSelected((cur) => (e.target.checked ? [...cur, s.id] : cur.filter((x) => x !== s.id)))
+                          }
+                        />
+                        {s.name} <span className="text-xs text-muted">({mine.length}개)</span>
+                      </label>
+
+                      {on && isDigits && (
+                        <div className="mt-1.5 ml-6">
+                          <div className="flex flex-wrap gap-1">
+                            {'0123456789'.split('').map((d) => {
+                              const count = mine.filter((i) => i.key[0] === d).length;
+                              const active = picked.length === 0 || picked.includes(d);
+                              const from = d + '0'.repeat(width - 1);
+                              const to = d + '9'.repeat(width - 1);
+                              return (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  disabled={count === 0}
+                                  onClick={() => toggleDecade(d)}
+                                  className={`tnum rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-30 ${
+                                    active && count > 0
+                                      ? 'border-accent/60 bg-accent/15 text-accent'
+                                      : 'border-line bg-panel2 text-muted'
+                                  }`}
+                                >
+                                  {from}–{to}
+                                  <span className="ml-1 opacity-60">{count}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-1 flex items-center gap-2 text-[11px] text-muted">
+                            <button type="button" className="hover:text-accent"
+                              onClick={() => setDecades((c) => ({ ...c, [s.id]: [] }))}>
+                              전체
+                            </button>
+                            <span>·</span>
+                            <span>
+                              {picked.length === 0
+                                ? '열 묶음 모두 출제합니다'
+                                : `${picked.length}묶음만 출제합니다`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
