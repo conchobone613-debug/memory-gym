@@ -143,6 +143,8 @@ export interface AppSettings {
   rankDigits: RankDigits;
   typedCheckRate: number;
   drillCount: number;
+  /** 초급 단계에서 낼 방향. 기본은 외울 때 쓰는 숫자 → 자음. */
+  mappingDirection: 'toConsonant' | 'toDigit' | 'mix';
   seededAt?: number;
 }
 
@@ -236,10 +238,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   rankDigits: DEFAULT_RANK_DIGITS,
   typedCheckRate: 0.1,
   drillCount: 30,
+  mappingDirection: 'toConsonant',
 };
 
 export async function getSettings(): Promise<AppSettings> {
-  return (await db.settings.get('app')) ?? DEFAULT_SETTINGS;
+  /* 기본값을 덮어 씌우는 식으로 합친다. 나중에 항목이 늘어도 옛 기록에 구멍이 나지 않는다. */
+  const stored = await db.settings.get('app');
+  return { ...DEFAULT_SETTINGS, ...stored, key: 'app' };
 }
 
 export async function saveSettings(patch: Partial<AppSettings>): Promise<void> {

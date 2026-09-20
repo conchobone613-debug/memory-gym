@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, getSettings, type MappingAttempt } from '../db/db';
+import { db, getSettings, saveSettings, type MappingAttempt } from '../db/db';
 import { buildMappingQueue, mappingStatsFor, mastery, recordMapping } from '../db/mapping';
-import { CHOICE_KEYS, makeQuestion, type Question, type Stage } from '../lib/mapping';
+import { makeQuestion, type Direction, type Question, type Stage } from '../lib/mapping';
+import { jamoFromKey, keyLabelFor } from '../lib/keyjamo';
 import { uid } from '../lib/random';
 import { median } from '../lib/srs';
 import { isTyping } from '../App';
@@ -29,6 +30,7 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
   const skill = useLiveQuery(() => mastery(stage), [stage]);
 
   const [count, setCount] = useState(stage === 1 ? 20 : 30);
+  const [dir, setDir] = useState<Direction | 'mix'>('toConsonant');
   const [phase, setPhase] = useState<Phase>('setup');
   const [queue, setQueue] = useState<Question[]>([]);
   const [idx, setIdx] = useState(0);
@@ -46,12 +48,21 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
     setCount(stage === 1 ? 20 : 30);
   }, [stage]);
 
+  useEffect(() => {
+    if (settings) setDir(settings.mappingDirection);
+  }, [settings?.mappingDirection]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const chooseDir = async (next: Direction | 'mix') => {
+    setDir(next);
+    await saveSettings({ mappingDirection: next });
+  };
+
   const q = queue[idx];
 
   const start = async () => {
     if (!settings) return;
     const units = await buildMappingQueue(stage, count);
-    const qs = units.map((u) => makeQuestion(stage, u, settings.chosungMap));
+    const qs = units.map((u) => makeQuestion(stage, u, settings.chosungMap, dir === 'mix' ? undefined : dir));
     const id = uid();
     await db.mappingSessions.add({ id, stage, startedAt: Date.now(), itemCount: qs.length });
     setSessionId(id);
@@ -74,7 +85,9 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
       const cur = queue[idx];
       if (!cur) return;
       const rtMs = Math.round(performance.now() - t0.current);
-      const isCorrect = given === cur.answer;
+      const isCorrect = cur.groups
+        ? cur.groups.every((g, i) => g.includes(given[i] ?? ''))
+        : given === cur.answer;
       const attempt: MappingAttempt = {
         id: uid(), sessionId, order: idx, stage, unit: cur.unit, direction: cur.direction,
         prompt: cur.prompt, answer: cur.answer, given, isCorrect, rtMs, shownAt: Date.now(),
@@ -118,20 +131,15 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
       }
       if (!q) return;
 
-      if (q.choices) {
-        const i = CHOICE_KEYS.indexOf(e.key.toLowerCase() as (typeof CHOICE_KEYS)[number]);
-        if (i >= 0 && i < q.choices.length) { e.preventDefault(); answer(q.choices[i]); }
-        return;
-      }
-      if (/^[0-9]$/.test(e.key)) {
-        e.preventDefault();
-        const next = (typed + e.key).slice(-q.answer.length);
-        if (next.length === q.answer.length) answer(next);
-        else setTyped(next);
-      } else if (e.key === 'Backspace') {
-        e.preventDefault();
-        setTyped((t) => t.slice(0, -1));
-      }
+      if (e.key === 'Backspace') { e.preventDefault(); setTyped((t) => t.slice(0, -1)); return; }
+
+      const want = q.groups ? q.groups.length : q.answer.length;
+      const ch = q.groups ? jamoFromKey(e) : (/^[0-9]$/.test(e.key) ? e.key : null);
+      if (!ch) return;
+      e.preventDefault();
+      const next = (typed + ch).slice(-want);
+      if (next.length === want) answer(next);
+      else setTyped(next);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -145,7 +153,7 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
       <Panel title={STAGE_TITLE[stage]}>
         <p className="mb-3 text-sm text-muted">
           {stage === 1
-            ? '숫자를 보면 자음이, 자음을 보면 숫자가 바로 나올 때까지 합니다. 이미지는 아직 쓰지 않습니다.'
+            ? '숫자를 보면 자음이 바로 나올 때까지 합니다. 이미지는 아직 쓰지 않습니다.'
             : '두 자리를 자음 두 개로 한 번에 읽는 연습입니다. 이미지는 그다음입니다.'}
         </p>
 
@@ -156,6 +164,28 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
           <Stat label="푼 문제" value={skill?.attempts ?? 0} />
         </div>
 
+        <div className="mb-4">
+          <div className="mb-1 text-xs text-muted">방향</div>
+          <div className="grid gap-1.5 sm:grid-cols-3">
+            {([
+              { v: 'toConsonant' as const, t: '숫자 → 자음', d: '외울 때 쓰는 방향 · 먼저 이것부터' },
+              { v: 'toDigit' as const, t: '자음 → 숫자', d: '회상에서 막혔을 때 되짚는 길' },
+              { v: 'mix' as const, t: '섞기', d: '양쪽이 다 붙은 뒤' },
+            ]).map((o) => (
+              <button
+                key={o.v}
+                onClick={() => chooseDir(o.v)}
+                className={`rounded-lg border px-3 py-2 text-left transition ${
+                  dir === o.v ? 'border-accent bg-accent/15' : 'border-line bg-panel2 hover:border-accent/50'
+                }`}
+              >
+                <div className="text-sm font-medium">{o.t}</div>
+                <div className="text-[11px] text-muted">{o.d}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-end gap-3">
           <Field label="문항 수">
             <input type="number" min={5} max={200} value={count} onChange={(e) => setCount(Number(e.target.value))} />
@@ -164,8 +194,8 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
         </div>
 
         <p className="mt-3 text-xs text-muted">
-          자음을 고를 땐 <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> ·
-          숫자로 답할 땐 숫자 키를 그냥 누르십시오 · <kbd>Esc</kbd> 중단
+          답이 자음이면 자판의 자음 키를, 숫자면 숫자 키를 그냥 누르십시오. 한/영 상태는 상관없습니다.
+          지울 땐 <kbd>Backspace</kbd>, 중단은 <kbd>Esc</kbd> 입니다.
         </p>
 
         {skill?.ready && (
@@ -239,25 +269,10 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
         </span>
         <div className="text-center text-[4.5rem] leading-none font-semibold tracking-wider">{showing.prompt}</div>
 
-        {phase === 'asking' && q.choices && (
-          <div className="grid w-full max-w-md grid-cols-2 gap-2">
-            {q.choices.map((c, i) => (
-              <button
-                key={c}
-                onClick={() => answer(c)}
-                className="flex items-center justify-between rounded-lg border border-line bg-panel2 px-3 py-3 text-lg transition hover:border-accent"
-              >
-                <span>{c}</span>
-                <kbd>{CHOICE_KEYS[i].toUpperCase()}</kbd>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {phase === 'asking' && !q.choices && (
+        {phase === 'asking' && (
           <div className="flex flex-col items-center gap-2">
             <div className="tnum flex gap-2">
-              {Array.from({ length: q.answer.length }).map((_, i) => (
+              {Array.from({ length: q.groups ? q.groups.length : q.answer.length }).map((_, i) => (
                 <span
                   key={i}
                   className={`flex size-14 items-center justify-center rounded-lg border text-2xl ${
@@ -268,7 +283,9 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
                 </span>
               ))}
             </div>
-            <span className="text-xs text-muted">숫자 키를 누르십시오</span>
+            <span className="text-xs text-muted">
+              {q.groups ? '자음 키를 누르십시오' : '숫자 키를 누르십시오'}
+            </span>
           </div>
         )}
 
@@ -276,14 +293,21 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
           <div className="flex flex-col items-center gap-3">
             <div className="text-sm text-bad">답하신 것 — {last.given || '—'}</div>
             <div className="text-4xl font-semibold text-good">{last.q.answer}</div>
+            {last.q.groups && (
+              <div className="text-xs text-muted">
+                {last.q.groups
+                  .map((g) => `${g[0]} → ${keyLabelFor(g[0]) ?? '?'} 키`)
+                  .join(' · ')}
+              </div>
+            )}
             <Btn variant="primary" onClick={continueAfterWrong}>계속 (Enter)</Btn>
           </div>
         )}
       </div>
 
       <p className="text-center text-xs text-muted">
-        {q.choices ? (
-          <>보기는 <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd></>
+        {q.groups ? (
+          <>자판에 적힌 자음을 그대로 누르십시오 (한/영 상관없음) · <kbd>Backspace</kbd> 로 지웁니다</>
         ) : (
           <>숫자 키로 답하고 <kbd>Backspace</kbd> 로 지웁니다</>
         )}
