@@ -27,7 +27,15 @@ export default function SetEditor() {
   const nameRef = useRef<HTMLInputElement>(null);
 
   const current = images[cursor];
+  /*
+   * 한 줄에 '00 오이' 를 담으려면 칸이 90px 은 돼야 한다. 창이 좁으면 10칸을 고집하지 않고
+   * 5칸으로 접는다 — 십의 자리 줄맞춤보다 이름이 읽히는 쪽이 먼저다.
+   */
   const cols = set?.domain === 'cardFace' ? 3 : set?.domain === 'custom' ? 5 : 10;
+  const gridCls =
+    set?.domain === 'cardFace' ? 'grid-cols-3'
+      : set?.domain === 'custom' ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
+        : 'grid-cols-5 xl:grid-cols-10';
 
   useEffect(() => {
     setDraft(current ? { ...current } : null);
@@ -145,7 +153,7 @@ export default function SetEditor() {
         {images.length === 0 ? (
           <Empty>이 세트에는 키가 없습니다. '키 채우기'를 누르시거나 CSV 로 가져오십시오.</Empty>
         ) : (
-          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          <div className={`grid gap-1 ${gridCls}`}>
             {images.map((img, i) => {
               const on = i === cursor;
               return (
@@ -153,7 +161,9 @@ export default function SetEditor() {
                   key={img.id}
                   onClick={() => setCursor(i)}
                   onDoubleClick={() => nameRef.current?.focus()}
-                  className={`flex flex-col items-start rounded-md border px-1.5 py-1 text-left transition ${
+                  title={img.name || undefined}
+                  /* 키와 이름을 한 줄에 둔다. 두 줄로 쌓으면 칸의 절반이 빈 공간이 된다. */
+                  className={`flex w-full items-baseline gap-1.5 rounded-md border px-2 py-2 text-left transition-colors ${
                     on
                       ? 'border-accent bg-accent/15'
                       : img.name
@@ -161,12 +171,8 @@ export default function SetEditor() {
                         : 'border-line/60 bg-transparent'
                   }`}
                 >
-                  <span className="tnum text-[10px] text-muted">{label(img.key)}</span>
-                  <span
-                    className={`line-clamp-2 w-full text-[11px] leading-tight break-all ${
-                      img.name ? '' : 'text-muted/50'
-                    }`}
-                  >
+                  <span className="tnum shrink-0 text-xs text-accent/70">{label(img.key)}</span>
+                  <span className={`min-w-0 flex-1 truncate text-sm ${img.name ? '' : 'text-muted/40'}`}>
                     {img.name || '—'}
                   </span>
                 </button>
