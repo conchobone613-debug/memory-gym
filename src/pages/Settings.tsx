@@ -5,11 +5,24 @@ import { RANKS, SUITS, SUIT_NAME, type Rank, type Suit } from '../lib/cards';
 import { exportBackup, download, importBackup, pickFile } from '../lib/io';
 import { Btn, ConfirmBtn, Field, Panel } from '../components/ui';
 import ChosungKey from '../components/ChosungKey';
+import SyncPanel from '../components/SyncPanel';
+import { useSearchParams } from 'react-router-dom';
+import { isValidSyncCode } from '../sync/config';
 
 export default function Settings() {
   const stored = useLiveQuery(() => getSettings(), []);
   const [s, setS] = useState<AppSettings | null>(null);
   const [msg, setMsg] = useState('');
+  const [params, setParams] = useSearchParams();
+
+  /* 다른 기기에서 보낸 주소로 열면 코드를 자동으로 넣어 준다 */
+  useEffect(() => {
+    const c = params.get('sync');
+    if (!c) return;
+    setParams({}, { replace: true });
+    if (isValidSyncCode(c)) saveSettings({ syncCode: c.toLowerCase(), lastSyncAt: 0 }).then(() => setMsg('동기화 코드를 넣었습니다. 아래에서 지금 맞추기를 누르십시오.'));
+    else setMsg('주소에 담긴 동기화 코드 형식이 올바르지 않습니다.');
+  }, [params, setParams]);
 
   useEffect(() => { if (stored && !s) setS(stored); }, [stored]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -114,6 +127,8 @@ export default function Settings() {
           </Field>
         </div>
       </Panel>
+
+      <SyncPanel />
 
       <Panel title="백업">
         <div className="flex flex-wrap items-center gap-2">

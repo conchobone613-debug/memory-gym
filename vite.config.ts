@@ -32,6 +32,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        /* Firebase 조각은 미리 받지 않는다. 동기화는 어차피 연결이 있어야 하고, 안 쓰시면 460KB 를 아낀다. */
+        globIgnores: ['**/firestore-*.js'],
         navigateFallback: `${BASE}index.html`,
         /* 글꼴은 한 번 받아 두면 오프라인에서도 쓴다. 못 받아도 시스템 글꼴로 읽히기만 하면 된다. */
         runtimeCaching: [

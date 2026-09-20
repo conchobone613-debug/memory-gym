@@ -1,0 +1,150 @@
+import { db, getSettings, saveSettings } from '../db/db';
+import { rebuildAll } from '../db/rebuild';
+
+/**
+ * 기기 사이 동기화.
+ *
+ * 나누는 기준이 하나 있다.
+ *  - **자산**(이미지 세트·궁전·설정)은 고쳐지는 것이라 한 덩어리로 주고받고 `updatedAt` 이
+ *    늦은 쪽을 남긴다. 기록마다 비교하므로 통째로 덮어쓰지 않는다.
+ *  - **기록**(드릴·실전 원시 데이터)은 추가만 되고 id 가 UUID 라 그냥 합치면 된다.
+ *    충돌이 아예 없다. 이것이 이 앱에서 동기화가 쉬운 이유다.
+ *  - **통계**는 보내지 않는다. 두 기기가 각자 센 횟수를 합치면 숫자가 부푼다.
+ *    합친 뒤 각 기기에서 원시 기록으로 다시 계산한다(`rebuildAll`).
+ */
+
+export interface SyncResult {
+  pushed: number;
+  pulled: number;
+  assets: 'local' | 'remote' | 'same';
+  at: number;
+}
+
+/* ── 올릴 것을 모으기 ───────────────────────────── */
+
+const LOG_TABLES = [
+  'drillSessions', 'drillAttempts',
+  'recallSessions', 'recallCells',
+  'mappingSessions', 'mappingAttempts',
+] as const;
+type LogTable = (typeof LOG_TABLES)[number];
+
+async function collectAssets() {
+  const [imageSets, images, palaces, loci, settings] = await Promise.all([
+    db.imageSets.toArray(), db.images.toArray(), db.palaces.toArray(), db.loci.toArray(), getSettings(),
+  ]);
+  /* settings 의 lastBackupAt·lastSyncAt 은 기기마다 다른 값이라 보내지 않는다 */
+  const { lastBackupAt: _b, lastSyncAt: _s, ...shared } = settings;
+  return { imageSets, images, palaces, loci, settings: shared };
+}
+
+type AssetBundle = Awaited<ReturnType<typeof collectAssets>>;
+
+/** 기록마다 updatedAt 이 늦은 쪽을 남긴다. 한쪽이 통째로 덮어쓰지 않는다. */
+export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundle {
+  const pick = <T extends { id: string; updatedAt?: number }>(a: T[], b: T[]): T[] => {
+    const m = new Map<string, T>();
+    for (const row of [...a, ...b]) {
+      const cur = m.get(row.id);
+      if (!cur || (row.updatedAt ?? 0) >= (cur.updatedAt ?? 0)) m.set(row.id, row);
+    }
+    return [...m.values()];
+  };
+  return {
+    imageSets: pick(local.imageSets, remote.imageSets),
+    images: pick(local.images, remote.images),
+    palaces: pick(local.palaces, remote.palaces),
+    /* 장소는 updatedAt 이 없다. 장소가 더 많은 쪽을 통째로 택한다 — 순서가 섞이면 궁전이 망가진다 */
+    loci: remote.loci.length > local.loci.length ? remote.loci : local.loci,
+    settings: local.settings,
+  };
+}
+
+async function applyAssets(b: AssetBundle) {
+  await db.transaction('rw', db.imageSets, db.images, db.palaces, db.loci, async () => {
+    if (b.imageSets.length) await db.imageSets.bulkPut(b.imageSets);
+    if (b.images.length) await db.images.bulkPut(b.images);
+    if (b.palaces.length) await db.palaces.bulkPut(b.palaces);
+    if (b.loci.length) {
+      await db.loci.clear();
+      await db.loci.bulkAdd(b.loci);
+    }
+  });
+}
+
+/* ── 기록 ───────────────────────────────────────── */
+
+async function collectLogsSince(since: number) {
+  const out: Partial<Record<LogTable, unknown[]>> = {};
+  let count = 0;
+  for (const name of LOG_TABLES) {
+    const rows = (await db.table(name).toArray()).filter((r: Record<string, unknown>) => {
+      const t = (r.shownAt ?? r.startedAt ?? 0) as number;
+      return t > since;
+    });
+    if (rows.length) { out[name] = rows; count += rows.length; }
+  }
+  return { rows: out, count };
+}
+
+/** id 가 UUID 라 bulkPut 은 몇 번 해도 같은 결과가 된다. */
+async function applyLogs(rows: Partial<Record<LogTable, unknown[]>>): Promise<number> {
+  let n = 0;
+  for (const name of LOG_TABLES) {
+    const list = rows[name];
+    if (!list?.length) continue;
+    await db.table(name).bulkPut(list as never[]);
+    n += list.length;
+  }
+  return n;
+}
+
+/* ── 원격 창구 (Firestore 구현은 firestore.ts 가 준다) ── */
+
+export interface Remote {
+  getAssets(): Promise<{ bundle: AssetBundle; updatedAt: number } | null>;
+  putAssets(bundle: AssetBundle, updatedAt: number): Promise<void>;
+  listBatches(after: number): Promise<{ id: string; createdAt: number; rows: Partial<Record<LogTable, unknown[]>> }[]>;
+  putBatch(id: string, createdAt: number, rows: Partial<Record<LogTable, unknown[]>>): Promise<void>;
+}
+
+/**
+ * 한 번 밀고 당긴다.
+ * 순서가 중요하다 — 먼저 내려받아 합치고, 그다음 올린다. 그래야 방금 받은 것이 지워지지 않는다.
+ */
+export async function syncOnce(remote: Remote): Promise<SyncResult> {
+  const settings = await getSettings();
+  const since = settings.lastSyncAt ?? 0;
+  const now = Date.now();
+
+  /* 1. 기록 내려받기 */
+  const batches = await remote.listBatches(since);
+  let pulled = 0;
+  for (const b of batches) pulled += await applyLogs(b.rows);
+
+  /* 2. 자산 맞추기 */
+  const localAssets = await collectAssets();
+  const remoteAssets = await remote.getAssets();
+  let assets: SyncResult['assets'] = 'same';
+  if (remoteAssets) {
+    const merged = mergeAssets(localAssets, remoteAssets.bundle);
+    await applyAssets(merged);
+    assets = JSON.stringify(merged.images) === JSON.stringify(localAssets.images) ? 'same' : 'remote';
+    await remote.putAssets(merged, now);
+  } else {
+    await remote.putAssets(localAssets, now);
+    assets = 'local';
+  }
+
+  /* 3. 새로 생긴 기록 올리기 */
+  const mine = await collectLogsSince(since);
+  if (mine.count > 0) {
+    await remote.putBatch(`${now}-${Math.random().toString(36).slice(2, 8)}`, now, mine.rows);
+  }
+
+  /* 4. 통계는 받은 게 아니라 여기서 다시 만든다 */
+  if (pulled > 0) await rebuildAll();
+
+  await saveSettings({ lastSyncAt: now });
+  return { pushed: mine.count, pulled, assets, at: now };
+}

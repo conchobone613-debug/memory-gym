@@ -153,6 +153,10 @@ export interface AppSettings {
   mappingDirection: 'toConsonant' | 'toDigit' | 'mix';
   /** 마지막으로 백업 파일을 받은 때. 데이터는 이 브라우저 안에만 있어 백업이 유일한 보험이다. */
   lastBackupAt?: number;
+  /** 기기 간 동기화 코드. 없으면 동기화 꺼짐. */
+  syncCode?: string;
+  /** 마지막으로 동기화한 때. 기기마다 다른 값이라 동기화 대상에서 뺀다. */
+  lastSyncAt?: number;
   seededAt?: number;
 }
 
