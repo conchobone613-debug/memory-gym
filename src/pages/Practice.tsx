@@ -8,7 +8,6 @@ import { markRecallWrong } from '../db/record';
 import { cardLabel, fullDeck, normalizeCardInput, resolveCard } from '../lib/cards';
 import { randBelow, shuffle, uid } from '../lib/random';
 import { isTyping } from '../App';
-import { useNavLock } from '../lib/navlock';
 import { Btn, Empty, Field, LinkBtn, Panel, Stat, fmtPct } from '../components/ui';
 
 type Phase = 'setup' | 'memorize' | 'recall' | 'grade' | 'done';
@@ -47,6 +46,9 @@ export default function Practice() {
 
   const [params, setParams] = useSearchParams();
   const [presetId, setPresetId] = useState('d80');
+  /** 'easy' 연습(시간 안 잼) · 'real' 실전(대회 규격) */
+  const [runMode, setRunMode] = useState<'easy' | 'real'>('real');
+  const [eventId, setEventId] = useState<string | undefined>();
   const [custom, setCustom] = useState(false);
   const [mode, setMode] = useState<PracticeMode>('digits');
   const [length, setLength] = useState(80);
@@ -55,6 +57,13 @@ export default function Practice() {
   const [recallSec, setRecallSec] = useState(900);
   const [unlimitedRecall, setUnlimitedRecall] = useState(false);
   const [palaceId, setPalaceId] = useState('');
+
+  const loci = useLiveQuery(
+    async () =>
+      palaceId ? (await db.loci.where('palaceId').equals(palaceId).toArray()).sort((a, b) => a.order - b.order) : [],
+    [palaceId],
+    [],
+  );
 
   const [phase, setPhase] = useState<Phase>('setup');
   const [stimulus, setStimulus] = useState<string[]>([]);
@@ -68,8 +77,6 @@ export default function Practice() {
   const [recallUsedMs, setRecallUsedMs] = useState(0);
   const [sessionId, setSessionId] = useState('');
 
-  useNavLock(phase !== 'setup' && phase !== 'done');
-
   const cellRefs = useRef<(HTMLInputElement | null)[]>([]);
   /** 회상 칸은 비제어 입력이다. 제어 입력이면 React 리렌더를 기다리는 사이 빠른 타이핑이 유실된다. */
   const answersRef = useRef<string[]>([]);
@@ -79,10 +86,17 @@ export default function Practice() {
   /* 종목 화면에서 ?preset=... 으로 넘어오면 그 프리셋으로 맞춰 둔다 */
   useEffect(() => {
     const want = params.get('preset');
-    if (!want) return;
-    if (PRESETS.some((p) => p.id === want)) { setCustom(false); setPresetId(want); }
+    const run = params.get('run');
+    const ev = params.get('event');
+    if (!want && !run && !ev) return;
+    if (want && PRESETS.some((p) => p.id === want)) { setCustom(false); setPresetId(want); }
+    if (run === 'easy' || run === 'real') setRunMode(run);
+    if (ev) setEventId(ev);
     setParams({}, { replace: true });
   }, [params, setParams]);
+
+  /* 연습은 시간을 재지 않고, 분량도 짧게 시작한다. 느린 실전이 아니라 보조를 켜는 자리다. */
+  const easy = runMode === 'easy';
 
   useEffect(() => {
     if (custom) return;
@@ -107,7 +121,8 @@ export default function Practice() {
 
   const start = () => {
     const effChunk = mode === 'digits' ? chunk : 1;
-    const n = mode === 'digits' ? Math.ceil(length / effChunk) * effChunk : Math.min(length, 52);
+    const wanted = easy ? Math.max(effChunk * 5, Math.round(length / 4)) : length;
+    const n = mode === 'digits' ? Math.ceil(wanted / effChunk) * effChunk : Math.min(wanted, 52);
     const seq = mode === 'digits'
       ? Array.from({ length: n }, () => String(randBelow(10)))
       : shuffle(fullDeck()).slice(0, n);
@@ -119,7 +134,7 @@ export default function Practice() {
     setTags({});
     setCursor(0);
     setStartedAt(Date.now());
-    setDeadline(Date.now() + memorizeSec * 1000);
+    setDeadline(easy ? Number.MAX_SAFE_INTEGER : Date.now() + memorizeSec * 1000);
     setPhase('memorize');
   };
 
@@ -128,7 +143,7 @@ export default function Practice() {
   const toRecall = useCallback(() => {
     setMemorizeUsedMs(Date.now() - startedAt);
     recallStart.current = Date.now();
-    setDeadline(Date.now() + recallSec * 1000);
+    setDeadline(easy ? Number.MAX_SAFE_INTEGER : Date.now() + recallSec * 1000);
     setPhase('recall');
     requestAnimationFrame(() => cellRefs.current[0]?.focus());
   }, [recallSec, startedAt]);
@@ -142,9 +157,10 @@ export default function Practice() {
 
   /* 시간 만료 자동 전환 */
   useEffect(() => {
+    if (easy) return; // 연습은 회장님이 끝낼 때까지 기다린다
     if (phase === 'memorize' && nowMs >= deadline) toRecall();
     if (phase === 'recall' && !unlimitedRecall && nowMs >= deadline) toGrade();
-  }, [nowMs, deadline, phase, toRecall, toGrade, unlimitedRecall]);
+  }, [nowMs, deadline, phase, toRecall, toGrade, unlimitedRecall, easy]);
 
   const graded = useMemo(
     () =>
@@ -173,6 +189,20 @@ export default function Practice() {
 
   const wrongCells = useMemo(() => graded.filter((g) => !g.isCorrect), [graded]);
 
+  /** 채점 화면에서 '이 칸은 무슨 이미지였나' 를 보여 준다. 연습에서만 켠다. */
+  const imageNameFor = (expectedKey: string): string | undefined => {
+    if (!easy || !settings) return undefined;
+    const bySetKey = new Map(images.map((i) => [`${i.setId}:${i.key}`, i]));
+    const setByDomain = new Map(sets.map((x) => [x.domain, x]));
+    if (mode === 'digits') {
+      const set = setByDomain.get(chunk === 3 ? 'digit3' : 'digit2');
+      return set ? bySetKey.get(`${set.id}:${expectedKey}`)?.name || undefined : undefined;
+    }
+    const r = resolveCard(expectedKey, settings.suitDigits, settings.rankDigits);
+    const set = r && setByDomain.get(r.domain);
+    return r && set ? bySetKey.get(`${set.id}:${r.key}`)?.name || undefined : undefined;
+  };
+
   const save = async () => {
     const id = uid();
     const cells: RecallCell[] = graded.map((g) => ({
@@ -183,7 +213,7 @@ export default function Practice() {
     await db.transaction('rw', db.recallSessions, db.recallCells, async () => {
       await db.recallSessions.add({
         id, mode, presetName: custom ? `커스텀 ${mode === 'digits' ? `${stimulus.length}자리` : `${stimulus.length}장`}` : preset.label,
-        stimulus, palaceId: palaceId || undefined,
+        stimulus, palaceId: palaceId || undefined, eventId, runMode,
         memorizeMs: memorizeSec * 1000, memorizeUsedMs,
         recallMs: recallSec * 1000, recallUsedMs, startedAt, endedAt: Date.now(),
         correct: score.correct, wrong: score.wrong, blank: score.blank,
@@ -269,7 +299,12 @@ export default function Practice() {
   /* ───────── 설정 ───────── */
   if (phase === 'setup') {
     return (
-      <Panel title="실전 모드">
+      <Panel title={easy ? '연습' : '실전'}>
+        <p className="mb-3 text-sm text-muted">
+          {easy
+            ? '시간을 재지 않습니다. 분량도 짧게 냅니다. 채점할 때 이미지 이름과 궁전 장소를 같이 보여 줍니다.'
+            : '대회 규격으로 시간을 잽니다. 암기 시간이 끝나면 자동으로 회상으로 넘어갑니다.'}
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-3">
             <Field label="프리셋">
@@ -331,10 +366,16 @@ export default function Practice() {
             </Field>
             <div className="rounded-lg border border-line bg-panel2 p-3 text-xs text-muted">
               <div className="mb-1 font-medium text-fg">이번 설정</div>
-              {mode === 'digits'
-                ? `숫자 ${Math.ceil(length / chunk) * chunk}자리 · ${chunk}자리씩 ${Math.ceil(length / chunk)}칸`
-                : `카드 ${Math.min(length, 52)}장`}
-              <br />암기 {mmss(memorizeSec * 1000)} · 회상 {unlimitedRecall ? '무제한' : mmss(recallSec * 1000)}
+              {(() => {
+                const shown = easy ? Math.max(chunk * 5, Math.round(length / 4)) : length;
+                return mode === 'digits'
+                  ? `숫자 ${Math.ceil(shown / chunk) * chunk}자리 · ${chunk}자리씩 ${Math.ceil(shown / chunk)}칸`
+                  : `카드 ${Math.min(shown, 52)}장`;
+              })()}
+              <br />
+              {easy
+                ? '암기 무제한 · 회상 무제한'
+                : `암기 ${mmss(memorizeSec * 1000)} · 회상 ${unlimitedRecall ? '무제한' : mmss(recallSec * 1000)}`}
             </div>
             <Btn variant="primary" size="lg" onClick={start}>시작</Btn>
             <p className="text-xs text-muted">
@@ -352,7 +393,9 @@ export default function Practice() {
     return (
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className={`tnum text-3xl font-semibold ${left < 30000 ? 'text-warn' : ''}`}>{mmss(left)}</span>
+          <span className={`tnum text-3xl font-semibold ${!easy && left < 30000 ? 'text-warn' : ''}`}>
+            {easy ? mmss(nowMs - startedAt) : mmss(left)}
+          </span>
           <div className="flex gap-2">
             <Btn variant="primary" onClick={toRecall}>외웠습니다 (Enter)</Btn>
             <Btn onClick={() => setPhase('setup')}>취소 (Esc)</Btn>
@@ -382,8 +425,8 @@ export default function Practice() {
     return (
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className={`tnum text-3xl font-semibold ${!unlimitedRecall && left < 60000 ? 'text-warn' : ''}`}>
-            {unlimitedRecall ? '무제한' : mmss(left)}
+          <span className={`tnum text-3xl font-semibold ${!easy && !unlimitedRecall && left < 60000 ? 'text-warn' : ''}`}>
+            {easy || unlimitedRecall ? mmss(nowMs - recallStart.current) : mmss(left)}
           </span>
           <Btn variant="primary" onClick={toGrade}>제출 (Ctrl+Enter)</Btn>
         </div>
@@ -392,6 +435,11 @@ export default function Practice() {
             {answers.map((_, i) => (
               <div key={i} className="flex flex-col items-center">
                 <span className="tnum text-[10px] text-muted">{i + 1}</span>
+                {loci[i] && (
+                  <span className="w-full truncate text-center text-[10px] text-accent/80" title={loci[i].name}>
+                    {loci[i].name}
+                  </span>
+                )}
                 <input
                   ref={(el) => { cellRefs.current[i] = el; }}
                   defaultValue={answersRef.current[i]}
@@ -427,7 +475,17 @@ export default function Practice() {
                   g.isCorrect ? 'border-good/40 bg-good/10' : g.blank ? 'border-line bg-panel2' : 'border-bad/50 bg-bad/10'
                 }`}
               >
+                {loci[g.index] && (
+                  <div className="truncate text-[10px] text-accent/80" title={loci[g.index].name}>
+                    {loci[g.index].name}
+                  </div>
+                )}
                 <div className="tnum text-sm">{mode === 'cards' ? cardLabel(g.expected) : g.expected}</div>
+                {imageNameFor(g.expected) && (
+                  <div className="truncate text-[10px] text-muted" title={imageNameFor(g.expected)}>
+                    {imageNameFor(g.expected)}
+                  </div>
+                )}
                 {!g.isCorrect && (
                   <div className="tnum text-[11px] text-bad">
                     {g.blank ? '—' : mode === 'cards' ? cardLabel(g.answered) : g.answered}

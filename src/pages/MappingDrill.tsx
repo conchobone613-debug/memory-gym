@@ -8,7 +8,6 @@ import { jamoFromKey, keyLabelFor } from '../lib/keyjamo';
 import { uid } from '../lib/random';
 import { median } from '../lib/srs';
 import { isTyping } from '../App';
-import { useNavLock } from '../lib/navlock';
 import { Btn, Field, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
 import ChosungKey from '../components/ChosungKey';
 import GoalPanel from '../components/GoalPanel';
@@ -51,8 +50,6 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
   const sessionStart = useRef(0);
   const [elapsed, setElapsed] = useState(0);
   const [totalMs, setTotalMs] = useState(0);
-
-  useNavLock(phase === 'asking' || phase === 'feedback');
 
   useEffect(() => {
     setPhase('setup');

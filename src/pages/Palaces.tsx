@@ -3,7 +3,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Locus, type Palace } from '../db/db';
 import { uid } from '../lib/random';
 import { isTyping } from '../App';
-import { useNavLock } from '../lib/navlock';
 import { Btn, ConfirmBtn, Empty, Panel } from '../components/ui';
 
 export default function Palaces() {
@@ -15,8 +14,6 @@ export default function Palaces() {
   const [walkIdx, setWalkIdx] = useState(0);
   const [hidden, setHidden] = useState(false);
   const addRef = useRef<HTMLInputElement>(null);
-
-  useNavLock(walk);
 
   const loci = useLiveQuery(
     async () =>

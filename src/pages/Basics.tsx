@@ -14,7 +14,6 @@ import { type Stage } from '../lib/mapping';
 import { goalFor } from '../db/goals';
 import GoalPanel from '../components/GoalPanel';
 import { isTyping } from '../App';
-import { useNavLock } from '../lib/navlock';
 import { Btn, Empty, Field, LinkBtn, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
 
 type Phase = 'setup' | 'showing' | 'typing' | 'reveal' | 'done';
@@ -70,8 +69,6 @@ export default function Drill() {
   const [typedInput, setTypedInput] = useState('');
   const [typedMatch, setTypedMatch] = useState<MatchKind | undefined>();
   const [sessionId, setSessionId] = useState('');
-
-  useNavLock(phase !== 'setup' && phase !== 'done');
 
   const sessionStart = useRef(0);
   const [elapsed, setElapsed] = useState(0);
@@ -324,7 +321,7 @@ export default function Drill() {
           </div>
           {namedCount === 0 && (
             <p className="mt-3 text-sm text-warn">
-              이름이 채워진 이미지가 없습니다. <Link to="/sets" className="text-accent underline">이미지 세트</Link>에서 먼저 채워 주십시오.
+              이름이 채워진 이미지가 없습니다. <Link to="/assets/sets" className="text-accent underline">이미지 세트</Link>에서 먼저 채워 주십시오.
             </p>
           )}
         </Panel>

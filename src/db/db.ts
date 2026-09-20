@@ -73,6 +73,10 @@ export interface RecallSession {
   id: string;
   mode: PracticeMode;
   presetName: string;
+  /** 어느 대회 종목으로 한 것인지 (data/events.ts 의 id) */
+  eventId?: string;
+  /** 'easy' 연습 · 'real' 실전 */
+  runMode?: 'easy' | 'real';
   /** 실제 출제 수열. 그대로 저장해 재현·복기가 가능하다. */
   stimulus: string[];
   palaceId?: string;

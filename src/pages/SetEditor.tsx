@@ -115,7 +115,7 @@ export default function SetEditor() {
     return (
       <Empty>
         세트를 찾을 수 없습니다.{' '}
-        <Link to="/sets" className="text-accent">
+        <Link to="/assets/sets" className="text-accent">
           목록으로
         </Link>
       </Empty>
@@ -138,7 +138,7 @@ export default function SetEditor() {
                 키 채우기
               </Btn>
             )}
-            <LinkBtn to="/sets" size="sm">목록</LinkBtn>
+            <LinkBtn to="/assets/sets" size="sm">목록</LinkBtn>
           </div>
         }
       >

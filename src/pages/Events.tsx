@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom';
 import { MEMORY_EVENTS } from '../data/events';
-import { LinkBtn, Panel } from '../components/ui';
+import { Panel } from '../components/ui';
 
 export default function Events() {
   const ready = MEMORY_EVENTS.filter((e) => e.status === 'ready');
@@ -11,46 +12,37 @@ export default function Events() {
         right={<span className="tnum text-xs text-muted">열림 {ready.length} / {MEMORY_EVENTS.length}</span>}
       >
         <p className="mb-3 text-xs text-muted">
-          세계기억력선수권(WMSC)과 국제기억력협회(IAM)가 쓰는 종목입니다. 시간은 연맹과 해에 따라 다르니
-          실제 대회에 나가실 땐 그 대회 요강을 보셔야 합니다. 여기 값은 훈련 목표를 잡는 기준입니다.
+          종목을 고르시면 안에 <b className="text-fg">연습</b>과 <b className="text-fg">실전</b>이 있습니다.
+          잠긴 종목도 들어가 보실 수 있고, 무엇이 있어야 열리는지 적어 두었습니다.
+          시간은 WMSC·IAM 기준이며 연맹과 해에 따라 다릅니다.
         </p>
 
-        <ul className="flex flex-col gap-2">
+        <ul className="grid gap-2 md:grid-cols-2">
           {MEMORY_EVENTS.map((e) => {
             const open = e.status === 'ready';
             return (
-              <li
-                key={e.id}
-                className={`rounded-lg border px-3 py-2.5 ${
-                  open ? 'border-line bg-panel2' : 'border-line/50 bg-transparent'
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`font-medium ${open ? '' : 'text-muted'}`}>{e.name}</span>
-                  <span className="tnum text-xs text-muted">
+              <li key={e.id}>
+                <Link
+                  to={`/events/${e.id}`}
+                  className={`flex h-full flex-col rounded-lg border px-3 py-2.5 transition hover:border-accent/60 ${
+                    open ? 'border-line bg-panel2' : 'border-line/50 bg-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`font-medium ${open ? '' : 'text-muted'}`}>{e.name}</span>
+                    <span
+                      className={`ml-auto rounded-md border px-2 py-0.5 text-[11px] ${
+                        open ? 'border-good/50 bg-good/10 text-good' : 'border-line text-muted'
+                      }`}
+                    >
+                      {open ? '열림' : '잠김'}
+                    </span>
+                  </div>
+                  <div className="tnum mt-0.5 text-xs text-muted">
                     암기 {e.memorize} · 회상 {e.recall}
-                  </span>
-                  <span
-                    className={`ml-auto rounded-md border px-2 py-0.5 text-[11px] ${
-                      open ? 'border-good/50 bg-good/10 text-good' : 'border-line text-muted'
-                    }`}
-                  >
-                    {open ? '열림' : '잠김'}
-                  </span>
-                  {open && e.to && (
-                    <LinkBtn to={e.to} size="sm" variant="primary">
-                      하러 가기
-                    </LinkBtn>
-                  )}
-                </div>
-
-                <p className={`mt-1 text-sm ${open ? 'text-muted' : 'text-muted/70'}`}>{e.what}</p>
-
-                {!open && e.needs && (
-                  <p className="mt-1.5 rounded-md border border-line/60 px-2 py-1 text-xs text-muted">
-                    <b className="text-fg">열려면</b> — {e.needs}
-                  </p>
-                )}
+                  </div>
+                  <p className={`mt-1 text-sm ${open ? 'text-muted' : 'text-muted/70'}`}>{e.what}</p>
+                </Link>
               </li>
             );
           })}

@@ -93,14 +93,14 @@ export default function Sets() {
                       className="w-full font-medium"
                       aria-label="세트 이름"
                     />
-                    <Link to={`/sets/${s.id}`} className="text-xs text-muted hover:text-accent">
+                    <Link to={`/assets/sets/${s.id}`} className="text-xs text-muted hover:text-accent">
                       {s.domain} · 채워진 이미지 {st.filled} / {st.total}
                     </Link>
                   </div>
                   <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
                     <div className="h-full bg-accent" style={{ width: `${ratio * 100}%` }} />
                   </div>
-                  <LinkBtn to={`/sets/${s.id}`} size="sm" variant="primary">편집</LinkBtn>
+                  <LinkBtn to={`/assets/sets/${s.id}`} size="sm" variant="primary">편집</LinkBtn>
                   {!s.builtin && (
                     <ConfirmBtn
                       size="sm"

@@ -34,7 +34,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     recall: '15분',
     what: '무작위 숫자를 최대한 많이. 두 번 시도해 좋은 쪽을 쓴다.',
     status: 'ready',
-    to: '/practice?preset=d80',
+    to: '/practice?preset=d80&event=speed-numbers',
   },
   {
     id: 'hour-numbers',
@@ -43,7 +43,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     recall: '120분',
     what: '같은 숫자 종목의 지구력 판. 궁전이 길게 필요하다.',
     status: 'ready',
-    to: '/practice?preset=h-num',
+    to: '/practice?preset=h-num&event=hour-numbers',
   },
   {
     id: 'speed-cards',
@@ -52,7 +52,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     recall: '5분',
     what: '섞은 카드 한 벌 52장의 순서. 기억력 스포츠의 간판 종목이다.',
     status: 'ready',
-    to: '/practice?preset=c52',
+    to: '/practice?preset=c52&event=speed-cards',
   },
   {
     id: 'spoken-numbers',

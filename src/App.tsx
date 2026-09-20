@@ -1,25 +1,29 @@
-import { useEffect } from 'react';
-import { HashRouter, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
+import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
 import Home from './pages/Home';
+import Assets from './pages/Assets';
 import Sets from './pages/Sets';
 import SetEditor from './pages/SetEditor';
-import Drill from './pages/Drill';
-import Practice from './pages/Practice';
-import Events from './pages/Events';
 import Palaces from './pages/Palaces';
+import Basics from './pages/Basics';
+import Events from './pages/Events';
+import EventDetail from './pages/EventDetail';
+import Practice from './pages/Practice';
 import Stats from './pages/Stats';
 import Settings from './pages/Settings';
-import { navLocked } from './lib/navlock';
 
+/**
+ * 층을 셋으로 나눈다.
+ *   자산 — 내가 만들어 두는 것 (이미지 세트 · 궁전)
+ *   기초 — 자산을 몸에 붙이는 것 (자음 → 두 자리 → 이미지). 종목과 무관한 공통 기반이다.
+ *   종목 — 대회 표준 10종목. 각 종목 안에 연습과 실전이 있다.
+ */
 const NAV = [
-  { to: '/', label: '홈', key: '1' },
-  { to: '/sets', label: '이미지 세트', key: '2' },
-  { to: '/drill', label: '변환 드릴', key: '3' },
-  { to: '/practice', label: '실전', key: '4' },
-  { to: '/events', label: '종목', key: '5' },
-  { to: '/palaces', label: '궁전', key: '6' },
-  { to: '/stats', label: '대시보드', key: '7' },
-  { to: '/settings', label: '설정', key: '8' },
+  { to: '/', label: '홈', end: true },
+  { to: '/assets', label: '자산' },
+  { to: '/basics', label: '기초' },
+  { to: '/events', label: '종목' },
+  { to: '/stats', label: '대시보드' },
+  { to: '/settings', label: '설정' },
 ];
 
 export function isTyping(el: EventTarget | null): boolean {
@@ -29,18 +33,6 @@ export function isTyping(el: EventTarget | null): boolean {
 }
 
 function Shell() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey || navLocked()) return;
-      const hit = NAV.find((n) => n.key === e.key);
-      if (hit) { e.preventDefault(); navigate(hit.to); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [navigate]);
-
   return (
     <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-4 px-4 py-5">
       <nav className="flex flex-wrap items-center gap-1.5">
@@ -48,7 +40,7 @@ function Shell() {
           <NavLink
             key={n.to}
             to={n.to}
-            end={n.to === '/'}
+            end={n.end}
             className={({ isActive }) =>
               `rounded-lg border px-3 py-1.5 text-sm transition ${
                 isActive ? 'border-accent bg-accent/15 text-accent' : 'border-line bg-panel hover:border-accent/50'
@@ -56,19 +48,24 @@ function Shell() {
             }
           >
             {n.label}
-            <span className="ml-1.5 text-[10px] text-muted">{n.key}</span>
           </NavLink>
         ))}
       </nav>
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/sets" element={<Sets />} />
-          <Route path="/sets/:setId" element={<SetEditor />} />
-          <Route path="/drill" element={<Drill />} />
-          <Route path="/practice" element={<Practice />} />
+
+          <Route path="/assets" element={<Assets />} />
+          <Route path="/assets/sets" element={<Sets />} />
+          <Route path="/assets/sets/:setId" element={<SetEditor />} />
+          <Route path="/assets/palaces" element={<Palaces />} />
+
+          <Route path="/basics" element={<Basics />} />
+
           <Route path="/events" element={<Events />} />
-          <Route path="/palaces" element={<Palaces />} />
+          <Route path="/events/:eventId" element={<EventDetail />} />
+          <Route path="/practice" element={<Practice />} />
+
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

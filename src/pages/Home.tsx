@@ -5,9 +5,9 @@ import { dailyRows, localDayKey } from '../db/analytics';
 import { Panel, Stat, fmtMs, fmtPct } from '../components/ui';
 
 const CARDS = [
-  { to: '/drill', key: '3', title: '변환 드릴', desc: '1단계 자음 → 2단계 자음 두 개 → 3단계 이미지.' },
-  { to: '/practice', key: '4', title: '실전', desc: '숫자 80자리 · 카드 52장. 암기 → 회상 → 채점.' },
-  { to: '/events', key: '5', title: '대회 종목', desc: '표준 10종목. 지금 되는 것과 아직 잠긴 것.' },
+  { to: '/assets', title: '자산', desc: '이미지 세트와 궁전. 훈련 전에 만들어 두는 것.' },
+  { to: '/basics', title: '기초', desc: '자음 → 두 자리 → 이미지. 모든 종목의 공통 기반.' },
+  { to: '/events', title: '종목', desc: '대회 표준 10종목. 각 종목 안에 연습과 실전.' },
 ];
 
 export default function Home() {
@@ -39,10 +39,7 @@ export default function Home() {
             to={c.to}
             className="rounded-xl border border-line bg-panel p-4 transition hover:border-accent/60"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">{c.title}</h3>
-              <kbd>{c.key}</kbd>
-            </div>
+            <h3 className="font-semibold">{c.title}</h3>
             <p className="mt-1 text-sm text-muted">{c.desc}</p>
           </Link>
         ))}
@@ -70,9 +67,8 @@ export default function Home() {
 
         <Panel title="조작">
           <ul className="flex flex-col gap-1.5 text-sm text-muted">
-            <li><kbd>1</kbd>–<kbd>8</kbd> 화면 이동</li>
-            <li>드릴 3단계: <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단</li>
-            <li>드릴 1·2단계: 자음 답은 자판의 자음 키 · 숫자 답은 숫자 키 (한/영 무관)</li>
+            <li>기초 3단계: 자음 답은 자판의 자음 키 · 숫자 답은 숫자 키 (한/영 무관)</li>
+            <li>이미지 드릴: <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단</li>
             <li>세트 편집: 방향키 이동 · <kbd>Enter</kbd> 저장·다음 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 다음 빈칸</li>
             <li>실전: 암기 중 <kbd>Enter</kbd> 조기 종료 · 회상 중 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 제출</li>
             <li>채점: <kbd>1</kbd>–<kbd>4</kbd> 원인 태그 · <kbd>↑</kbd><kbd>↓</kbd> 칸 이동</li>
