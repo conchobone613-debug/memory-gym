@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0f16;
+  --color-panel: #141b26;
+  --color-panel2: #1c2634;
+  --color-line: #2a3646;
+  --color-fg: #e6edf6;
+  --color-muted: #8ea0b8;
+  --color-accent: #7cd4ff;
+  --color-good: #4ade80;
+  --color-bad: #fb7185;
+  --color-warn: #fbbf24;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-fg);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+::selection { background: var(--color-accent); color: #04121c; }
+
+input, textarea, select, button { font: inherit; color: inherit; }
+input, textarea, select {
+  background: var(--color-panel2);
+  border: 1px solid var(--color-line);
+  border-radius: .5rem;
+  padding: .4rem .6rem;
+  outline: none;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--color-accent); }
+
+kbd {
+  background: var(--color-panel2);
+  border: 1px solid var(--color-line);
+  border-bottom-width: 2px;
+  border-radius: .35rem;
+  padding: .05rem .35rem;
+  font-size: .8em;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+}
+.tnum { font-variant-numeric: tabular-nums; }
