@@ -9,6 +9,7 @@ import { median } from '../lib/srs';
 import { isTyping } from '../App';
 import { useNavLock } from '../lib/navlock';
 import { Btn, Field, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
+import ChosungKey from '../components/ChosungKey';
 
 type Phase = 'setup' | 'asking' | 'feedback' | 'done';
 
@@ -156,6 +157,12 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
             ? '숫자를 보면 자음이 바로 나올 때까지 합니다. 이미지는 아직 쓰지 않습니다.'
             : '두 자리를 자음 두 개로 한 번에 읽는 연습입니다. 이미지는 그다음입니다.'}
         </p>
+
+        {settings && (
+          <div className="mb-4">
+            <ChosungKey map={settings.chosungMap} compact={stage === 2} />
+          </div>
+        )}
 
         <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
           <Stat label="익힌 칸" value={`${seen}/${total}`} />

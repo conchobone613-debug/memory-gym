@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, db, getSettings, saveSettings, type AppSettings } fro
 import { RANKS, SUITS, SUIT_NAME, type Rank, type Suit } from '../lib/cards';
 import { exportBackup, download, importBackup, pickFile } from '../lib/io';
 import { Btn, ConfirmBtn, Field, Panel } from '../components/ui';
+import ChosungKey from '../components/ChosungKey';
 
 export default function Settings() {
   const stored = useLiveQuery(() => getSettings(), []);
@@ -43,6 +44,9 @@ export default function Settings() {
   return (
     <div className="flex flex-col gap-4">
       <Panel title="숫자 ↔ 자음 매핑">
+        <div className="mb-4">
+          <ChosungKey map={s.chosungMap} />
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {Object.keys(s.chosungMap).sort().map((d) => (
             <Field key={d} label={`${d}`}>
