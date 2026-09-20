@@ -1,4 +1,4 @@
-import { db, type MemoImage } from './db';
+import { compareKeys, db, type MemoImage } from './db';
 import { median } from '../lib/srs';
 
 export function localDayKey(t: number): string {
@@ -78,11 +78,12 @@ export async function confusionPairs(limit = 10): Promise<ConfusionPair[]> {
 export interface HeatCell { key: string; image?: MemoImage; medianRt: number; attempts: number; errRate: number }
 
 export async function heatmap(setId: string): Promise<HeatCell[]> {
+  const set = await db.imageSets.get(setId);
   const images = await db.images.where('setId').equals(setId).toArray();
   const stats = await db.imageStats.where('setId').equals(setId).toArray();
   const byId = new Map(stats.map((s) => [s.imageId, s]));
   return images
-    .sort((a, b) => a.key.localeCompare(b.key))
+    .sort((a, b) => compareKeys(set?.domain ?? 'custom', a.key, b.key))
     .map((image) => {
       const s = byId.get(image.id);
       return {

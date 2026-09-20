@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, useParams } from 'react-router-dom';
-import { db, ensureKeys, getSettings, type MemoImage } from '../db/db';
+import { compareKeys, db, ensureKeys, getSettings, type MemoImage } from '../db/db';
 import { hintForKey } from '../lib/hangul';
-import { cardLabel } from '../lib/cards';
+import { cardLabel, faceHint } from '../lib/cards';
 import { download, importRows, pickFile, rowsFromCsv, setFileBase, toCsv } from '../lib/io';
 import { isTyping } from '../App';
 import { Btn, Empty, Field, LinkBtn, Panel } from '../components/ui';
@@ -12,7 +12,11 @@ export default function SetEditor() {
   const { setId = '' } = useParams();
   const set = useLiveQuery(() => db.imageSets.get(setId), [setId]);
   const images = useLiveQuery(
-    async () => (await db.images.where('setId').equals(setId).toArray()).sort((a, b) => a.key.localeCompare(b.key)),
+    async () => {
+      const set = await db.imageSets.get(setId);
+      const rows = await db.images.where('setId').equals(setId).toArray();
+      return rows.sort((a, b) => compareKeys(set?.domain ?? 'custom', a.key, b.key));
+    },
     [setId],
     [] as MemoImage[],
   );
@@ -180,7 +184,11 @@ export default function SetEditor() {
           <div className="grid gap-3 md:grid-cols-2">
             <Field
               label="이미지 이름"
-              hint={set.domain !== 'cardFace' ? `초성 힌트 ${hintForKey(draft.key, settings.chosungMap)}` : '인물 카드'}
+              hint={
+                set.domain === 'cardFace'
+                  ? (faceHint(draft.key) ?? '인물 카드 — 초성 규칙 없음')
+                  : `초성 힌트 ${hintForKey(draft.key, settings.chosungMap)}`
+              }
             >
               <input
                 ref={nameRef}

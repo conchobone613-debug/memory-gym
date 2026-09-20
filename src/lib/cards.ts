@@ -89,3 +89,41 @@ export function normalizeCardInput(raw: string): CardCode | null {
   const rank = RANK_INPUT[s.slice(1)];
   return suit && rank ? cardCode(suit, rank) : null;
 }
+
+/**
+ * 인물 카드 12장에는 숫자 코드가 없다.
+ * A~10 이 0~9 열 자리를 모두 쓰므로 J/Q/K 에 줄 숫자가 남지 않는다.
+ * 그래서 이 12장만 코드 밖에 있고, 무엇을 넣든 자유다.
+ *
+ * 대신 떠올릴 실마리가 없으면 12장이 통째로 흔들린다. 아래는 그 실마리로 쓰는 관습이며
+ * 기억술 표준이 아니라 이 앱이 제안하는 기본값이다. 바꾸셔도 된다.
+ * 무늬 = 세계 하나, 랭크 = 그 세계 안의 자리.
+ */
+export const SUIT_WORLD: Record<Suit, string> = {
+  S: '싸우는 사람',
+  H: '불과 사랑',
+  D: '캐고 가진 사람',
+  C: '풀과 나무',
+};
+
+export const FACE_ROLE: Record<string, string> = {
+  J: '일하는 젊은이',
+  Q: '여성',
+  K: '우두머리',
+};
+
+/** 'DQ' -> '♦ 캐고 가진 사람 · Q 여성' */
+export function faceHint(code: CardCode): string | null {
+  const p = parseCard(code);
+  if (!p || !FACE_ROLE[p.rank]) return null;
+  return `${SUIT_SYMBOL[p.suit]} ${SUIT_WORLD[p.suit]} · ${p.rank} ${FACE_ROLE[p.rank]}`;
+}
+
+const FACE_RANKS: Rank[] = ['J', 'Q', 'K'];
+
+/** 인물 카드 정렬 순서. 문자열 정렬은 ♣J ♣K ♣Q 처럼 어긋나므로 쓰지 않는다. */
+export function faceOrder(code: CardCode): number {
+  const p = parseCard(code);
+  if (!p) return 999;
+  return SUITS.indexOf(p.suit) * 3 + FACE_RANKS.indexOf(p.rank);
+}

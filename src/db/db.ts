@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import { DEFAULT_CHOSUNG_MAP, type ChosungMap } from '../lib/hangul';
 import {
-  DEFAULT_RANK_DIGITS, DEFAULT_SUIT_DIGITS, faceKeys,
+  DEFAULT_RANK_DIGITS, DEFAULT_SUIT_DIGITS, faceKeys, faceOrder,
   type RankDigits, type SuitDigits,
 } from '../lib/cards';
 import { uid } from '../lib/random';
@@ -198,6 +198,12 @@ export async function saveSettings(patch: Partial<AppSettings>): Promise<void> {
 }
 
 /* ───────────────── 키 공간 생성 ───────────────── */
+
+/** 세트 종류에 맞는 키 정렬. 카드는 ♠♥♦♣ × J·Q·K 순, 나머지는 키 문자열 순. */
+export function compareKeys(domain: SetDomain, a: string, b: string): number {
+  if (domain === 'cardFace') return faceOrder(a) - faceOrder(b);
+  return a.localeCompare(b);
+}
 
 export function generateKeys(gen: ImageSet['keyGenerator']): string[] {
   switch (gen) {
