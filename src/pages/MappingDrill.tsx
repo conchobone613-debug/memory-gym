@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getSettings, saveSettings, type MappingAttempt } from '../db/db';
-import { buildMappingQueue, mappingStatsFor, mastery, recordMapping } from '../db/mapping';
+import { buildMappingQueue, mappingStatsFor, recordMapping } from '../db/mapping';
+import { goalFor } from '../db/goals';
 import { makeQuestion, type Direction, type Question, type Stage } from '../lib/mapping';
 import { jamoFromKey, keyLabelFor } from '../lib/keyjamo';
 import { uid } from '../lib/random';
@@ -10,8 +11,14 @@ import { isTyping } from '../App';
 import { useNavLock } from '../lib/navlock';
 import { Btn, Field, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
 import ChosungKey from '../components/ChosungKey';
+import GoalPanel from '../components/GoalPanel';
 
 type Phase = 'setup' | 'asking' | 'feedback' | 'done';
+
+const mmss = (ms: number) => {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
 
 interface Result {
   q: Question;
@@ -28,7 +35,7 @@ const STAGE_TITLE: Record<Stage, string> = {
 export default function MappingDrill({ stage }: { stage: Stage }) {
   const settings = useLiveQuery(() => getSettings(), []);
   const stats = useLiveQuery(() => mappingStatsFor(stage), [stage], new Map());
-  const skill = useLiveQuery(() => mastery(stage), [stage]);
+  const goal = useLiveQuery(() => goalFor(stage), [stage]);
 
   const [count, setCount] = useState(stage === 1 ? 20 : 30);
   const [dir, setDir] = useState<Direction | 'mix'>('toConsonant');
@@ -41,6 +48,9 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
   const [sessionId, setSessionId] = useState('');
 
   const t0 = useRef(0);
+  const sessionStart = useRef(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [totalMs, setTotalMs] = useState(0);
 
   useNavLock(phase === 'asking' || phase === 'feedback');
 
@@ -72,11 +82,15 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
     setIdx(0);
     setTyped('');
     setLast(null);
+    sessionStart.current = Date.now();
+    setElapsed(0);
     setPhase('asking');
   };
 
   const finish = useCallback(async (final: Result[]) => {
-    if (sessionId) await db.mappingSessions.update(sessionId, { endedAt: Date.now() });
+    const now = Date.now();
+    if (sessionId) await db.mappingSessions.update(sessionId, { endedAt: now });
+    setTotalMs(now - sessionStart.current);
     setResults(final);
     setPhase('done');
   }, [sessionId]);
@@ -118,6 +132,12 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
   useEffect(() => {
     if (phase === 'asking') t0.current = performance.now();
   }, [phase, idx]);
+
+  useEffect(() => {
+    if (phase !== 'asking' && phase !== 'feedback') return;
+    const t = setInterval(() => setElapsed(Date.now() - sessionStart.current), 250);
+    return () => clearInterval(t);
+  }, [phase]);
 
   /* 단축키 — 보기는 D F J K, 숫자 답은 숫자 키 직접 */
   useEffect(() => {
@@ -166,10 +186,12 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
 
         <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
           <Stat label="익힌 칸" value={`${seen}/${total}`} />
-          <Stat label="정확도" value={skill?.attempts ? fmtPct(skill.accuracy) : '—'} />
-          <Stat label="중앙 반응시간" value={fmtMs(skill?.medianRt ?? 0)} />
-          <Stat label="푼 문제" value={skill?.attempts ?? 0} />
+          <Stat label="정확도" value={goal?.attempts ? fmtPct(goal.accuracy) : '—'} />
+          <Stat label="중앙 반응시간" value={fmtMs(goal?.medianRt ?? 0)} />
+          <Stat label="푼 문제" value={goal?.attempts ?? 0} />
         </div>
+
+        {goal && <div className="mb-4"><GoalPanel goal={goal} /></div>}
 
         <div className="mb-4">
           <div className="mb-1 text-xs text-muted">방향</div>
@@ -205,11 +227,6 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
           지울 땐 <kbd>Backspace</kbd>, 중단은 <kbd>Esc</kbd> 입니다.
         </p>
 
-        {skill?.ready && (
-          <p className="mt-3 rounded-lg border border-good/40 bg-good/10 px-3 py-2 text-sm text-good">
-            정확도 {fmtPct(skill.accuracy)} · {fmtMs(skill.medianRt)} — 다음 단계로 넘어가셔도 됩니다.
-          </p>
-        )}
       </Panel>
     );
   }
@@ -225,12 +242,15 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
           <p className="py-6 text-center text-sm text-muted">기록된 문항이 없습니다.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
               <Stat label="문항" value={results.length} />
               <Stat label="정확도" value={fmtPct(correct.length / results.length)} sub={`${correct.length}/${results.length}`} />
+              <Stat label="총 걸린 시간" value={mmss(totalMs)} sub={`문항당 ${fmtMs(Math.round(totalMs / results.length))}`} />
               <Stat label="중앙 반응시간" value={fmtMs(median(rts))} />
               <Stat label="틀린 칸" value={wrongs.length} />
             </div>
+
+            {goal && <div className="mt-4"><GoalPanel goal={goal} celebrate /></div>}
             {wrongs.length > 0 && (
               <div className="mt-4">
                 <div className="mb-1 text-xs text-muted">틀린 문제</div>
@@ -264,6 +284,7 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between text-xs text-muted">
         <span className="tnum">{idx + 1} / {queue.length}</span>
+        <span className="tnum ml-3">{mmss(elapsed)}</span>
         <div className="mx-4 h-1 flex-1 overflow-hidden rounded-full bg-line">
           <div className="h-full bg-accent transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
         </div>

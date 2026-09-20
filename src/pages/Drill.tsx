@@ -11,12 +11,18 @@ import { cardLabel, fullDeck, resolveCard } from '../lib/cards';
 import { pickOne, randBelow, uid } from '../lib/random';
 import MappingDrill from './MappingDrill';
 import { type Stage } from '../lib/mapping';
-import { mastery } from '../db/mapping';
+import { goalFor } from '../db/goals';
+import GoalPanel from '../components/GoalPanel';
 import { isTyping } from '../App';
 import { useNavLock } from '../lib/navlock';
 import { Btn, Empty, Field, LinkBtn, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
 
 type Phase = 'setup' | 'showing' | 'typing' | 'reveal' | 'done';
+
+const mmss = (ms: number) => {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
 type Style = 'key' | 'card' | 'mix';
 
 interface Trial {
@@ -46,8 +52,9 @@ export default function Drill() {
   const images = useLiveQuery(() => db.images.toArray(), [], [] as MemoImage[]);
   const stats = useLiveQuery(() => db.imageStats.toArray(), [], [] as ImageStat[]);
   const settings = useLiveQuery(() => getSettings(), []);
-  const m1 = useLiveQuery(() => mastery(1), []);
-  const m2 = useLiveQuery(() => mastery(2), []);
+  const m1 = useLiveQuery(() => goalFor(1), []);
+  const m2 = useLiveQuery(() => goalFor(2), []);
+  const m3 = useLiveQuery(() => goalFor(3), []);
 
   const [stage, setStage] = useState<Stage | 3>(3);
   const [selected, setSelected] = useState<string[]>([]);
@@ -65,6 +72,10 @@ export default function Drill() {
   const [sessionId, setSessionId] = useState('');
 
   useNavLock(phase !== 'setup' && phase !== 'done');
+
+  const sessionStart = useRef(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [totalMs, setTotalMs] = useState(0);
 
   const t0 = useRef(0);
   const rtRef = useRef(0);
@@ -128,11 +139,15 @@ export default function Drill() {
     setQueue(trials);
     setResults([]);
     setIdx(0);
+    sessionStart.current = Date.now();
+    setElapsed(0);
     setPhase('showing');
   }, [cardsByImage, count, mode, pool, selected, stats, style, typedRate]);
 
   const finish = useCallback(async (final: Result[]) => {
-    if (sessionId) await db.drillSessions.update(sessionId, { endedAt: Date.now() });
+    const now = Date.now();
+    if (sessionId) await db.drillSessions.update(sessionId, { endedAt: now });
+    setTotalMs(now - sessionStart.current);
     setResults(final);
     setPhase('done');
   }, [sessionId]);
@@ -168,6 +183,12 @@ export default function Drill() {
     if (phase === 'showing') t0.current = performance.now();
   }, [phase, idx]);
 
+  useEffect(() => {
+    if (phase === 'setup' || phase === 'done') return;
+    const t = setInterval(() => setElapsed(Date.now() - sessionStart.current), 250);
+    return () => clearInterval(t);
+  }, [phase]);
+
   /* 드릴 단축키 */
   useEffect(() => {
     if (phase === 'setup' || phase === 'done') return;
@@ -201,7 +222,7 @@ export default function Drill() {
         {([
           { n: 1 as const, title: '1단계 · 자음 하나', desc: '숫자 ↔ ㄱㄴㄷ', m: m1 },
           { n: 2 as const, title: '2단계 · 자음 두 개', desc: '두 자리 ↔ 자음 두 개', m: m2 },
-          { n: 3 as const, title: '3단계 · 이미지', desc: '자극 → 이미지 (본 훈련)', m: undefined },
+          { n: 3 as const, title: '3단계 · 이미지', desc: '자극 → 이미지 (본 훈련)', m: m3 },
         ]).map((t) => (
           <button
             key={t.n}
@@ -215,7 +236,7 @@ export default function Drill() {
             {t.m && t.m.attempts > 0 && (
               <div className="tnum mt-1 text-[11px] text-muted">
                 정확도 {fmtPct(t.m.accuracy)} · {fmtMs(t.m.medianRt)}
-                {t.m.ready && <span className="text-good"> · 통과</span>}
+                {t.m.passed && <span className="text-good"> · 통과</span>}
               </div>
             )}
           </button>
@@ -293,6 +314,8 @@ export default function Drill() {
               </div>
             </div>
           </div>
+          {m3 && <div className="mt-4"><GoalPanel goal={m3} /></div>}
+
           <div className="mt-4 flex items-center gap-3">
             <Btn variant="primary" size="lg" disabled={namedCount === 0} onClick={start}>시작</Btn>
             <span className="text-xs text-muted">
@@ -321,12 +344,14 @@ export default function Drill() {
             <Empty>기록된 문항이 없습니다.</Empty>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
                 <Stat label="문항" value={done.length} />
                 <Stat label="정확도" value={fmtPct(correct.length / done.length)} sub={`${correct.length}/${done.length}`} />
+                <Stat label="총 걸린 시간" value={mmss(totalMs)} sub={`문항당 ${fmtMs(Math.round(totalMs / done.length))}`} />
                 <Stat label="중앙 반응시간" value={fmtMs(median(rts))} />
                 <Stat label="가장 느린" value={fmtMs(Math.max(0, ...rts))} />
               </div>
+              {m3 && <div className="mt-4"><GoalPanel goal={m3} celebrate /></div>}
               <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-line">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-panel2 text-xs text-muted">
@@ -375,6 +400,7 @@ export default function Drill() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between text-xs text-muted">
         <span className="tnum">{idx + 1} / {queue.length}</span>
+        <span className="tnum ml-3">{mmss(elapsed)}</span>
         <div className="mx-4 h-1 flex-1 overflow-hidden rounded-full bg-line">
           <div className="h-full bg-accent transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
         </div>

@@ -79,6 +79,8 @@ export interface RecallSession {
   memorizeMs: number;
   memorizeUsedMs: number;
   recallMs: number;
+  /** 회상에 실제로 쓴 시간 (색인이 아니므로 버전을 올리지 않아도 된다) */
+  recallUsedMs?: number;
   startedAt: number;
   endedAt?: number;
   correct: number;

@@ -61,6 +61,7 @@ export default function Practice() {
   const [nowMs, setNowMs] = useState(Date.now());
   const [startedAt, setStartedAt] = useState(0);
   const [memorizeUsedMs, setMemorizeUsedMs] = useState(0);
+  const [recallUsedMs, setRecallUsedMs] = useState(0);
   const [sessionId, setSessionId] = useState('');
 
   useNavLock(phase !== 'setup' && phase !== 'done');
@@ -110,14 +111,18 @@ export default function Practice() {
     setPhase('memorize');
   };
 
+  const recallStart = useRef(0);
+
   const toRecall = useCallback(() => {
     setMemorizeUsedMs(Date.now() - startedAt);
+    recallStart.current = Date.now();
     setDeadline(Date.now() + recallSec * 1000);
     setPhase('recall');
     requestAnimationFrame(() => cellRefs.current[0]?.focus());
   }, [recallSec, startedAt]);
 
   const toGrade = useCallback(() => {
+    if (recallStart.current) setRecallUsedMs(Date.now() - recallStart.current);
     setAnswers([...answersRef.current]);
     setPhase('grade');
     setCursor(0);
@@ -168,7 +173,7 @@ export default function Practice() {
         id, mode, presetName: custom ? `커스텀 ${mode === 'digits' ? `${stimulus.length}자리` : `${stimulus.length}장`}` : preset.label,
         stimulus, palaceId: palaceId || undefined,
         memorizeMs: memorizeSec * 1000, memorizeUsedMs,
-        recallMs: recallSec * 1000, startedAt, endedAt: Date.now(),
+        recallMs: recallSec * 1000, recallUsedMs, startedAt, endedAt: Date.now(),
         correct: score.correct, wrong: score.wrong, blank: score.blank,
       });
       await db.recallCells.bulkAdd(cells);
@@ -471,11 +476,12 @@ export default function Practice() {
   /* ───────── 완료 ───────── */
   return (
     <Panel title="저장 완료">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         <Stat label="칸 정답" value={`${score.correct}/${score.total}`} />
         <Stat label="정확도" value={fmtPct(score.total ? score.correct / score.total : 0)} />
         {digitScore && <Stat label="자릿수 정답" value={`${digitScore.ok}/${digitScore.total}`} />}
-        <Stat label="암기 사용" value={mmss(memorizeUsedMs)} />
+        <Stat label="암기 사용" value={mmss(memorizeUsedMs)} sub={`제한 ${mmss(memorizeSec * 1000)}`} />
+        <Stat label="회상 사용" value={mmss(recallUsedMs)} sub={`합계 ${mmss(memorizeUsedMs + recallUsedMs)}`} />
       </div>
       <p className="mt-3 text-xs text-muted">세션 {sessionId.slice(0, 8)} · 출제 수열과 칸별 기록이 모두 저장되었습니다.</p>
       <div className="mt-4 flex gap-2">

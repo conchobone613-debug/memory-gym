@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { confusionPairs, dailyRows, heatmap, mappingCells, movers } from '../db/analytics';
-import { mastery } from '../db/mapping';
+import { goalFor } from '../db/goals';
+import GoalPanel from '../components/GoalPanel';
 import { db, type ImageSet } from '../db/db';
 import { weeklyMarkdown } from '../lib/markdown';
 import { download } from '../lib/io';
@@ -21,8 +22,9 @@ export default function Stats() {
   const pairs = useLiveQuery(() => confusionPairs(10), [], []);
   const mv = useLiveQuery(() => movers(5), [], { slowest: [], worst: [] });
   const map1 = useLiveQuery(() => mappingCells(1), [], []);
-  const m1 = useLiveQuery(() => mastery(1), []);
-  const m2 = useLiveQuery(() => mastery(2), []);
+  const m1 = useLiveQuery(() => goalFor(1), []);
+  const m2 = useLiveQuery(() => goalFor(2), []);
+  const m3 = useLiveQuery(() => goalFor(3), []);
 
   const measured = useMemo(() => cells.filter((c) => c.attempts > 0), [cells]);
   const maxRt = useMemo(() => Math.max(1, ...measured.map((c) => c.medianRt)), [measured]);
@@ -68,6 +70,21 @@ export default function Stats() {
         <Stat label="실전 세션" value={totals.practice} />
         <Stat label="측정된 이미지" value={`${measured.length}/${cells.length}`} />
       </div>
+
+      <Panel title="단계별 목표">
+        <div className="grid gap-2 md:grid-cols-3">
+          {[
+            { t: '1단계 · 자음 하나', g: m1 },
+            { t: '2단계 · 자음 두 개', g: m2 },
+            { t: '3단계 · 이미지', g: m3 },
+          ].map((x) => (
+            <div key={x.t} className="flex flex-col gap-1.5">
+              <div className="text-xs font-medium text-muted">{x.t}</div>
+              {x.g ? <GoalPanel goal={x.g} /> : null}
+            </div>
+          ))}
+        </div>
+      </Panel>
 
       {(m1?.attempts || m2?.attempts) ? (
         <Panel title="자음 매핑 숙련도 (초급 1·2단계)">

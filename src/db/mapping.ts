@@ -65,29 +65,3 @@ export async function buildMappingQueue(stage: Stage, count: number): Promise<st
 
   return shuffle([...take(band, nTop), ...take(rest.length ? rest : sorted, count - nTop)]);
 }
-
-export interface Mastery {
-  attempts: number;
-  accuracy: number;
-  medianRt: number;
-  /** 한 번도 안 본 단위 수 */
-  unseen: number;
-  /** 정확도 95% 이상 + 중앙 반응시간 2초 이하면 다음 단계로 */
-  ready: boolean;
-}
-
-export async function mastery(stage: Stage): Promise<Mastery> {
-  const units = allUnits(stage);
-  const stats = await mappingStatsFor(stage);
-  const rows = [...stats.values()];
-  const attempts = rows.reduce((s, r) => s + r.attempts, 0);
-  const correct = rows.reduce((s, r) => s + r.correct, 0);
-  const rts = rows.filter((r) => r.rtSamples.length).map((r) => r.medianRt);
-  const accuracy = attempts ? correct / attempts : 0;
-  const medianRt = Math.round(median(rts));
-  const unseen = units.filter((u) => !stats.get(u)?.attempts).length;
-  return {
-    attempts, accuracy, medianRt, unseen,
-    ready: unseen === 0 && attempts >= units.length * 3 && accuracy >= 0.95 && medianRt > 0 && medianRt <= 2000,
-  };
-}
