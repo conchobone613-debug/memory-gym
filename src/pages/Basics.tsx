@@ -14,7 +14,7 @@ import { type Stage } from '../lib/mapping';
 import { goalFor } from '../db/goals';
 import GoalPanel from '../components/GoalPanel';
 import { isTyping } from '../App';
-import { Btn, Empty, Field, LinkBtn, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
+import { Btn, Empty, Field, LinkBtn, Panel, Stat, Streak, fmtMs, fmtPct } from '../components/ui';
 
 type Phase = 'setup' | 'showing' | 'typing' | 'reveal' | 'done';
 
@@ -69,6 +69,9 @@ export default function Drill() {
   const [typedInput, setTypedInput] = useState('');
   const [typedMatch, setTypedMatch] = useState<MatchKind | undefined>();
   const [sessionId, setSessionId] = useState('');
+  const [flash, setFlash] = useState<'good' | 'bad' | null>(null);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
 
   const sessionStart = useRef(0);
   const [elapsed, setElapsed] = useState(0);
@@ -138,6 +141,9 @@ export default function Drill() {
     setIdx(0);
     sessionStart.current = Date.now();
     setElapsed(0);
+    setStreak(0);
+    setBestStreak(0);
+    setFlash(null);
     setPhase('showing');
   }, [cardsByImage, count, mode, pool, selected, stats, style, typedRate]);
 
@@ -160,6 +166,13 @@ export default function Drill() {
         typedInput: typedInput || undefined, typedMatch, shownAt: Date.now(),
       };
       await recordAttempt(attempt);
+      setFlash(verdict === 'correct' ? 'good' : 'bad');
+      setTimeout(() => setFlash(null), 340);
+      if (verdict === 'correct') {
+        setStreak((v) => { const n = v + 1; setBestStreak((b) => Math.max(b, n)); return n; });
+      } else if (verdict === 'wrong') {
+        setStreak(0);
+      }
       const next = [...results, { trial, rtMs: rtRef.current, verdict, typedInput: typedInput || undefined, typedMatch }];
       setTypedInput('');
       setTypedMatch(undefined);
@@ -245,14 +258,8 @@ export default function Drill() {
     </div>
   );
 
-  if (stage !== 3) {
-    return (
-      <div className="flex flex-col gap-4">
-        {stageTabs}
-        <MappingDrill stage={stage} />
-      </div>
-    );
-  }
+  /* 훈련 중에는 탭을 내린다 — 휴대폰에서 문제가 화면 아래로 밀려나면 못 쓴다 */
+  if (stage !== 3) return <MappingDrill stage={stage} header={stageTabs} />;
 
   /* ───────── 설정 화면 ───────── */
   if (phase === 'setup') {
@@ -341,12 +348,13 @@ export default function Drill() {
             <Empty>기록된 문항이 없습니다.</Empty>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
                 <Stat label="문항" value={done.length} />
                 <Stat label="정확도" value={fmtPct(correct.length / done.length)} sub={`${correct.length}/${done.length}`} />
                 <Stat label="총 걸린 시간" value={mmss(totalMs)} sub={`문항당 ${fmtMs(Math.round(totalMs / done.length))}`} />
                 <Stat label="중앙 반응시간" value={fmtMs(median(rts))} />
                 <Stat label="가장 느린" value={fmtMs(Math.max(0, ...rts))} />
+                <Stat label="최고 연속" value={bestStreak} />
               </div>
               {m3 && <div className="mt-4"><GoalPanel goal={m3} celebrate /></div>}
               <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-line">
@@ -398,6 +406,7 @@ export default function Drill() {
       <div className="flex items-center justify-between text-xs text-muted">
         <span className="tnum">{idx + 1} / {queue.length}</span>
         <span className="tnum ml-3">{mmss(elapsed)}</span>
+        <span className="ml-3"><Streak n={streak} /></span>
         <div className="mx-4 h-1 flex-1 overflow-hidden rounded-full bg-line">
           <div className="h-full bg-accent transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
         </div>
@@ -405,7 +414,11 @@ export default function Drill() {
       </div>
 
       <div
-        className="flex min-h-[22rem] cursor-pointer select-none flex-col items-center justify-center gap-6 rounded-xl border border-line bg-panel"
+        className={`flex min-h-[22rem] cursor-pointer flex-col items-center justify-center gap-6 rounded-xl border px-4 py-6 transition-colors select-none ${
+          flash === 'good' ? 'mg-good border-good/70 bg-good/10' :
+          flash === 'bad' ? 'mg-bad border-bad/70 bg-bad/10' :
+          'border-line bg-panel'
+        }`}
         onClick={() => phase === 'showing' && onSpace()}
       >
         <div className="tnum text-[5.5rem] leading-none font-semibold tracking-wider">{trial.display}</div>
@@ -439,12 +452,12 @@ export default function Drill() {
               </div>
             )}
             <div className="tnum text-xs text-muted">{fmtMs(rtRef.current)}</div>
-            <div className="flex gap-2">
-              <Btn variant="good" size="lg" onClick={(e) => { e.stopPropagation(); commit('correct'); }}>
-                맞음 (D)
+            <div className="grid w-full max-w-sm grid-cols-2 gap-2">
+              <Btn variant="good" size="lg" className="min-h-14" onClick={(e) => { e.stopPropagation(); commit('correct'); }}>
+                맞음 <span className="text-xs opacity-70">D</span>
               </Btn>
-              <Btn variant="danger" size="lg" onClick={(e) => { e.stopPropagation(); commit('wrong'); }}>
-                틀림 (F)
+              <Btn variant="danger" size="lg" className="min-h-14" onClick={(e) => { e.stopPropagation(); commit('wrong'); }}>
+                틀림 <span className="text-xs opacity-70">F</span>
               </Btn>
             </div>
           </div>

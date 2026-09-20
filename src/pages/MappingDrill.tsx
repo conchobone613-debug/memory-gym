@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getSettings, saveSettings, type MappingAttempt } from '../db/db';
 import { buildMappingQueue, mappingStatsFor, recordMapping } from '../db/mapping';
@@ -8,7 +8,8 @@ import { jamoFromKey, keyLabelFor } from '../lib/keyjamo';
 import { uid } from '../lib/random';
 import { median } from '../lib/srs';
 import { isTyping } from '../App';
-import { Btn, Field, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
+import { Btn, Field, Panel, Stat, Streak, fmtMs, fmtPct } from '../components/ui';
+import Keypad from '../components/Keypad';
 import ChosungKey from '../components/ChosungKey';
 import GoalPanel from '../components/GoalPanel';
 
@@ -31,7 +32,7 @@ const STAGE_TITLE: Record<Stage, string> = {
   2: '2단계 · 두 자리 ↔ 자음 두 개',
 };
 
-export default function MappingDrill({ stage }: { stage: Stage }) {
+export default function MappingDrill({ stage, header }: { stage: Stage; header?: ReactNode }) {
   const settings = useLiveQuery(() => getSettings(), []);
   const stats = useLiveQuery(() => mappingStatsFor(stage), [stage], new Map());
   const goal = useLiveQuery(() => goalFor(stage), [stage]);
@@ -44,6 +45,9 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
   const [results, setResults] = useState<Result[]>([]);
   const [typed, setTyped] = useState('');
   const [last, setLast] = useState<Result | null>(null);
+  const [flash, setFlash] = useState<'good' | 'bad' | null>(null);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
   const [sessionId, setSessionId] = useState('');
 
   const t0 = useRef(0);
@@ -81,6 +85,9 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
     setLast(null);
     sessionStart.current = Date.now();
     setElapsed(0);
+    setStreak(0);
+    setBestStreak(0);
+    setFlash(null);
     setPhase('asking');
   };
 
@@ -109,6 +116,13 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
       const next = [...results, r];
       setResults(next);
       setTyped('');
+      setFlash(isCorrect ? 'good' : 'bad');
+      setTimeout(() => setFlash(null), 340);
+      if (isCorrect) {
+        setStreak((v) => { const n = v + 1; setBestStreak((b) => Math.max(b, n)); return n; });
+      } else {
+        setStreak(0);
+      }
       if (isCorrect) {
         /* 맞으면 멈추지 않는다. 틀렸을 때만 정답을 보여주고 붙잡는다. */
         if (idx + 1 >= queue.length) await finish(next);
@@ -120,6 +134,16 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
     },
     [finish, idx, queue, results, sessionId, stage],
   );
+
+  /** 키로 누르든 화면을 누르든 같은 길로 들어온다. 휴대폰에는 물리 키가 없다. */
+  const push = useCallback((ch: string) => {
+    const cur = queue[idx];
+    if (!cur || phase !== 'asking') return;
+    const want = cur.groups ? cur.groups.length : cur.answer.length;
+    const next = (typed + ch).slice(-want);
+    if (next.length === want) answer(next);
+    else setTyped(next);
+  }, [answer, idx, phase, queue, typed]);
 
   const continueAfterWrong = useCallback(() => {
     if (idx + 1 >= queue.length) finish(results);
@@ -151,17 +175,14 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
 
       if (e.key === 'Backspace') { e.preventDefault(); setTyped((t) => t.slice(0, -1)); return; }
 
-      const want = q.groups ? q.groups.length : q.answer.length;
       const ch = q.groups ? jamoFromKey(e) : (/^[0-9]$/.test(e.key) ? e.key : null);
       if (!ch) return;
       e.preventDefault();
-      const next = (typed + ch).slice(-want);
-      if (next.length === want) answer(next);
-      else setTyped(next);
+      push(ch);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [answer, continueAfterWrong, finish, phase, q, results, typed]);
+  }, [continueAfterWrong, finish, phase, push, q, results]);
 
   /* ───────── 설정 ───────── */
   if (phase === 'setup') {
@@ -234,17 +255,20 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
     const rts = correct.map((r) => r.rtMs);
     const wrongs = results.filter((r) => !r.isCorrect);
     return (
+      <div className="flex flex-col gap-4">
+      {header}
       <Panel title={`${STAGE_TITLE[stage]} — 결과`}>
         {results.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">기록된 문항이 없습니다.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
               <Stat label="문항" value={results.length} />
               <Stat label="정확도" value={fmtPct(correct.length / results.length)} sub={`${correct.length}/${results.length}`} />
               <Stat label="총 걸린 시간" value={mmss(totalMs)} sub={`문항당 ${fmtMs(Math.round(totalMs / results.length))}`} />
               <Stat label="중앙 반응시간" value={fmtMs(median(rts))} />
               <Stat label="틀린 칸" value={wrongs.length} />
+              <Stat label="최고 연속" value={bestStreak} />
             </div>
 
             {goal && <div className="mt-4"><GoalPanel goal={goal} celebrate /></div>}
@@ -270,6 +294,7 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
           <Btn onClick={() => setPhase('setup')}>설정으로</Btn>
         </div>
       </Panel>
+      </div>
     );
   }
 
@@ -282,13 +307,20 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
       <div className="flex items-center justify-between text-xs text-muted">
         <span className="tnum">{idx + 1} / {queue.length}</span>
         <span className="tnum ml-3">{mmss(elapsed)}</span>
+        <span className="ml-3"><Streak n={streak} /></span>
         <div className="mx-4 h-1 flex-1 overflow-hidden rounded-full bg-line">
           <div className="h-full bg-accent transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
         </div>
         <button className="text-muted hover:text-fg" onClick={() => finish(results)}>중단 (Esc)</button>
       </div>
 
-      <div className="flex min-h-[20rem] flex-col items-center justify-center gap-6 rounded-xl border border-line bg-panel px-4">
+      <div
+        className={`flex min-h-[20rem] flex-col items-center justify-center gap-6 rounded-xl border px-4 py-6 transition-colors ${
+          flash === 'good' ? 'mg-good border-good/70 bg-good/10' :
+          flash === 'bad' ? 'mg-bad border-bad/70 bg-bad/10' :
+          'border-line bg-panel'
+        }`}
+      >
         <span className="text-xs text-muted">
           {showing.direction === 'toConsonant' ? '이 숫자의 자음은?' : '이 자음의 숫자는?'}
         </span>
@@ -309,8 +341,13 @@ export default function MappingDrill({ stage }: { stage: Stage }) {
               ))}
             </div>
             <span className="text-xs text-muted">
-              {q.groups ? '자음 키를 누르십시오' : '숫자 키를 누르십시오'}
+              {q.groups ? '자음을 누르십시오' : '숫자를 누르십시오'}
             </span>
+            <Keypad
+              kind={q.groups ? 'jamo' : 'digit'}
+              onPress={push}
+              onBackspace={() => setTyped((t) => t.slice(0, -1))}
+            />
           </div>
         )}
 

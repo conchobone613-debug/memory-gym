@@ -5,10 +5,10 @@ export function Panel({ title, right, children, className = '' }: {
   title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-line bg-panel ${className}`}>
+    <section className={`rounded-xl border border-line/80 bg-panel shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset] ${className}`}>
       {(title || right) && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
-          <h2 className="text-sm font-semibold text-muted">{title}</h2>
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line/70 px-4 py-3">
+          <h2 className="font-display text-base leading-none">{title}</h2>
           {right}
         </header>
       )}
@@ -33,7 +33,7 @@ const SIZE: Record<Size, string> = {
 };
 
 const btnClass = (variant: Variant, size: Size, extra: string) =>
-  `inline-block rounded-lg border text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${VARIANT[variant]} ${SIZE[size]} ${extra}`;
+  `inline-block rounded-lg border text-center transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${VARIANT[variant]} ${SIZE[size]} ${extra}`;
 
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size };
 
@@ -95,10 +95,10 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-line bg-panel2 px-3 py-2">
-      <div className="text-[11px] text-muted">{label}</div>
-      <div className="tnum text-xl font-semibold">{value}</div>
-      {sub && <div className="text-[11px] text-muted">{sub}</div>}
+    <div className="rounded-lg border border-line/70 bg-panel2/70 px-3 py-2.5">
+      <div className="text-[11px] tracking-wide text-muted">{label}</div>
+      <div className="tnum mt-0.5 text-2xl leading-none font-semibold">{value}</div>
+      {sub && <div className="mt-1 text-[11px] text-muted">{sub}</div>}
     </div>
   );
 }
@@ -109,3 +109,18 @@ export function Kbd({ children }: { children: ReactNode }) {
 
 export const fmtMs = (x: number) => (x ? `${(x / 1000).toFixed(2)}s` : '—');
 export const fmtPct = (x: number) => `${Math.round(x * 100)}%`;
+
+/** 연속 정답. 숫자가 바뀔 때마다 톡 튀어야 손맛이 난다. */
+export function Streak({ n }: { n: number }) {
+  if (n < 2) return null;
+  return (
+    <span
+      key={n}
+      className="mg-pop inline-flex items-center gap-1 rounded-full border border-accent/50 bg-accent/10 px-2.5 py-0.5 text-xs text-accent"
+    >
+      <span aria-hidden>🔥</span>
+      <span className="tnum font-semibold">{n}</span>
+      연속
+    </span>
+  );
+}

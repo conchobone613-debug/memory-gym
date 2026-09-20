@@ -1,28 +1,49 @@
 @import "tailwindcss";
 
+/*
+ * 테마 — 기억의 궁전.
+ * 회장님이 실제로 훈련에 쓰는 은유가 건축물이라 거기서 색을 가져왔다.
+ * 먹빛 바탕에 오래된 돌·황동·상아. 차가운 남색 대신 따뜻한 검정을 쓴다.
+ */
 @theme {
-  --color-ink: #0b0f16;
-  --color-panel: #141b26;
-  --color-panel2: #1c2634;
-  --color-line: #2a3646;
-  --color-fg: #e6edf6;
-  --color-muted: #8ea0b8;
-  --color-accent: #7cd4ff;
-  --color-good: #4ade80;
-  --color-bad: #fb7185;
-  --color-warn: #fbbf24;
+  --color-ink: #0e0c0a;
+  --color-panel: #17140f;
+  --color-panel2: #201b15;
+  --color-line: #342c22;
+  --color-fg: #ece4d8;
+  --color-muted: #9b8f7d;
+  --color-accent: #d9a441;
+  --color-good: #86b96a;
+  --color-bad: #cf6049;
+  --color-warn: #d9912b;
+
+  --font-display: "Gowun Batang", "Apple SD Gothic Neo", serif;
+  --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "IBM Plex Sans KR", ui-monospace, monospace;
 }
 
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: var(--color-ink);
+  background:
+    radial-gradient(120% 80% at 50% -10%, #1b1712 0%, transparent 60%),
+    var(--color-ink);
   color: var(--color-fg);
-  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 * { box-sizing: border-box; }
-::selection { background: var(--color-accent); color: #04121c; }
+::selection { background: var(--color-accent); color: #1a1408; }
+
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+button, a, input, select, textarea { touch-action: manipulation; }
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 0.4rem;
+}
 
 input, textarea, select, button { font: inherit; color: inherit; }
 input, textarea, select {
@@ -41,6 +62,46 @@ kbd {
   border-radius: .35rem;
   padding: .05rem .35rem;
   font-size: .8em;
-  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-family: var(--font-mono);
 }
-.tnum { font-variant-numeric: tabular-nums; }
+.tnum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.balance { text-wrap: balance; }
+
+/* ── 맞고 틀리는 순간의 반응 ──────────────────────────────
+   훈련 화면에서 장식은 해롭지만 판정 피드백은 다르다. 맞았는지 틀렸는지가
+   몸에 남아야 학습이 된다. 대신 transform·opacity 만 건드리고 250ms 안에 끝낸다. */
+@keyframes mg-good {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-good) 70%, transparent); }
+  40%  { transform: scale(1.03); box-shadow: 0 0 0 12px color-mix(in srgb, var(--color-good) 0%, transparent); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes mg-bad {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-7px); }
+  45%      { transform: translateX(6px); }
+  70%      { transform: translateX(-3px); }
+}
+@keyframes mg-pop {
+  0%   { transform: scale(0.7); opacity: 0; }
+  60%  { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes mg-rise {
+  from { transform: translateY(6px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+@keyframes mg-sheen {
+  from { transform: translateX(-120%); }
+  to   { transform: translateX(120%); }
+}
+
+.mg-good  { animation: mg-good 320ms ease-out; }
+.mg-bad   { animation: mg-bad 260ms ease-out; }
+.mg-pop   { animation: mg-pop 220ms cubic-bezier(.34,1.56,.64,1); }
+.mg-rise  { animation: mg-rise 260ms ease-out both; }
+.mg-sheen { animation: mg-sheen 900ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-good, .mg-bad, .mg-pop, .mg-rise, .mg-sheen { animation: none !important; }
+  * { transition-duration: 1ms !important; }
+}
