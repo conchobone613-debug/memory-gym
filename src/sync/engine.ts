@@ -40,8 +40,32 @@ async function collectAssets() {
 
 type AssetBundle = Awaited<ReturnType<typeof collectAssets>>;
 
-/** 기록마다 updatedAt 이 늦은 쪽을 남긴다. 한쪽이 통째로 덮어쓰지 않는다. */
+/**
+ * 기록마다 updatedAt 이 늦은 쪽을 남긴다. 한쪽이 통째로 덮어쓰지 않는다.
+ *
+ * 다만 갓 켠 기기에는 첫 실행 때 만들어진 **빈 기본 세트**가 있다. 그걸 그대로 합치면
+ * 같은 종류의 세트가 두 벌이 되어 통계가 갈라진다. 그래서 '한 칸도 안 채운 기본 세트'는
+ * 같은 종류가 저쪽에 있으면 버린다. 회장이 손댄 세트는 절대 버리지 않는다.
+ */
 export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundle {
+  const namedBySet = new Map<string, number>();
+  for (const img of local.images) {
+    if (img.name.trim()) namedBySet.set(img.setId, (namedBySet.get(img.setId) ?? 0) + 1);
+  }
+  const remoteDomains = new Set(remote.imageSets.map((s) => s.domain));
+  const dropped = new Set(
+    local.imageSets
+      .filter((s) => s.builtin && !namedBySet.get(s.id) && remoteDomains.has(s.domain))
+      .map((s) => s.id),
+  );
+  if (dropped.size) {
+    local = {
+      ...local,
+      imageSets: local.imageSets.filter((s) => !dropped.has(s.id)),
+      images: local.images.filter((i) => !dropped.has(i.setId)),
+    };
+  }
+
   const pick = <T extends { id: string; updatedAt?: number }>(a: T[], b: T[]): T[] => {
     const m = new Map<string, T>();
     for (const row of [...a, ...b]) {
@@ -61,7 +85,16 @@ export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundl
 }
 
 async function applyAssets(b: AssetBundle) {
-  await db.transaction('rw', db.imageSets, db.images, db.palaces, db.loci, async () => {
+  await db.transaction('rw', db.imageSets, db.images, db.imageStats, db.palaces, db.loci, async () => {
+    /* 합친 결과에 없는 세트는 이 기기에서도 치운다 (갓 켠 기기의 빈 기본 세트) */
+    const keep = new Set(b.imageSets.map((s) => s.id));
+    const stale = (await db.imageSets.toArray()).filter((s) => !keep.has(s.id)).map((s) => s.id);
+    if (stale.length) {
+      const staleImages = (await db.images.toArray()).filter((i) => stale.includes(i.setId)).map((i) => i.id);
+      await db.images.bulkDelete(staleImages);
+      await db.imageStats.bulkDelete(staleImages);
+      await db.imageSets.bulkDelete(stale);
+    }
     if (b.imageSets.length) await db.imageSets.bulkPut(b.imageSets);
     if (b.images.length) await db.images.bulkPut(b.images);
     if (b.palaces.length) await db.palaces.bulkPut(b.palaces);
