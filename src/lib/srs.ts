@@ -1,5 +1,5 @@
 import type { ImageStat, MemoImage, PickMode } from '../db/db';
-import { sample, shuffle } from './random';
+import { sample, spread } from './random';
 
 const DAY = 86_400_000;
 
@@ -69,12 +69,15 @@ export function buildQueue(ranked: Ranked[], count: number, mode: PickMode): Mem
 
   switch (mode) {
     case 'all':
-      return shuffle(pickFrom(sorted, count));
-    case 'weak':
-      return shuffle(pickFrom(sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.25))), count));
+      return spread(pickFrom(sorted, count));
+    case 'weak': {
+      /* 후보가 한둘이면 같은 문제만 되풀이된다. 최소 넷은 남겨 둔다. */
+      const n = Math.min(sorted.length, Math.max(4, Math.ceil(sorted.length * 0.25)));
+      return spread(pickFrom(sorted.slice(0, n), count));
+    }
     case 'unseen': {
       const unseen = sorted.filter((r) => !r.stat || r.stat.attempts === 0);
-      return shuffle(pickFrom(unseen.length ? unseen : sorted, count));
+      return spread(pickFrom(unseen.length ? unseen : sorted, count));
     }
     case 'srs':
     default: {
@@ -86,7 +89,7 @@ export function buildQueue(ranked: Ranked[], count: number, mode: PickMode): Mem
         ...pickFrom(band, nTop),
         ...pickFrom(rest.length ? rest : sorted, count - nTop),
       ];
-      return shuffle(picked);
+      return spread(picked);
     }
   }
 }

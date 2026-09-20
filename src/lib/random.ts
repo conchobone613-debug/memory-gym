@@ -47,3 +47,36 @@ export function weightedPick<T>(items: readonly T[], weights: readonly number[])
 export function uid(): string {
   return crypto.randomUUID();
 }
+
+/**
+ * 같은 항목이 연달아 나오지 않게 흩는다.
+ *
+ * 문항 수가 칸 수보다 많으면 같은 칸이 여러 번 나올 수밖에 없다. 그때 단순히 섞기만 하면
+ * 바로 앞 문제와 같은 것이 붙어 나와, 기억을 꺼내는 게 아니라 방금 본 답을 되뇌게 된다.
+ *
+ * 남은 개수가 가장 많은 것부터 집되 직전 것은 건너뛴다. 이러면 어떤 항목이 전체의 절반을
+ * 넘지 않는 한 붙는 일이 없고, 넘을 때도 붙는 횟수가 최소가 된다.
+ */
+export function spread<T>(items: readonly T[]): T[] {
+  const counts = new Map<T, number>();
+  for (const it of items) counts.set(it, (counts.get(it) ?? 0) + 1);
+
+  const out: T[] = [];
+  let prev: T | undefined;
+
+  while (out.length < items.length) {
+    const left = [...counts.entries()].filter(([, c]) => c > 0);
+    if (left.length === 0) break;
+
+    const usable = left.filter(([u]) => u !== prev);
+    const from = usable.length > 0 ? usable : left; // 남은 게 직전 것뿐이면 어쩔 수 없다
+    const max = Math.max(...from.map(([, c]) => c));
+    const top = from.filter(([, c]) => c === max);
+    const pick = top[randBelow(top.length)][0];
+
+    out.push(pick);
+    counts.set(pick, (counts.get(pick) ?? 1) - 1);
+    prev = pick;
+  }
+  return out;
+}

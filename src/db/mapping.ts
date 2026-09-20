@@ -1,7 +1,7 @@
 import { db, type MappingAttempt, type MappingStat } from './db';
 import { allUnits, statKey, type Stage } from '../lib/mapping';
 import { median } from '../lib/srs';
-import { sample, shuffle } from '../lib/random';
+import { sample, spread } from '../lib/random';
 
 const MAX_SAMPLES = 20;
 const DAY = 86_400_000;
@@ -63,5 +63,5 @@ export async function buildMappingQueue(stage: Stage, count: number): Promise<st
     return out;
   };
 
-  return shuffle([...take(band, nTop), ...take(rest.length ? rest : sorted, count - nTop)]);
+  return spread([...take(band, nTop), ...take(rest.length ? rest : sorted, count - nTop)]);
 }
