@@ -25,9 +25,3 @@ export function jamoFromKey(e: KeyboardEvent): string | null {
   if (e.key && /^[a-zA-Z]$/.test(e.key)) return CODE_TO_JAMO[`Key${e.key.toUpperCase()}`] ?? null;
   return null;
 }
-
-/** 자음이 어느 물리 키인지 (화면 안내용). 'ㄱ' -> 'R' */
-export function keyLabelFor(jamo: string): string | null {
-  const code = Object.keys(CODE_TO_JAMO).find((c) => CODE_TO_JAMO[c] === jamo);
-  return code ? code.replace('Key', '') : null;
-}

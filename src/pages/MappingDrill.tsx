@@ -4,7 +4,7 @@ import { db, getSettings, saveSettings, type MappingAttempt } from '../db/db';
 import { buildMappingQueue, mappingStatsFor, recordMapping } from '../db/mapping';
 import { goalFor } from '../db/goals';
 import { makeQuestion, type Direction, type Question, type Stage } from '../lib/mapping';
-import { jamoFromKey, keyLabelFor } from '../lib/keyjamo';
+import { jamoFromKey } from '../lib/keyjamo';
 import { uid } from '../lib/random';
 import { median } from '../lib/srs';
 import { isTyping } from '../App';
@@ -355,24 +355,15 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           <div className="flex flex-col items-center gap-3">
             <div className="text-sm text-bad">답하신 것 — {last.given || '—'}</div>
             <div className="text-4xl font-semibold text-good">{last.q.answer}</div>
-            {last.q.groups && (
-              <div className="text-xs text-muted">
-                {last.q.groups
-                  .map((g) => `${g[0]} → ${keyLabelFor(g[0]) ?? '?'} 키`)
-                  .join(' · ')}
-              </div>
-            )}
             <Btn variant="primary" onClick={continueAfterWrong}>계속 (Enter)</Btn>
           </div>
         )}
       </div>
 
       <p className="text-center text-xs text-muted">
-        {q.groups ? (
-          <>자판에 적힌 자음을 그대로 누르십시오 (한/영 상관없음) · <kbd>Backspace</kbd> 로 지웁니다</>
-        ) : (
-          <>숫자 키로 답하고 <kbd>Backspace</kbd> 로 지웁니다</>
-        )}
+        {q.groups
+          ? '자판이든 화면이든 편한 쪽으로 누르십시오. 한/영 상태는 상관없습니다.'
+          : '자판이든 화면이든 편한 쪽으로 누르십시오.'}
       </p>
     </div>
   );
