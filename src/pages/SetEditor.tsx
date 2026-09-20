@@ -158,7 +158,13 @@ export default function SetEditor() {
                   }`}
                 >
                   <span className="tnum text-[10px] text-muted">{label(img.key)}</span>
-                  <span className={`w-full truncate text-xs ${img.name ? '' : 'text-muted/50'}`}>{img.name || '—'}</span>
+                  <span
+                    className={`line-clamp-2 w-full text-[11px] leading-tight break-all ${
+                      img.name ? '' : 'text-muted/50'
+                    }`}
+                  >
+                    {img.name || '—'}
+                  </span>
                 </button>
               );
             })}

@@ -62,8 +62,11 @@ export type MatchKind = 'exact' | 'alias' | 'chosung' | 'none';
 
 /**
  * 타이핑 검증 채점.
- * 1) 정확 일치 → 2) alias 일치 → 3) 초성 코드가 키와 같으면 인정.
- * 3번 덕분에 '기차'/'기차역'/'긴 차' 같은 표기 흔들림에 훈련이 방해받지 않는다.
+ * 1) 정확 일치 → 2) alias 일치 → 3) 초성 코드가 키로 시작하면 인정.
+ *
+ * 3번을 '같음'이 아니라 '로 시작함'으로 두는 이유: 키가 두 자리라도 좋은 이미지는
+ * '너구리'(ㄴㄱㄹ)처럼 음절이 더 길 때가 많다. 앞 두 초성이 코드와 맞으면 변환은 맞은 것이다.
+ * 덕분에 '기차'/'기차역'/'긴 차' 같은 표기 흔들림도 훈련을 방해하지 않는다.
  */
 export function matchName(
   input: string,
@@ -76,6 +79,9 @@ export function matchName(
   if (!i) return 'none';
   if (i === norm(target.name)) return 'exact';
   if (target.aliases.some((a) => norm(a) === i)) return 'alias';
-  if (keyIsDigits && codeOfName(i, map) === target.key) return 'chosung';
+  if (keyIsDigits) {
+    const code = codeOfName(i, map);
+    if (code && code.startsWith(target.key)) return 'chosung';
+  }
   return 'none';
 }

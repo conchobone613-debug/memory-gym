@@ -2,10 +2,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
 import { db, ensureKeys, type ImageSet } from '../db/db';
 import { uid } from '../lib/random';
+import { loadStarter } from '../data/starter';
 import { Btn, Empty, LinkBtn, Panel } from '../components/ui';
+import { useState } from 'react';
 
 export default function Sets() {
   const sets = useLiveQuery(() => db.imageSets.toArray(), [], [] as ImageSet[]);
+  const [msg, setMsg] = useState('');
   const images = useLiveQuery(() => db.images.toArray(), [], []);
 
   const stat = (setId: string) => {
@@ -18,6 +21,15 @@ export default function Sets() {
     const set: ImageSet = { id: uid(), name, domain, keyGenerator: gen, builtin: false, createdAt: t, updatedAt: t };
     await db.imageSets.add(set);
     await ensureKeys(set);
+  };
+
+  const fillStarter = async () => {
+    const r = await loadStarter();
+    setMsg(
+      r.filled === 0
+        ? '빈 칸이 없습니다. 이미 채워진 칸은 덮어쓰지 않습니다.'
+        : `추천 이미지 ${r.filled}개를 빈 칸에 넣었습니다.${r.kept ? ` 이미 쓰시던 ${r.kept}개는 그대로 두었습니다.` : ''}`,
+    );
   };
 
   const removeSet = async (set: ImageSet) => {
@@ -37,6 +49,7 @@ export default function Sets() {
         title="이미지 세트"
         right={
           <div className="flex gap-1.5">
+            <Btn size="sm" variant="primary" onClick={fillStarter}>추천 이미지 불러오기</Btn>
             <Btn size="sm" onClick={() => addSet('숫자 000–999', 'digits:3', 'digit3')}>+ 3자리 숫자</Btn>
             <Btn size="sm" onClick={() => addSet('새 세트', undefined, 'custom')}>+ 빈 세트</Btn>
           </div>
@@ -68,8 +81,10 @@ export default function Sets() {
           </ul>
         )}
       </Panel>
+      {msg && <p className="text-xs text-accent">{msg}</p>}
       <p className="text-xs text-muted">
         카드 A~10 은 숫자 세트의 이미지를 그대로 씁니다. 따로 채우실 것은 인물 12장뿐입니다.
+        추천 이미지는 빈 칸에만 들어가며, 마음에 안 드는 칸은 편집에서 바꾸시면 됩니다.
       </p>
     </div>
   );
