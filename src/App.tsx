@@ -5,6 +5,7 @@ import Sets from './pages/Sets';
 import SetEditor from './pages/SetEditor';
 import Drill from './pages/Drill';
 import Practice from './pages/Practice';
+import Events from './pages/Events';
 import Palaces from './pages/Palaces';
 import Stats from './pages/Stats';
 import Settings from './pages/Settings';
@@ -15,9 +16,10 @@ const NAV = [
   { to: '/sets', label: '이미지 세트', key: '2' },
   { to: '/drill', label: '변환 드릴', key: '3' },
   { to: '/practice', label: '실전', key: '4' },
-  { to: '/palaces', label: '궁전', key: '5' },
-  { to: '/stats', label: '대시보드', key: '6' },
-  { to: '/settings', label: '설정', key: '7' },
+  { to: '/events', label: '종목', key: '5' },
+  { to: '/palaces', label: '궁전', key: '6' },
+  { to: '/stats', label: '대시보드', key: '7' },
+  { to: '/settings', label: '설정', key: '8' },
 ];
 
 export function isTyping(el: EventTarget | null): boolean {
@@ -65,6 +67,7 @@ function Shell() {
           <Route path="/sets/:setId" element={<SetEditor />} />
           <Route path="/drill" element={<Drill />} />
           <Route path="/practice" element={<Practice />} />
+          <Route path="/events" element={<Events />} />
           <Route path="/palaces" element={<Palaces />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />

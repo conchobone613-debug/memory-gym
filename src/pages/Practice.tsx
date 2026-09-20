@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useSearchParams } from 'react-router-dom';
 import {
   db, ERROR_TAG_LABEL, getSettings, type ErrorTag, type Palace, type PracticeMode, type RecallCell,
 } from '../db/db';
@@ -21,6 +22,8 @@ const PRESETS: Preset[] = [
   { id: 'd40', label: '숫자 40자리 (2분 / 5분)', mode: 'digits', length: 40, memorizeSec: 120, recallSec: 300, chunk: 2 },
   { id: 'c52', label: '카드 52장 (5분 / 5분)', mode: 'cards', length: 52, memorizeSec: 300, recallSec: 300, chunk: 1 },
   { id: 'c20', label: '카드 20장 (2분 / 3분)', mode: 'cards', length: 20, memorizeSec: 120, recallSec: 180, chunk: 1 },
+  /* 대회 지구력 종목. 대회는 '시간 안에 최대한 많이' 지만 여기서는 길이를 넉넉히 잡아 흉내만 낸다. */
+  { id: 'h-num', label: '1시간 숫자 600자리 (60분 / 120분)', mode: 'digits', length: 600, memorizeSec: 3600, recallSec: 7200, chunk: 2 },
 ];
 
 const TAGS: ErrorTag[] = ['image', 'locus', 'link', 'order'];
@@ -42,6 +45,7 @@ export default function Practice() {
   const images = useLiveQuery(() => db.images.toArray(), [], []);
   const sets = useLiveQuery(() => db.imageSets.toArray(), [], []);
 
+  const [params, setParams] = useSearchParams();
   const [presetId, setPresetId] = useState('d80');
   const [custom, setCustom] = useState(false);
   const [mode, setMode] = useState<PracticeMode>('digits');
@@ -71,6 +75,14 @@ export default function Practice() {
   const answersRef = useRef<string[]>([]);
 
   const preset = PRESETS.find((p) => p.id === presetId)!;
+
+  /* 종목 화면에서 ?preset=... 으로 넘어오면 그 프리셋으로 맞춰 둔다 */
+  useEffect(() => {
+    const want = params.get('preset');
+    if (!want) return;
+    if (PRESETS.some((p) => p.id === want)) { setCustom(false); setPresetId(want); }
+    setParams({}, { replace: true });
+  }, [params, setParams]);
 
   useEffect(() => {
     if (custom) return;
