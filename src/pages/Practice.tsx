@@ -5,7 +5,8 @@ import {
   db, ERROR_TAG_LABEL, getSettings, type ErrorTag, type Palace, type PracticeMode, type RecallCell,
 } from '../db/db';
 import { markRecallWrong } from '../db/record';
-import { cardLabel, fullDeck, normalizeCardInput, resolveCard } from '../lib/cards';
+import { cardLabel, fullDeck, normalizeCardInput } from '../lib/cards';
+import { resolveCellImage } from '../lib/resolveImage';
 import { randBelow, shuffle, uid } from '../lib/random';
 import { isTyping } from '../App';
 import { Btn, Empty, Field, LinkBtn, Panel, Stat, fmtPct } from '../components/ui';
@@ -192,15 +193,7 @@ export default function Practice() {
   /** 채점 화면에서 '이 칸은 무슨 이미지였나' 를 보여 준다. 연습에서만 켠다. */
   const imageNameFor = (expectedKey: string): string | undefined => {
     if (!easy || !settings) return undefined;
-    const bySetKey = new Map(images.map((i) => [`${i.setId}:${i.key}`, i]));
-    const setByDomain = new Map(sets.map((x) => [x.domain, x]));
-    if (mode === 'digits') {
-      const set = setByDomain.get(chunk === 3 ? 'digit3' : 'digit2');
-      return set ? bySetKey.get(`${set.id}:${expectedKey}`)?.name || undefined : undefined;
-    }
-    const r = resolveCard(expectedKey, settings.suitDigits, settings.rankDigits);
-    const set = r && setByDomain.get(r.domain);
-    return r && set ? bySetKey.get(`${set.id}:${r.key}`)?.name || undefined : undefined;
+    return resolveCellImage(expectedKey, mode, chunk, settings, sets, images)?.name || undefined;
   };
 
   const save = async () => {
@@ -223,17 +216,8 @@ export default function Practice() {
 
     /* 틀린 칸의 이미지를 통계에도 오답으로 반영 */
     if (settings) {
-      const bySetKey = new Map(images.map((i) => [`${i.setId}:${i.key}`, i]));
-      const setByDomain = new Map(sets.map((s) => [s.domain, s]));
-      const digitSet = setByDomain.get(chunk === 3 ? 'digit3' : 'digit2');
       for (const g of wrongCells) {
-        let img;
-        if (mode === 'digits' && digitSet) img = bySetKey.get(`${digitSet.id}:${g.expected}`);
-        else if (mode === 'cards') {
-          const r = resolveCard(g.expected, settings.suitDigits, settings.rankDigits);
-          const s = r && setByDomain.get(r.domain);
-          if (r && s) img = bySetKey.get(`${s.id}:${r.key}`);
-        }
+        const img = resolveCellImage(g.expected, mode, chunk, settings, sets, images);
         if (img?.name) await markRecallWrong(img.id, img.setId, Date.now());
       }
     }
