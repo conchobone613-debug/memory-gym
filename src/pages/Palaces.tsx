@@ -4,7 +4,7 @@ import { db, type Locus, type Palace } from '../db/db';
 import { uid } from '../lib/random';
 import { isTyping } from '../App';
 import { useNavLock } from '../lib/navlock';
-import { Btn, Empty, Panel } from '../components/ui';
+import { Btn, ConfirmBtn, Empty, Panel } from '../components/ui';
 
 export default function Palaces() {
   const palaces = useLiveQuery(() => db.palaces.toArray(), [], [] as Palace[]);
@@ -45,7 +45,6 @@ export default function Palaces() {
 
   const removePalace = async () => {
     if (!palace) return;
-    if (!confirm(`'${palace.name}' 궁전과 장소 ${loci.length}개를 지웁니다. 계속할까요?`)) return;
     await db.transaction('rw', db.palaces, db.loci, async () => {
       await db.loci.bulkDelete(loci.map((l) => l.id));
       await db.palaces.delete(palace.id);
@@ -168,7 +167,12 @@ export default function Palaces() {
                 onClick={() => { setWalk(true); setWalkIdx(0); setHidden(false); }}>
                 워크스루
               </Btn>
-              <Btn size="sm" variant="danger" onClick={removePalace}>삭제</Btn>
+              <ConfirmBtn
+                size="sm"
+                label="삭제"
+                confirmLabel={`'${palace.name}' 과 장소 ${loci.length}개가 사라집니다`}
+                onConfirm={removePalace}
+              />
             </div>
           }
         >

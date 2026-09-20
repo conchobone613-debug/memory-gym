@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 export function Panel({ title, right, children, className = '' }: {
@@ -46,6 +46,37 @@ export function LinkBtn({ to, variant = 'ghost', size = 'md', className = '', ch
   to: string; variant?: Variant; size?: Size; className?: string; children: ReactNode;
 }) {
   return <Link to={to} className={btnClass(variant, size, className)}>{children}</Link>;
+}
+
+/**
+ * 되돌릴 수 없는 동작은 이 버튼으로 받는다.
+ * window.confirm 을 쓰지 않는 이유: 브라우저·웹뷰에 따라 대화상자가 막히면 조용히 false 가
+ * 돌아와 삭제가 아무 일도 없이 취소된다(실제로 겪음). 확인은 앱 안에서 받아야 한다.
+ */
+export function ConfirmBtn({ label, confirmLabel, onConfirm, size = 'md' }: {
+  label: ReactNode;
+  confirmLabel: ReactNode;
+  onConfirm: () => void;
+  size?: Size;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 8000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  if (!armed) {
+    return <Btn variant="danger" size={size} onClick={() => setArmed(true)}>{label}</Btn>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-lg border border-bad/60 bg-bad/10 px-1.5 py-0.5">
+      <span className="text-xs text-bad">{confirmLabel}</span>
+      <Btn variant="danger" size="sm" onClick={() => { setArmed(false); onConfirm(); }}>지웁니다</Btn>
+      <Btn size="sm" onClick={() => setArmed(false)}>취소</Btn>
+    </span>
+  );
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {

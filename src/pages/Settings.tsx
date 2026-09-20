@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { DEFAULT_SETTINGS, db, getSettings, saveSettings, type AppSettings } from '../db/db';
 import { RANKS, SUITS, SUIT_NAME, type Rank, type Suit } from '../lib/cards';
 import { exportBackup, download, importBackup, pickFile } from '../lib/io';
-import { Btn, Field, Panel } from '../components/ui';
+import { Btn, ConfirmBtn, Field, Panel } from '../components/ui';
 
 export default function Settings() {
   const stored = useLiveQuery(() => getSettings(), []);
@@ -27,7 +27,6 @@ export default function Settings() {
   const doRestore = async () => {
     const text = await pickFile('.json,application/json');
     if (!text) return;
-    if (!confirm('현재 데이터를 모두 지우고 백업 파일로 덮어씁니다. 계속할까요?')) return;
     try {
       await importBackup(text);
       setMsg('복원 완료 — 새로고침하십시오.');
@@ -37,8 +36,6 @@ export default function Settings() {
   };
 
   const wipe = async () => {
-    if (!confirm('모든 이미지·기록·궁전을 영구 삭제합니다. 되돌릴 수 없습니다. 계속할까요?')) return;
-    if (!confirm('정말 지웁니다. 백업은 받으셨습니까?')) return;
     await db.transaction('rw', db.tables, async () => { for (const t of db.tables) await t.clear(); });
     setMsg('전체 삭제 완료 — 새로고침하면 기본 세트가 다시 생성됩니다.');
   };
@@ -112,12 +109,19 @@ export default function Settings() {
       </Panel>
 
       <Panel title="백업">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Btn variant="primary" onClick={doBackup}>전체 백업 내려받기</Btn>
           <Btn onClick={doRestore}>백업에서 복원</Btn>
           <Btn onClick={() => commit(DEFAULT_SETTINGS)}>매핑 기본값으로</Btn>
-          <Btn variant="danger" onClick={wipe}>전체 삭제</Btn>
+          <ConfirmBtn
+            label="전체 삭제"
+            confirmLabel="이미지·기록·궁전이 모두 사라지고 되돌릴 수 없습니다"
+            onConfirm={wipe}
+          />
         </div>
+        <p className="mt-2 text-xs text-warn">
+          '백업에서 복원' 은 파일을 고르는 즉시 현재 데이터를 덮어씁니다. 먼저 백업을 받아 두십시오.
+        </p>
         <p className="mt-2 text-xs text-muted">
           모든 데이터는 이 브라우저 안에만 있습니다. 서버로 나가지 않으니 기기를 옮기실 땐 백업 파일을 쓰십시오.
         </p>

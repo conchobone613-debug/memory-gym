@@ -1,26 +1,34 @@
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
 import { db, ensureKeys, type ImageSet } from '../db/db';
 import { uid } from '../lib/random';
 import { loadStarter } from '../data/starter';
-import { Btn, Empty, LinkBtn, Panel } from '../components/ui';
-import { useState } from 'react';
+import { Btn, ConfirmBtn, Empty, LinkBtn, Panel } from '../components/ui';
 
 export default function Sets() {
   const sets = useLiveQuery(() => db.imageSets.toArray(), [], [] as ImageSet[]);
-  const [msg, setMsg] = useState('');
   const images = useLiveQuery(() => db.images.toArray(), [], []);
+  const [msg, setMsg] = useState('');
 
   const stat = (setId: string) => {
     const mine = images.filter((i) => i.setId === setId);
     return { total: mine.length, filled: mine.filter((i) => i.name.trim()).length };
   };
 
+  const hasDigit3 = sets.some((s) => s.domain === 'digit3');
+
   const addSet = async (name: string, gen: ImageSet['keyGenerator'], domain: ImageSet['domain']) => {
+    /* 같은 종류의 세트를 두 벌 만들면 통계가 갈라진다. 숫자 세트는 한 벌만 허용한다. */
+    if (domain !== 'custom' && sets.some((s) => s.domain === domain)) {
+      setMsg(`'${name}' 세트는 이미 있습니다. 목록에서 편집하십시오.`);
+      return;
+    }
     const t = Date.now();
     const set: ImageSet = { id: uid(), name, domain, keyGenerator: gen, builtin: false, createdAt: t, updatedAt: t };
     await db.imageSets.add(set);
-    await ensureKeys(set);
+    const made = await ensureKeys(set);
+    setMsg(`'${name}' 세트를 만들고 빈 키 ${made}개를 준비했습니다.`);
   };
 
   const fillStarter = async () => {
@@ -33,14 +41,19 @@ export default function Sets() {
   };
 
   const removeSet = async (set: ImageSet) => {
-    const s = stat(set.id);
-    if (!confirm(`'${set.name}' 세트와 이미지 ${s.filled}개를 지웁니다. 계속할까요?`)) return;
     const ids = (await db.images.where('setId').equals(set.id).toArray()).map((i) => i.id);
     await db.transaction('rw', db.images, db.imageStats, db.imageSets, async () => {
       await db.images.bulkDelete(ids);
       await db.imageStats.bulkDelete(ids);
       await db.imageSets.delete(set.id);
     });
+    setMsg(`'${set.name}' 세트를 지웠습니다.`);
+  };
+
+  const rename = async (set: ImageSet, name: string) => {
+    const next = name.trim();
+    if (!next || next === set.name) return;
+    await db.imageSets.update(set.id, { name: next, updatedAt: Date.now() });
   };
 
   return (
@@ -48,13 +61,21 @@ export default function Sets() {
       <Panel
         title="이미지 세트"
         right={
-          <div className="flex gap-1.5">
-            <Btn size="sm" variant="primary" onClick={fillStarter}>추천 이미지 불러오기</Btn>
-            <Btn size="sm" onClick={() => addSet('숫자 000–999', 'digits:3', 'digit3')}>+ 3자리 숫자</Btn>
+          <div className="flex flex-wrap gap-1.5">
+            <Btn size="sm" variant="primary" onClick={fillStarter}>추천 이미지 112개 채우기</Btn>
+            <Btn size="sm" disabled={hasDigit3} onClick={() => addSet('숫자 000–999', 'digits:3', 'digit3')}>
+              + 3자리 숫자
+            </Btn>
             <Btn size="sm" onClick={() => addSet('새 세트', undefined, 'custom')}>+ 빈 세트</Btn>
           </div>
         }
       >
+        <p className="mb-3 text-xs text-muted">
+          <b className="text-fg">추천 이미지 112개 채우기</b> — 숫자 00–99 와 인물 카드 12장에 제가 고른 이미지를
+          한 번에 넣습니다. <b className="text-fg">비어 있는 칸에만</b> 들어가고 회장님이 직접 쓰신 칸은 건드리지
+          않습니다. 마음에 안 드는 칸은 편집에서 바꾸시면 됩니다.
+        </p>
+
         {sets.length === 0 ? (
           <Empty>세트가 없습니다.</Empty>
         ) : (
@@ -63,28 +84,41 @@ export default function Sets() {
               const st = stat(s.id);
               const ratio = st.total ? st.filled / st.total : 0;
               return (
-                <li key={s.id} className="flex items-center gap-3 rounded-lg border border-line bg-panel2 px-3 py-2.5">
-                  <Link to={`/sets/${s.id}`} className="flex-1">
-                    <div className="font-medium">{s.name}</div>
-                    <div className="text-xs text-muted">
+                <li key={s.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel2 px-3 py-2.5">
+                  <div className="min-w-40 flex-1">
+                    <input
+                      defaultValue={s.name}
+                      onBlur={(e) => rename(s, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      className="w-full font-medium"
+                      aria-label="세트 이름"
+                    />
+                    <Link to={`/sets/${s.id}`} className="text-xs text-muted hover:text-accent">
                       {s.domain} · 채워진 이미지 {st.filled} / {st.total}
-                    </div>
-                  </Link>
-                  <div className="h-1.5 w-32 overflow-hidden rounded-full bg-line">
+                    </Link>
+                  </div>
+                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
                     <div className="h-full bg-accent" style={{ width: `${ratio * 100}%` }} />
                   </div>
                   <LinkBtn to={`/sets/${s.id}`} size="sm" variant="primary">편집</LinkBtn>
-                  {!s.builtin && <Btn size="sm" variant="danger" onClick={() => removeSet(s)}>삭제</Btn>}
+                  {!s.builtin && (
+                    <ConfirmBtn
+                      size="sm"
+                      label="삭제"
+                      confirmLabel={`'${s.name}' 과 채운 이미지 ${st.filled}개가 사라집니다`}
+                      onConfirm={() => removeSet(s)}
+                    />
+                  )}
                 </li>
               );
             })}
           </ul>
         )}
       </Panel>
+
       {msg && <p className="text-xs text-accent">{msg}</p>}
       <p className="text-xs text-muted">
         카드 A~10 은 숫자 세트의 이미지를 그대로 씁니다. 따로 채우실 것은 인물 12장뿐입니다.
-        추천 이미지는 빈 칸에만 들어가며, 마음에 안 드는 칸은 편집에서 바꾸시면 됩니다.
       </p>
     </div>
   );
