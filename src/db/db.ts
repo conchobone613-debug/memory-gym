@@ -46,6 +46,7 @@ export interface DrillSession {
   setIds: string[];
   pickMode: PickMode;
   itemCount: number;
+  /** 1 = 모든 문항을 타이핑으로 채점. 자가 채점을 쓰던 시절 기록은 0.1 처럼 남아 있다. */
   typedCheckRate: number;
 }
 
@@ -147,7 +148,6 @@ export interface AppSettings {
   chosungMap: ChosungMap;
   suitDigits: SuitDigits;
   rankDigits: RankDigits;
-  typedCheckRate: number;
   drillCount: number;
   /** 초급 단계에서 낼 방향. 기본은 외울 때 쓰는 숫자 → 자음. */
   mappingDirection: 'toConsonant' | 'toDigit' | 'mix';
@@ -248,7 +248,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   chosungMap: DEFAULT_CHOSUNG_MAP,
   suitDigits: DEFAULT_SUIT_DIGITS,
   rankDigits: DEFAULT_RANK_DIGITS,
-  typedCheckRate: 0.1,
   drillCount: 30,
   mappingDirection: 'toConsonant',
 };

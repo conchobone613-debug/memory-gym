@@ -65,7 +65,10 @@ export async function confusionPairs(limit = 10): Promise<ConfusionPair[]> {
   };
   for (const c of cells) bump(c.expected, c.answered, '실전');
 
-  const typed = await db.drillAttempts.filter((a) => a.typedMatch === 'none' && !!a.typedInput).toArray();
+  /* 초성만 맞은 것도 센다 — 다른 칸 이름을 쳤는데 코드 앞자리가 겹치면 그쪽으로 분류되기 때문 */
+  const typed = await db.drillAttempts
+    .filter((a) => !!a.typedInput && (a.typedMatch === 'none' || a.typedMatch === 'chosung'))
+    .toArray();
   const images = await db.images.toArray();
   const byName = new Map(images.filter((i) => i.name).map((i) => [i.name.replace(/\s+/g, ''), i]));
   for (const a of typed) {

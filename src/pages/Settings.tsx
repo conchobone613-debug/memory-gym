@@ -120,12 +120,10 @@ export default function Settings() {
               onChange={(e) => setS({ ...s, drillCount: Number(e.target.value) })}
               onBlur={() => commit({ drillCount: s.drillCount })} />
           </Field>
-          <Field label="타이핑 검증 확률" hint="0.1 = 10%">
-            <input type="number" min={0} max={1} step={0.05} value={s.typedCheckRate}
-              onChange={(e) => setS({ ...s, typedCheckRate: Number(e.target.value) })}
-              onBlur={() => commit({ typedCheckRate: s.typedCheckRate })} />
-          </Field>
         </div>
+        <p className="mt-3 text-xs text-muted">
+          3단계는 모든 문항을 이름 타이핑으로 채점합니다. 맞음/틀림을 직접 누르던 방식은 없앴습니다.
+        </p>
       </Panel>
 
       <SyncPanel />

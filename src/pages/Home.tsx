@@ -192,7 +192,7 @@ export default function Home() {
             <summary className="cursor-pointer text-xs text-muted">키보드 단축키</summary>
             <ul className="mt-2 flex flex-col gap-1.5 text-xs text-muted">
               <li>기초 1·2단계: 자판의 자음 키 · 숫자 키 (한/영 무관, 화면 버튼도 있음)</li>
-              <li>이미지 드릴: <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단</li>
+              <li>이미지 드릴: 이름 입력 후 <kbd>Enter</kbd> · 빈칸에서 <kbd>Backspace</kbd> 앞 문제 · <kbd>Esc</kbd> 중단</li>
               <li>세트 편집: 방향키 이동 · <kbd>Enter</kbd> 저장·다음 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 다음 빈칸</li>
               <li>실전: 암기 중 <kbd>Enter</kbd> 조기 종료 · 회상 중 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 제출</li>
               <li>채점: <kbd>1</kbd>–<kbd>4</kbd> 원인 태그 · <kbd>↑</kbd><kbd>↓</kbd> 칸 이동</li>

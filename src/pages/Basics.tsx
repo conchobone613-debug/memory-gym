@@ -6,7 +6,7 @@ import {
 } from '../db/db';
 import { recordAttempt, undoAttempt } from '../db/record';
 import { buildQueue, median, rank } from '../lib/srs';
-import { matchName, type MatchKind } from '../lib/hangul';
+import { codeOfName, hintForKey, matchName, type ChosungMap, type MatchKind } from '../lib/hangul';
 import { cardLabel, fullDeck, resolveCard } from '../lib/cards';
 import { pickOne, randBelow, uid } from '../lib/random';
 import { streaks } from '../lib/streak';
@@ -17,7 +17,7 @@ import GoalPanel from '../components/GoalPanel';
 import { isTyping } from '../App';
 import { Btn, Empty, Field, LinkBtn, Panel, Stat, Streak, fmtMs, fmtPct } from '../components/ui';
 
-type Phase = 'setup' | 'showing' | 'typing' | 'reveal' | 'done';
+type Phase = 'setup' | 'asking' | 'feedback' | 'done';
 
 const mmss = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -50,6 +50,52 @@ const MODE_LABEL: Record<PickMode, string> = {
   unseen: '아직 안 본 것',
 };
 
+const MATCH_LABEL: Record<MatchKind, string> = {
+  exact: '정확', alias: '별칭', chosung: '초성만', none: '불일치',
+};
+
+/**
+ * 결과 표에서 이름을 바로 고친다.
+ *
+ * 이름이 안 붙는다는 걸 아는 순간이 바로 여기다 — 방금 틀린 줄을 보면서. 세트 편집기까지
+ * 가라고 하면 그 순간을 놓친다. 초성이 키와 맞는지도 옆에서 바로 알려 준다.
+ */
+function NameCell({ image, map, isDigits }: { image: MemoImage; map: ChosungMap; isDigits: boolean }) {
+  const [v, setV] = useState(image.name);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => setV(image.name), [image.name]);
+
+  const save = async () => {
+    const name = v.trim();
+    if (name === image.name) return;
+    await db.images.update(image.id, { name, updatedAt: Date.now() });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  const code = isDigits && v.trim() ? codeOfName(v, map) : null;
+  const bad = isDigits && !!v.trim() && !(code && code.startsWith(image.key));
+
+  return (
+    <span className="flex items-center gap-1.5">
+      <input
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+        className={`w-full min-w-0 px-1.5 py-0.5 text-sm ${bad ? 'border-bad/60' : ''}`}
+        aria-label={`${image.key} 이미지 이름`}
+      />
+      {bad && (
+        <span className="shrink-0 text-[11px] text-bad" title={`초성이 ${hintForKey(image.key, map)} 이어야 합니다`}>
+          초성 ✕
+        </span>
+      )}
+      {saved && <span className="shrink-0 text-[11px] text-good">저장</span>}
+    </span>
+  );
+}
+
 export default function Drill() {
   const sets = useLiveQuery(() => db.imageSets.toArray(), [], [] as ImageSet[]);
   const images = useLiveQuery(() => db.images.toArray(), [], [] as MemoImage[]);
@@ -70,14 +116,14 @@ export default function Drill() {
   const [mode, setMode] = useState<PickMode>('srs');
   const [style, setStyle] = useState<Style>('key');
   const [count, setCount] = useState(30);
-  const [typedRate, setTypedRate] = useState(0.1);
 
   const [phase, setPhase] = useState<Phase>('setup');
   const [queue, setQueue] = useState<Trial[]>([]);
   const [idx, setIdx] = useState(0);
   const [results, setResults] = useState<Result[]>([]);
   const [typedInput, setTypedInput] = useState('');
-  const [typedMatch, setTypedMatch] = useState<MatchKind | undefined>();
+  /** 한/영이 영문에 있을 때. 오답으로 세지 않고 알려만 준다 — 몰라서 틀린 게 아니다. */
+  const [imeHint, setImeHint] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [flash, setFlash] = useState<'good' | 'bad' | null>(null);
   const [streak, setStreak] = useState(0);
@@ -101,8 +147,8 @@ export default function Drill() {
   }, [sets, images]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (settings) { setTypedRate(settings.typedCheckRate); setCount(settings.drillCount); }
-  }, [settings?.typedCheckRate, settings?.drillCount]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (settings) setCount(settings.drillCount);
+  }, [settings?.drillCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(
     () =>
@@ -149,7 +195,7 @@ export default function Drill() {
     const id = uid();
     await db.drillSessions.add({
       id, startedAt: Date.now(), setIds: selected, pickMode: mode,
-      itemCount: trials.length, typedCheckRate: typedRate,
+      itemCount: trials.length, typedCheckRate: 1,
     });
     setSessionId(id);
     setQueue(trials);
@@ -159,9 +205,11 @@ export default function Drill() {
     setElapsed(0);
     setStreak(0);
     setBestStreak(0);
+    setTypedInput('');
+    setImeHint(false);
     setFlash(null);
-    setPhase('showing');
-  }, [cardsByImage, count, mode, pool, selected, stats, style, typedRate]);
+    setPhase('asking');
+  }, [cardsByImage, count, mode, pool, selected, stats, style]);
 
   const finish = useCallback(async (final: Result[]) => {
     const now = Date.now();
@@ -171,46 +219,64 @@ export default function Drill() {
     setPhase('done');
   }, [sessionId]);
 
-  const commit = useCallback(
-    async (verdict: Verdict) => {
-      const trial = queue[idx];
-      if (!trial) return;
-      const attempt: DrillAttempt = {
-        id: uid(), sessionId, order: idx,
-        imageId: trial.image.id, setId: trial.image.setId, key: trial.image.key,
-        stimulus: trial.stimulus, rtMs: rtRef.current, verdict,
-        typedInput: typedInput || undefined, typedMatch, shownAt: Date.now(),
-      };
-      const prevStat = await recordAttempt(attempt);
-      setFlash(verdict === 'correct' ? 'good' : 'bad');
-      setTimeout(() => setFlash(null), 340);
-      if (verdict === 'correct') {
-        setStreak((v) => { const n = v + 1; setBestStreak((b) => Math.max(b, n)); return n; });
-      } else if (verdict === 'wrong') {
-        setStreak(0);
-      }
-      const next = [
-        ...results,
-        {
-          trial, rtMs: rtRef.current, verdict,
-          typedInput: typedInput || undefined, typedMatch,
-          attemptId: attempt.id, prevStat,
-        },
-      ];
-      setTypedInput('');
-      setTypedMatch(undefined);
+  /**
+   * 채점은 타이핑으로만 한다.
+   *
+   * 예전에는 스페이스로 '떠올랐다'를 표시하고 회장이 맞음/틀림을 직접 눌렀다. 자가 채점은
+   * 손이 미끄러질 수 있고, 무엇보다 **떠올렸다고 믿은 것과 실제로 떠올린 것을 구분하지 못한다.**
+   * 이름을 쳐야만 넘어가게 하면 그 구분이 사라진다.
+   *
+   * 정답 기준은 **이름 그대로(또는 별칭)** 다. 초성만 맞은 것은 오답으로 센다 — '82'에서 'ㅈㄴ'
+   * 는 이미지를 떠올리지 않고 2단계 변환만 해도 나오기 때문이다. 그걸 정답으로 세면 3단계가
+   * 2단계와 같아진다.
+   */
+  const submit = useCallback(async () => {
+    const trial = queue[idx];
+    if (!trial || !settings) return;
+    const raw = typedInput.trim();
+    if (!raw) return;
+    if (/^[A-Za-z ]+$/.test(raw)) { setImeHint(true); return; }
+
+    const set = sets.find((s) => s.id === trial.image.setId);
+    const m = matchName(raw, trial.image, settings.chosungMap, set?.domain !== 'cardFace');
+    const verdict: Verdict = m === 'exact' || m === 'alias' ? 'correct' : 'wrong';
+
+    const attempt: DrillAttempt = {
+      id: uid(), sessionId, order: idx,
+      imageId: trial.image.id, setId: trial.image.setId, key: trial.image.key,
+      stimulus: trial.stimulus, rtMs: rtRef.current, verdict,
+      typedInput: raw, typedMatch: m, shownAt: Date.now(),
+    };
+    const prevStat = await recordAttempt(attempt);
+    const next = [...results, { trial, rtMs: rtRef.current, verdict, typedInput: raw, typedMatch: m, attemptId: attempt.id, prevStat }];
+
+    setResults(next);
+    setTypedInput('');
+    setImeHint(false);
+    setFlash(verdict === 'correct' ? 'good' : 'bad');
+    setTimeout(() => setFlash(null), 340);
+
+    if (verdict === 'correct') {
+      /* 맞으면 멈추지 않는다. 틀렸을 때만 이름을 보여주고 붙잡는다 (1·2단계와 같다). */
+      setStreak((v) => { const n = v + 1; setBestStreak((b) => Math.max(b, n)); return n; });
       if (idx + 1 >= queue.length) await finish(next);
-      else { setResults(next); setIdx(idx + 1); setPhase('showing'); }
-    },
-    [finish, idx, queue, results, sessionId, typedInput, typedMatch],
-  );
+      else setIdx(idx + 1);
+    } else {
+      setStreak(0);
+      setPhase('feedback');
+    }
+  }, [finish, idx, queue, results, sessionId, sets, settings, typedInput]);
+
+  const continueAfterWrong = useCallback(() => {
+    if (idx + 1 >= queue.length) finish(results);
+    else { setIdx(idx + 1); setPhase('asking'); }
+  }, [finish, idx, queue.length, results]);
 
   /**
-   * 한 문제 뒤로 — 판정을 잘못 눌렀을 때.
+   * 한 문제 뒤로 — 오타로 넘어갔을 때.
    *
-   * 화면만 되돌리면 기록은 틀린 채로 남는다. 원시 기록과 통계까지 같이 되돌린다.
-   * 누를 때마다 한 칸씩 뒤로 가므로 몇 문제 전으로도 돌아갈 수 있다.
-   * 반응시간은 처음 것을 그대로 쓴다 — 다시 재는 것은 이미 답을 본 뒤라 의미가 없다.
+   * 화면만 되돌리면 기록은 틀린 채로 남는다. 원시 기록과 통계까지 같이 되돌리고 그 문제를
+   * 다시 낸다. 누를 때마다 한 칸씩 뒤로 가므로 몇 문제 전으로도 돌아갈 수 있다.
    */
   const undo = useCallback(async () => {
     if (undoing) return;
@@ -226,25 +292,29 @@ export default function Drill() {
       setStreak(s.cur);
       setBestStreak(s.best);
       setIdx(rest.length);
-      rtRef.current = last.rtMs;
-      setTypedInput(last.typedInput ?? '');
-      setTypedMatch(last.typedMatch);
+      setTypedInput('');
+      setImeHint(false);
       setFlash(null);
-      setPhase('reveal');
+      setPhase('asking');
     } finally {
       setUndoing(false);
     }
   }, [phase, results, sessionId, undoing]);
 
-  const onSpace = useCallback(() => {
-    rtRef.current = Math.round(performance.now() - t0.current);
-    const ask = randBelow(1000) / 1000 < typedRate;
-    setPhase(ask ? 'typing' : 'reveal');
-    if (ask) requestAnimationFrame(() => typedRef.current?.focus());
-  }, [typedRate]);
+  /** 반응시간은 **첫 글자를 치기까지**로 잰다. 타자 속도가 아니라 이미지가 떠오른 때가 알고 싶다. */
+  const onType = (v: string) => {
+    if (!rtRef.current && v) rtRef.current = Math.round(performance.now() - t0.current);
+    setTypedInput(v);
+    if (imeHint) setImeHint(false);
+  };
 
   useEffect(() => {
-    if (phase === 'showing') t0.current = performance.now();
+    if (phase !== 'asking') return;
+    t0.current = performance.now();
+    rtRef.current = 0;
+    /* requestAnimationFrame 을 쓰지 않는다 — 창이 그리지 않는 동안에는 콜백이 오지 않아
+       입력칸에 포커스가 안 잡히고, 그러면 아무리 쳐도 글자가 안 들어간다. */
+    typedRef.current?.focus();
   }, [phase, idx]);
 
   useEffect(() => {
@@ -253,33 +323,20 @@ export default function Drill() {
     return () => clearInterval(t);
   }, [phase]);
 
-  /* 드릴 단축키 */
+  /* 드릴 단축키 — 입력칸 안에서 오는 키는 입력칸이 먼저 처리한다 */
   useEffect(() => {
     if (phase === 'setup' || phase === 'done') return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); finish(results); return; }
       if (isTyping(e.target)) return;
-      if (e.key === 'Backspace') { e.preventDefault(); undo(); return; }
-      if (phase === 'showing' && (e.code === 'Space' || e.key === ' ')) { e.preventDefault(); onSpace(); }
-      else if (phase === 'reveal') {
-        /* 화면 왼쪽이 맞음, 오른쪽이 틀림. 키보드에서도 D 가 F 왼쪽이라 순서가 맞는다. */
-        const k = e.key.toLowerCase();
-        if (k === 'd') { e.preventDefault(); commit('correct'); }
-        else if (k === 'f') { e.preventDefault(); commit('wrong'); }
+      if (phase === 'feedback') {
+        if (e.key === 'Enter' || e.code === 'Space' || e.key === ' ') { e.preventDefault(); continueAfterWrong(); }
+        else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [commit, finish, onSpace, phase, results, undo]);
-
-  const submitTyped = () => {
-    const trial = queue[idx];
-    if (!trial || !settings) return;
-    const set = sets.find((s) => s.id === trial.image.setId);
-    const m = matchName(typedInput, trial.image, settings.chosungMap, set?.domain !== 'cardFace');
-    setTypedMatch(m);
-    setPhase('reveal');
-  };
+  }, [continueAfterWrong, finish, phase, results, undo]);
 
   const stageTabs = (
     <div className="flex flex-col gap-2">
@@ -413,18 +470,9 @@ export default function Drill() {
                   <option value="mix">섞기</option>
                 </select>
               </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="문항 수">
-                  <input type="number" min={5} max={300} value={count} onChange={(e) => setCount(Number(e.target.value))} />
-                </Field>
-                <Field label="타이핑 검증 확률">
-                  <input
-                    type="number" min={0} max={1} step={0.05}
-                    value={typedRate}
-                    onChange={(e) => setTypedRate(Number(e.target.value))}
-                  />
-                </Field>
-              </div>
+              <Field label="문항 수">
+                <input type="number" min={5} max={300} value={count} onChange={(e) => setCount(Number(e.target.value))} />
+              </Field>
             </div>
           </div>
           {m3 && <div className="mt-4"><GoalPanel goal={m3} /></div>}
@@ -432,8 +480,8 @@ export default function Drill() {
           <div className="mt-4 flex items-center gap-3">
             <Btn variant="primary" size="lg" disabled={namedCount === 0} onClick={start}>시작</Btn>
             <span className="text-xs text-muted">
-              출제 가능한 이미지 {namedCount}개 · <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 ·{' '}
-              <kbd>Backspace</kbd> 앞 문제 · <kbd>Esc</kbd> 중단
+              출제 가능한 이미지 {namedCount}개 · 이름을 치고 <kbd>Enter</kbd> ·{' '}
+              빈칸에서 <kbd>Backspace</kbd> 앞 문제 · <kbd>Esc</kbd> 중단
             </span>
           </div>
           {namedCount === 0 && (
@@ -468,30 +516,50 @@ export default function Drill() {
               </div>
               {m3 && <div className="mt-4"><GoalPanel goal={m3} celebrate /></div>}
               <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-line">
-                <table className="w-full text-sm">
+                {/* 좁은 화면에서는 이름칸이 짓눌리느니 가로로 밀리는 편이 낫다 */}
+                <table className="w-full min-w-[34rem] text-sm">
                   <thead className="sticky top-0 bg-panel2 text-xs text-muted">
                     <tr>
-                      <th className="px-2 py-1.5 text-left">자극</th>
-                      <th className="px-2 py-1.5 text-left">이미지</th>
-                      <th className="px-2 py-1.5 text-right">반응</th>
-                      <th className="px-2 py-1.5 text-center">판정</th>
-                      <th className="px-2 py-1.5 text-left">타이핑</th>
+                      <th className="w-16 px-2 py-1.5 text-left">자극</th>
+                      <th className="px-2 py-1.5 text-left">이미지 <span className="font-normal text-muted/70">— 눌러서 고치실 수 있습니다</span></th>
+                      <th className="w-20 px-2 py-1.5 text-right">반응</th>
+                      <th className="w-12 px-2 py-1.5 text-center">판정</th>
+                      <th className="px-2 py-1.5 text-left">치신 것</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {results.map((r, i) => (
-                      <tr key={i} className="border-t border-line/60">
-                        <td className="tnum px-2 py-1">{r.trial.display}</td>
-                        <td className="px-2 py-1">{r.trial.image.name}</td>
-                        <td className="tnum px-2 py-1 text-right">{fmtMs(r.rtMs)}</td>
-                        <td className={`px-2 py-1 text-center ${r.verdict === 'correct' ? 'text-good' : 'text-bad'}`}>
-                          {r.verdict === 'correct' ? '○' : r.verdict === 'wrong' ? '×' : '–'}
-                        </td>
-                        <td className="px-2 py-1 text-xs text-muted">
-                          {r.typedInput ? `${r.typedInput} (${r.typedMatch})` : ''}
-                        </td>
-                      </tr>
-                    ))}
+                    {results.map((r, i) => {
+                      const live = images.find((im) => im.id === r.trial.image.id) ?? r.trial.image;
+                      const dom = sets.find((st) => st.id === live.setId)?.domain;
+                      return (
+                        <tr key={i} className="border-t border-line/60">
+                          <td className="tnum px-2 py-1">{r.trial.display}</td>
+                          <td className="px-2 py-1">
+                            {settings && (
+                              <NameCell
+                                image={live}
+                                map={settings.chosungMap}
+                                isDigits={dom === 'digit2' || dom === 'digit3'}
+                              />
+                            )}
+                          </td>
+                          <td className="tnum px-2 py-1 text-right">{fmtMs(r.rtMs)}</td>
+                          <td className={`px-2 py-1 text-center ${r.verdict === 'correct' ? 'text-good' : 'text-bad'}`}>
+                            {r.verdict === 'correct' ? '○' : '×'}
+                          </td>
+                          <td className="px-2 py-1 text-xs text-muted">
+                            {r.typedInput && (
+                              <>
+                                {r.typedInput}{' '}
+                                <span className={r.typedMatch === 'none' || r.typedMatch === 'chosung' ? 'text-bad' : 'text-good'}>
+                                  {MATCH_LABEL[r.typedMatch ?? 'none']}
+                                </span>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -513,6 +581,9 @@ export default function Drill() {
   /* ───────── 실행 화면 ───────── */
   const trial = queue[idx];
   if (!trial) return <Empty>출제할 문항이 없습니다.</Empty>;
+  /* 틀려서 붙잡혀 있는 동안에는 방금 틀린 문제를 계속 보여 준다 */
+  const last = phase === 'feedback' ? results[results.length - 1] : undefined;
+  const shown = last?.trial ?? trial;
 
   return (
     <div className="flex flex-col gap-4">
@@ -536,55 +607,59 @@ export default function Drill() {
       </div>
 
       <div
-        className={`flex min-h-[22rem] cursor-pointer flex-col items-center justify-center gap-6 rounded-xl border px-4 py-6 transition-colors select-none ${
+        className={`flex min-h-[22rem] flex-col items-center justify-center gap-6 rounded-xl border px-4 py-6 transition-colors ${
           flash === 'good' ? 'mg-good border-good/70 bg-good/10' :
           flash === 'bad' ? 'mg-bad border-bad/70 bg-bad/10' :
           'border-line bg-panel'
         }`}
-        onClick={() => phase === 'showing' && onSpace()}
+        onClick={() => phase === 'asking' && typedRef.current?.focus()}
       >
-        <div className="tnum text-[5.5rem] leading-none font-semibold tracking-wider">{trial.display}</div>
+        <div className="tnum text-[5.5rem] leading-none font-semibold tracking-wider">{shown.display}</div>
 
-        {phase === 'showing' && (
-          <p className="text-sm text-muted">이미지가 떠오르면 <kbd>Space</kbd></p>
-        )}
-
-        {phase === 'typing' && (
-          <div className="flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <span className="text-xs text-muted">타이핑 검증 — 이미지 이름을 입력하십시오</span>
-            <input
-              ref={typedRef}
-              value={typedInput}
-              onChange={(e) => setTypedInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitTyped(); } }}
-              className="w-56 text-center text-lg"
-              placeholder="이름 + Enter"
-            />
+        {phase === 'asking' && (
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                ref={typedRef}
+                value={typedInput}
+                onChange={(e) => onType(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); submit(); }
+                  /* 아무것도 안 친 상태의 Backspace 는 앞 문제로 (1·2단계와 같은 규칙) */
+                  else if (e.key === 'Backspace' && !e.currentTarget.value) { e.preventDefault(); undo(); }
+                }}
+                className="w-56 text-center text-xl"
+                placeholder="이미지 이름"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              {/* 휴대폰에는 Enter 가 잘 안 보인다 */}
+              <Btn variant="primary" onClick={submit} disabled={!typedInput.trim()}>확인</Btn>
+            </div>
+            <span className="text-xs text-muted">
+              {imeHint ? '한/영 을 한글로 바꾸고 다시 쳐 주십시오' : '이름을 치고 Enter'}
+            </span>
           </div>
         )}
 
-        {phase === 'reveal' && (
+        {phase === 'feedback' && last && (
           <div className="flex flex-col items-center gap-3">
-            <div className="text-3xl font-semibold text-accent">{trial.image.name}</div>
-            {trial.image.note && <div className="text-sm text-muted">{trial.image.note}</div>}
-            {typedMatch && (
-              <div className={`text-sm ${typedMatch === 'none' ? 'text-bad' : 'text-good'}`}>
-                타이핑 「{typedInput || '—'}」 →{' '}
-                {typedMatch === 'none' ? '불일치' : typedMatch === 'chosung' ? '초성 일치' : typedMatch === 'alias' ? '별칭 일치' : '정확 일치'}
-              </div>
+            <div className="text-sm text-bad">치신 것 — {last.typedInput || '—'}</div>
+            <div className="text-4xl font-semibold text-good">{last.trial.image.name}</div>
+            {last.trial.image.note && <div className="text-sm text-muted">{last.trial.image.note}</div>}
+            {last.typedMatch === 'chosung' && (
+              <div className="text-xs text-warn">초성은 맞았습니다 — 이름까지 떠올라야 합니다</div>
             )}
-            <div className="tnum text-xs text-muted">{fmtMs(rtRef.current)}</div>
-            <div className="grid w-full max-w-sm grid-cols-2 gap-2">
-              <Btn variant="good" size="lg" className="min-h-14" onClick={(e) => { e.stopPropagation(); commit('correct'); }}>
-                맞음 <span className="text-xs opacity-70">D</span>
-              </Btn>
-              <Btn variant="danger" size="lg" className="min-h-14" onClick={(e) => { e.stopPropagation(); commit('wrong'); }}>
-                틀림 <span className="text-xs opacity-70">F</span>
-              </Btn>
-            </div>
+            <div className="tnum text-xs text-muted">{fmtMs(last.rtMs)}</div>
+            <Btn variant="primary" onClick={continueAfterWrong}>계속 (Enter)</Btn>
           </div>
         )}
       </div>
+
+      <p className="text-center text-xs text-muted">
+        떠오른 이름을 그대로 치십시오. 초성만으로는 넘어가지 않습니다 — 그건 2단계입니다.
+      </p>
     </div>
   );
 }
