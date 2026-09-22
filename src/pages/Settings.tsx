@@ -121,9 +121,6 @@ export default function Settings() {
               onBlur={() => commit({ drillCount: s.drillCount })} />
           </Field>
         </div>
-        <p className="mt-3 text-xs text-muted">
-          3단계는 모든 문항을 이름 타이핑으로 채점합니다. 맞음/틀림을 직접 누르던 방식은 없앴습니다.
-        </p>
       </Panel>
 
       <SyncPanel />

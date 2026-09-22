@@ -33,9 +33,6 @@ export default function Assets() {
   return (
     <div className="flex flex-col gap-4">
       <Panel title="자산">
-        <p className="mb-3 text-xs text-muted">
-          훈련하기 전에 만들어 두는 것들입니다. 한 번 잘 만들어 두면 모든 종목에서 계속 씁니다.
-        </p>
         <div className="grid gap-3 md:grid-cols-2">
           {cards.map((c) => (
             <Link

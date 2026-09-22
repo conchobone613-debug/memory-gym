@@ -404,9 +404,6 @@ export default function Drill() {
           </button>
         ))}
       </div>
-      <p className="text-xs text-muted">
-        자음 매핑이 아직 안 붙으셨으면 1단계부터 하십시오. 이미지 드릴은 매핑이 자동으로 나온 뒤에 효과가 납니다.
-      </p>
     </div>
   );
 
@@ -447,7 +444,7 @@ export default function Drill() {
                             setSelected((cur) => (e.target.checked ? [...cur, s.id] : cur.filter((x) => x !== s.id)))
                           }
                         />
-                        {s.name} <span className="text-xs text-muted">({mine.length}개)</span>
+                        {s.name}
                       </label>
 
                       {on && isDigits && (
@@ -476,18 +473,13 @@ export default function Drill() {
                               );
                             })}
                           </div>
-                          <div className="mt-1 flex items-center gap-2 text-[11px] text-muted">
-                            <button type="button" className="hover:text-accent"
-                              onClick={() => setDecades((c) => ({ ...c, [s.id]: [] }))}>
-                              전체
-                            </button>
-                            <span>·</span>
-                            <span>
-                              {picked.length === 0
-                                ? '열 묶음 모두 출제합니다'
-                                : `${picked.length}묶음만 출제합니다`}
-                            </span>
-                          </div>
+                          <button
+                            type="button"
+                            className="mt-1 text-[11px] text-muted hover:text-accent"
+                            onClick={() => setDecades((c) => ({ ...c, [s.id]: [] }))}
+                          >
+                            전체
+                          </button>
                         </div>
                       )}
                     </div>
@@ -519,10 +511,6 @@ export default function Drill() {
 
           <div className="mt-4 flex items-center gap-3">
             <Btn variant="primary" size="lg" disabled={namedCount === 0} onClick={start}>시작</Btn>
-            <span className="text-xs text-muted">
-              출제 가능한 이미지 {namedCount}개 · 이름을 치고 <kbd>Enter</kbd> ·{' '}
-              빈칸에서 <kbd>Backspace</kbd> 앞 문제 · <kbd>Esc</kbd> 중단
-            </span>
           </div>
           {namedCount === 0 && (
             <p className="mt-3 text-sm text-warn">
@@ -561,7 +549,7 @@ export default function Drill() {
                   <thead className="sticky top-0 bg-panel2 text-xs text-muted">
                     <tr>
                       <th className="w-16 px-2 py-1.5 text-left">자극</th>
-                      <th className="px-2 py-1.5 text-left">이미지 <span className="font-normal text-muted/70">— 눌러서 고치실 수 있습니다</span></th>
+                      <th className="px-2 py-1.5 text-left">이미지</th>
                       <th className="w-20 px-2 py-1.5 text-right">반응</th>
                       <th className="w-12 px-2 py-1.5 text-center">판정</th>
                       <th className="px-2 py-1.5 text-left">치신 것</th>
@@ -677,9 +665,7 @@ export default function Drill() {
               {/* 휴대폰에는 Enter 가 잘 안 보인다 */}
               <Btn variant="primary" onClick={submit} disabled={!typedInput.trim()}>확인</Btn>
             </div>
-            <span className="text-xs text-muted">
-              {imeHint ? '한/영 을 한글로 바꾸고 다시 쳐 주십시오' : '이름을 치고 Enter'}
-            </span>
+            {imeHint && <span className="text-xs text-warn">한/영 을 한글로</span>}
           </div>
         )}
 
@@ -696,10 +682,6 @@ export default function Drill() {
           </div>
         )}
       </div>
-
-      <p className="text-center text-xs text-muted">
-        떠오른 이름을 그대로 치십시오. 초성만으로는 넘어가지 않습니다 — 그건 2단계입니다.
-      </p>
     </div>
   );
 }

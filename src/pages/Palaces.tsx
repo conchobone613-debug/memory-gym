@@ -104,9 +104,6 @@ export default function Palaces() {
           <span className="tnum text-sm text-muted">{walkIdx + 1}번 장소</span>
           <div className="text-4xl font-semibold">{hidden ? '● ● ●' : l?.name}</div>
           {!hidden && l?.note && <div className="text-sm text-muted">{l.note}</div>}
-          <p className="text-xs text-muted">
-            <kbd>Space</kbd> 가리기 · <kbd>→</kbd> 다음 · <kbd>←</kbd> 이전
-          </p>
         </div>
       </div>
     );

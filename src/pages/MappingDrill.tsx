@@ -232,12 +232,6 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
       <div className="flex flex-col gap-4">
       {header}
       <Panel title={STAGE_TITLE[stage]}>
-        <p className="mb-3 text-sm text-muted">
-          {stage === 1
-            ? '숫자를 보면 자음이 바로 나올 때까지 합니다. 이미지는 아직 쓰지 않습니다.'
-            : '두 자리를 자음 두 개로 한 번에 읽는 연습입니다. 이미지는 그다음입니다.'}
-        </p>
-
         {settings && (
           <div className="mb-4">
             <ChosungKey map={settings.chosungMap} compact={stage === 2} />
@@ -257,9 +251,9 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           <div className="mb-1 text-xs text-muted">방향</div>
           <div className="grid gap-1.5 sm:grid-cols-3">
             {([
-              { v: 'toConsonant' as const, t: '숫자 → 자음', d: '외울 때 쓰는 방향 · 먼저 이것부터' },
-              { v: 'toDigit' as const, t: '자음 → 숫자', d: '회상에서 막혔을 때 되짚는 길' },
-              { v: 'mix' as const, t: '섞기', d: '양쪽이 다 붙은 뒤' },
+              { v: 'toConsonant' as const, t: '숫자 → 자음' },
+              { v: 'toDigit' as const, t: '자음 → 숫자' },
+              { v: 'mix' as const, t: '섞기' },
             ]).map((o) => (
               <button
                 key={o.v}
@@ -269,7 +263,6 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
                 }`}
               >
                 <div className="text-sm font-medium">{o.t}</div>
-                <div className="text-[11px] text-muted">{o.d}</div>
               </button>
             ))}
           </div>
@@ -281,12 +274,6 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           </Field>
           <Btn variant="primary" size="lg" onClick={start}>시작</Btn>
         </div>
-
-        <p className="mt-3 text-xs text-muted">
-          답이 자음이면 자판의 자음 키를, 숫자면 숫자 키를 그냥 누르십시오. 한/영 상태는 상관없습니다.
-          지울 땐 <kbd>Backspace</kbd>, 중단은 <kbd>Esc</kbd> 입니다.
-          잘못 눌러 넘어갔으면 아무것도 안 친 상태에서 <kbd>Backspace</kbd> 를 누르십시오 — 앞 문제로 돌아갑니다.
-        </p>
 
       </Panel>
       </div>
@@ -396,9 +383,6 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
                 </span>
               ))}
             </div>
-            <span className="text-xs text-muted">
-              {q.groups ? '자음을 누르십시오' : '숫자를 누르십시오'}
-            </span>
             <Keypad
               kind={q.groups ? 'jamo' : 'digit'}
               onPress={push}
@@ -415,12 +399,6 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           </div>
         )}
       </div>
-
-      <p className="text-center text-xs text-muted">
-        {q.groups
-          ? '자판이든 화면이든 편한 쪽으로 누르십시오. 한/영 상태는 상관없습니다.'
-          : '자판이든 화면이든 편한 쪽으로 누르십시오.'}
-      </p>
     </div>
   );
 }

@@ -12,8 +12,6 @@ export default function Events() {
         right={<span className="tnum text-xs text-muted">열림 {ready.length} / {MEMORY_EVENTS.length}</span>}
       >
         <p className="mb-3 text-xs text-muted">
-          종목을 고르시면 안에 <b className="text-fg">연습</b>과 <b className="text-fg">실전</b>이 있습니다.
-          잠긴 종목도 들어가 보실 수 있고, 무엇이 있어야 열리는지 적어 두었습니다.
           시간은 WMSC·IAM 기준이며 연맹과 해에 따라 다릅니다.
         </p>
 

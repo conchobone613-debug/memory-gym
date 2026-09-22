@@ -205,7 +205,6 @@ export default function SetEditor() {
       {draft && settings && (
         <Panel
           title={`${label(draft.key)} 편집`}
-          right={<span className="text-[11px] text-muted">Enter 저장·다음 · Shift+Enter 다음 빈칸 · 방향키 이동</span>}
         >
           <div className="grid gap-3 md:grid-cols-2">
             <Field
@@ -257,7 +256,7 @@ export default function SetEditor() {
           {suggestions.length > 0 && (
             <div className="mt-3">
               <div className="mb-1.5 text-xs text-muted">
-                이름 후보 <span className="text-muted/70">— 초성이 맞는 구체 명사만 골라 놓았습니다. 누르면 바로 들어갑니다</span>
+이름 후보
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {suggestions.map((sg) => (

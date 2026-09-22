@@ -284,11 +284,6 @@ export default function Practice() {
   if (phase === 'setup') {
     return (
       <Panel title={easy ? '연습' : '실전'}>
-        <p className="mb-3 text-sm text-muted">
-          {easy
-            ? '시간을 재지 않습니다. 분량도 짧게 냅니다. 채점할 때 이미지 이름과 궁전 장소를 같이 보여 줍니다.'
-            : '대회 규격으로 시간을 잽니다. 암기 시간이 끝나면 자동으로 회상으로 넘어갑니다.'}
-        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-3">
             <Field label="프리셋">
@@ -362,9 +357,6 @@ export default function Practice() {
                 : `암기 ${mmss(memorizeSec * 1000)} · 회상 ${unlimitedRecall ? '무제한' : mmss(recallSec * 1000)}`}
             </div>
             <Btn variant="primary" size="lg" onClick={start}>시작</Btn>
-            <p className="text-xs text-muted">
-              암기 중 <kbd>Enter</kbd> 로 조기 종료 · 회상 중 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 로 제출
-            </p>
           </div>
         </div>
       </Panel>
