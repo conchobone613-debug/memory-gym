@@ -33,7 +33,7 @@ function pickNext(filled: number, g1?: GoalStatus, g2?: GoalStatus, g3?: GoalSta
       eyebrow: '오늘 할 일',
       title: '1단계 · 숫자와 자음',
       why: '숫자를 보면 자음이 바로 나와야 합니다. 여기가 안 붙으면 뒤가 전부 느려집니다.',
-      to: '/basics',
+      to: '/basics?stage=1',
       cta: '1단계 시작',
     };
   }
@@ -42,7 +42,7 @@ function pickNext(filled: number, g1?: GoalStatus, g2?: GoalStatus, g3?: GoalSta
       eyebrow: '오늘 할 일',
       title: '2단계 · 두 자리 한 번에',
       why: '1단계는 통과하셨습니다. 이제 두 자리를 한 호흡에 읽습니다.',
-      to: '/basics',
+      to: '/basics?stage=2',
       cta: '2단계 시작',
     };
   }
@@ -51,7 +51,7 @@ function pickNext(filled: number, g1?: GoalStatus, g2?: GoalStatus, g3?: GoalSta
       eyebrow: '오늘 할 일',
       title: '3단계 · 이미지 변환',
       why: '자음까지 붙었습니다. 이제 숫자에서 곧장 이미지가 떠올라야 합니다.',
-      to: '/basics',
+      to: '/basics?stage=3',
       cta: '3단계 시작',
     };
   }
@@ -115,7 +115,7 @@ export default function Home() {
           return (
             <Link
               key={s.n}
-              to="/basics"
+              to={`/basics?stage=${s.n}`}
               className={`rounded-xl border p-4 transition-colors ${
                 passed ? 'border-good/40 bg-good/5' : 'border-line bg-panel hover:border-accent/50'
               }`}

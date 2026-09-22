@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   db, getSettings, type DrillAttempt, type ImageSet, type ImageStat, type MemoImage, type PickMode, type Verdict,
 } from '../db/db';
@@ -105,7 +105,18 @@ export default function Drill() {
   const m2 = useLiveQuery(() => goalFor(2), []);
   const m3 = useLiveQuery(() => goalFor(3), []);
 
-  const [stage, setStage] = useState<Stage | 3>(3);
+  /**
+   * 단계는 주소에 둔다 (`/basics?stage=2`).
+   *
+   * 화면 상태로만 두면 2단계에서 뒤로가기를 눌렀을 때 3단계가 아니라 이 화면에 오기 전
+   * 페이지(홈·자산)로 튄다 — 브라우저가 아는 것은 주소뿐이기 때문이다. 주소에 두면
+   * 뒤로가기가 단계 사이를 오가고, 특정 단계로 바로 잇는 링크도 생긴다.
+   */
+  const [params, setParams] = useSearchParams();
+  const raw = Number(params.get('stage'));
+  const stage: Stage | 3 = raw === 1 ? 1 : raw === 2 ? 2 : 3;
+  /* 같은 단계를 다시 누르면 방문 기록만 쌓이므로 아무것도 안 한다 */
+  const setStage = (n: Stage | 3) => { if (n !== stage) setParams({ stage: String(n) }); };
   const [selected, setSelected] = useState<string[]>([]);
   /**
    * 숫자 세트는 앞자리로 열 묶음을 낸다 (00–09, 10–19 …).

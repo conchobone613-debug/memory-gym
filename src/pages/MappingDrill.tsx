@@ -229,6 +229,8 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     const seen = stats.size;
     const total = stage === 1 ? 10 : 100;
     return (
+      <div className="flex flex-col gap-4">
+      {header}
       <Panel title={STAGE_TITLE[stage]}>
         <p className="mb-3 text-sm text-muted">
           {stage === 1
@@ -287,6 +289,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
         </p>
 
       </Panel>
+      </div>
     );
   }
 
