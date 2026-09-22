@@ -192,11 +192,12 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     if (phase === 'asking') answer('', true);
   }, [answer, phase]);
 
-  /** 지우기 — 친 것이 남아 있으면 한 글자, 없으면 앞 문제로. 셸에서 하던 것과 같다. */
-  const back = useCallback(() => {
-    if (typed) setTyped((t) => t.slice(0, -1));
-    else undo();
-  }, [typed, undo]);
+  /**
+   * 지우기 — 한 글자만.
+   * 빈 칸일 때 앞 문제로 보내 봤더니 글자를 지우다가 한 번 더 눌리면 그대로 넘어가 버렸다.
+   * 앞 문제는 '← 앞 문제' 를 눌러야만 간다.
+   */
+  const back = useCallback(() => setTyped((t) => t.slice(0, -1)), []);
 
   useEffect(() => {
     if (phase === 'asking') t0.current = performance.now();
@@ -208,7 +209,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     return () => clearInterval(t);
   }, [phase]);
 
-  /* 단축키 — 보기는 D F J K, 숫자 답은 숫자 키 직접 */
+  /* 단축키 — 자음은 자판의 자음 키, 숫자는 숫자 키를 직접 누른다 */
   useEffect(() => {
     if (phase !== 'asking' && phase !== 'feedback') return;
     const onKey = (e: KeyboardEvent) => {
@@ -217,7 +218,6 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
 
       if (phase === 'feedback') {
         if (e.key === 'Enter' || e.code === 'Space' || e.key === ' ') { e.preventDefault(); continueAfterWrong(); }
-        else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
         return;
       }
       if (!q) return;
@@ -232,7 +232,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [back, continueAfterWrong, finish, pass, phase, push, q, results, undo]);
+  }, [back, continueAfterWrong, finish, pass, phase, push, q, results]);
 
   /* ───────── 설정 ───────── */
   if (phase === 'setup') {

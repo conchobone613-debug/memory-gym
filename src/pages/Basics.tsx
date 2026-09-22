@@ -379,7 +379,6 @@ export default function Drill() {
       if (isTyping(e.target)) return;
       if (phase === 'feedback') {
         if (e.key === 'Enter' || e.code === 'Space' || e.key === ' ') { e.preventDefault(); continueAfterWrong(); }
-        else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -665,8 +664,11 @@ export default function Drill() {
                   if (e.key === 'Enter') { e.preventDefault(); submit(); }
                   /* Tab = 모름. 글자를 만들지 않는 키라 치는 도중에 눌러도 안전하다 */
                   else if (e.key === 'Tab') { e.preventDefault(); submit(true); }
-                  /* 아무것도 안 친 상태의 Backspace 는 앞 문제로 (1·2단계와 같은 규칙) */
-                  else if (e.key === 'Backspace' && !e.currentTarget.value) { e.preventDefault(); undo(); }
+                  /*
+                   * Backspace 는 글자 지우기 전용이다.
+                   * 빈 칸일 때 앞 문제로 보내 봤더니, 치던 글자를 지우다가 한 번 더 눌리면
+                   * 그대로 앞 문제로 넘어가 버렸다. 앞 문제는 '← 앞 문제' 를 눌러야만 간다.
+                   */
                 }}
                 className="w-56 text-center text-xl"
                 placeholder="이미지 이름"
