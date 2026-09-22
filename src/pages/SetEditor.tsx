@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, useParams } from 'react-router-dom';
 import { compareKeys, db, ensureKeys, getSettings, type MemoImage } from '../db/db';
 import { hintForKey } from '../lib/hangul';
+import { suggestNames, FACE_SUGGESTIONS } from '../lib/suggest';
 import { cardLabel, faceHint } from '../lib/cards';
 import { download, importRows, pickFile, rowsFromCsv, setFileBase, toCsv } from '../lib/io';
 import { isTyping } from '../App';
@@ -119,6 +120,25 @@ export default function SetEditor() {
 
   const filled = useMemo(() => images.filter((i) => i.name.trim()).length, [images]);
 
+  /* 빈 칸에서 막히실 때 쓰실 후보. 이미 쓰고 있는 이름은 표시해 둔다. */
+  const suggestions = useMemo(() => {
+    if (!draft || !settings) return [];
+    const used = images.filter((i) => i.id !== draft.id && i.name.trim()).map((i) => i.name);
+    if (set?.domain === 'cardFace') {
+      const taken = new Set(used.map((n) => n.replace(/\s+/g, '')));
+      return FACE_SUGGESTIONS.map((name) => ({ name, taken: taken.has(name) }));
+    }
+    return suggestNames(draft.key, settings.chosungMap, used);
+  }, [draft?.key, draft?.id, images, settings, set?.domain]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const useSuggestion = async (name: string) => {
+    if (!draft) return;
+    const next = { ...draft, name };
+    setDraft(next);
+    await save(next);
+    nameRef.current?.focus();
+  };
+
   if (!set) {
     return (
       <Empty>
@@ -234,6 +254,31 @@ export default function SetEditor() {
               />
             </Field>
           </div>
+          {suggestions.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1.5 text-xs text-muted">
+                이름 후보 <span className="text-muted/70">— 초성이 맞는 구체 명사만 골라 놓았습니다. 누르면 바로 들어갑니다</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((sg) => (
+                  <button
+                    key={sg.name}
+                    type="button"
+                    onClick={() => useSuggestion(sg.name)}
+                    title={sg.taken ? '다른 칸에서 이미 쓰고 있습니다' : undefined}
+                    className={`rounded-md border px-2.5 py-1 text-sm transition-colors ${
+                      sg.taken
+                        ? 'border-line/60 text-muted/50 line-through'
+                        : 'border-line bg-panel2 hover:border-accent hover:text-accent'
+                    }`}
+                  >
+                    {sg.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-3 flex gap-1.5">
             <Btn size="sm" variant="primary" onClick={() => save()}>저장</Btn>
             <Btn size="sm" onClick={() => setCursor(nextEmpty(cursor))}>다음 빈 칸</Btn>
