@@ -143,12 +143,26 @@ export interface ImageStat {
   lastSeenAt: number;
 }
 
+/** 3단계에서 무엇을 자극으로 낼지. 숫자·키 / 카드 / 섞기. */
+export type StimulusStyle = 'key' | 'card' | 'mix';
+
 export interface AppSettings {
   key: 'app';
   chosungMap: ChosungMap;
   suitDigits: SuitDigits;
   rankDigits: RankDigits;
   drillCount: number;
+  /**
+   * 3단계 설정을 마지막 상태로 되살리기 위한 값들.
+   *
+   * 회장은 보통 같은 묶음을 며칠씩 판다. 열 때마다 세트와 열 묶음을 다시 고르게 하면
+   * 훈련을 시작하기 전에 손이 먼저 지친다. 없으면(첫 실행) 기본값으로 떨어진다.
+   */
+  drillSetIds?: string[];
+  /** 세트 id -> 낼 앞자리 목록. 빈 배열 = 전부. */
+  drillDecades?: Record<string, string[]>;
+  drillPickMode?: PickMode;
+  drillStyle?: StimulusStyle;
   /** 초급 단계에서 낼 방향. 기본은 외울 때 쓰는 숫자 → 자음. */
   mappingDirection: 'toConsonant' | 'toDigit' | 'mix';
   /** 마지막으로 백업 파일을 받은 때. 데이터는 이 브라우저 안에만 있어 백업이 유일한 보험이다. */

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  db, getSettings, type DrillAttempt, type ImageSet, type ImageStat, type MemoImage, type PickMode, type Verdict,
+  db, getSettings, saveSettings,
+  type DrillAttempt, type ImageSet, type ImageStat, type MemoImage, type PickMode, type StimulusStyle, type Verdict,
 } from '../db/db';
 import { recordAttempt, undoAttempt } from '../db/record';
 import { buildQueue, median, rank } from '../lib/srs';
@@ -23,7 +24,6 @@ const mmss = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
   return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 };
-type Style = 'key' | 'card' | 'mix';
 
 interface Trial {
   image: MemoImage;
@@ -125,7 +125,7 @@ export default function Drill() {
    */
   const [decades, setDecades] = useState<Record<string, string[]>>({});
   const [mode, setMode] = useState<PickMode>('srs');
-  const [style, setStyle] = useState<Style>('key');
+  const [style, setStyle] = useState<StimulusStyle>('key');
   const [count, setCount] = useState(30);
 
   const [phase, setPhase] = useState<Phase>('setup');
@@ -149,17 +149,46 @@ export default function Drill() {
   const rtRef = useRef(0);
   const typedRef = useRef<HTMLInputElement>(null);
 
-  /* 기본 선택: 채워진 이미지가 있는 세트 전부 */
+  /**
+   * 마지막에 쓰신 설정을 되살린다.
+   *
+   * 처음 한 번만 읽는다. 그 뒤로는 화면이 원본이고, 저장은 아래 effect 가 한쪽으로만 한다.
+   * 매번 읽으면 저장 → 다시 읽기 → 덮어쓰기로 회장 조작이 되돌려진다.
+   */
+  const loaded = useRef(false);
   useEffect(() => {
-    if (selected.length === 0 && sets.length > 0) {
-      const withNames = sets.filter((s) => images.some((i) => i.setId === s.id && i.name.trim()));
-      setSelected((withNames.length ? withNames : sets).map((s) => s.id));
-    }
-  }, [sets, images]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (loaded.current || !settings) return;
+    loaded.current = true;
+    setCount(settings.drillCount);
+    setMode(settings.drillPickMode ?? 'srs');
+    setStyle(settings.drillStyle ?? 'key');
+    setDecades(settings.drillDecades ?? {});
+  }, [settings]);
 
+  /** 세트는 따로 — 저장된 것이 없거나 지워진 세트면 '이름이 있는 세트 전부'로 떨어진다. */
+  const setsPicked = useRef(false);
   useEffect(() => {
-    if (settings) setCount(settings.drillCount);
-  }, [settings?.drillCount]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (setsPicked.current || !settings || sets.length === 0) return;
+    const saved = (settings.drillSetIds ?? []).filter((id) => sets.some((s) => s.id === id));
+    if (saved.length) {
+      setSelected(saved);
+      setsPicked.current = true;
+      return;
+    }
+    if (images.length === 0) return; // 기본값을 고르려면 이미지가 있어야 한다
+    const withNames = sets.filter((s) => images.some((i) => i.setId === s.id && i.name.trim()));
+    setSelected((withNames.length ? withNames : sets).map((s) => s.id));
+    setsPicked.current = true;
+  }, [settings, sets, images]);
+
+  /* 바뀔 때마다 저장. 되살리기가 끝난 뒤에만 쓴다. */
+  useEffect(() => {
+    if (!loaded.current || !setsPicked.current) return;
+    saveSettings({
+      drillSetIds: selected, drillDecades: decades,
+      drillPickMode: mode, drillStyle: style, drillCount: count,
+    });
+  }, [selected, decades, mode, style, count]);
 
   const pool = useMemo(
     () =>
@@ -475,7 +504,7 @@ export default function Drill() {
                 </select>
               </Field>
               <Field label="자극 형태">
-                <select value={style} onChange={(e) => setStyle(e.target.value as Style)}>
+                <select value={style} onChange={(e) => setStyle(e.target.value as StimulusStyle)}>
                   <option value="key">숫자·키</option>
                   <option value="card">카드</option>
                   <option value="mix">섞기</option>
