@@ -16,7 +16,8 @@ export async function recordMapping(a: MappingAttempt): Promise<MappingStat | un
       key, stage: a.stage, unit: a.unit,
       attempts: 0, correct: 0, wrong: 0, rtSamples: [], medianRt: 0, wrongStreak: 0, lastSeenAt: 0,
     };
-    const samples = [...base.rtSamples, a.rtMs].slice(-MAX_SAMPLES);
+    /* rtMs 0 = '모름'. 표본에 넣으면 중앙 반응시간이 거짓으로 빨라진다 (record.ts 와 같은 규칙) */
+    const samples = a.rtMs > 0 ? [...base.rtSamples, a.rtMs].slice(-MAX_SAMPLES) : base.rtSamples;
     await db.mappingStats.put({
       ...base,
       attempts: base.attempts + 1,

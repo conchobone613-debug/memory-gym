@@ -18,7 +18,14 @@ export async function recordAttempt(a: DrillAttempt): Promise<ImageStat | undefi
       imageId: a.imageId, setId: a.setId, attempts: 0, correct: 0, wrong: 0,
       rtSamples: [], meanRt: 0, medianRt: 0, wrongStreak: 0, lastSeenAt: 0,
     };
-    const samples = a.verdict === 'skip' ? base.rtSamples : [...base.rtSamples, a.rtMs].slice(-MAX_SAMPLES);
+    /*
+     * rtMs 0 = '모름' 으로 넘긴 문항. 0 을 표본에 넣으면 중앙 반응시간이 거짓으로 빨라지고,
+     * 포기까지 걸린 시간을 넣으면 회상 속도가 아니라 인내심을 재게 된다. 그래서 뺀다.
+     * rebuild.ts 의 재계산도 같은 규칙이어야 한다.
+     */
+    const samples = a.verdict === 'skip' || a.rtMs <= 0
+      ? base.rtSamples
+      : [...base.rtSamples, a.rtMs].slice(-MAX_SAMPLES);
     const next: ImageStat = {
       ...base,
       attempts: base.attempts + (a.verdict === 'skip' ? 0 : 1),

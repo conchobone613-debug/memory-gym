@@ -270,25 +270,33 @@ export default function Drill() {
    * 는 이미지를 떠올리지 않고 2단계 변환만 해도 나오기 때문이다. 그걸 정답으로 세면 3단계가
    * 2단계와 같아진다.
    */
-  const submit = useCallback(async () => {
+  const submit = useCallback(async (giveUp = false) => {
     const trial = queue[idx];
     if (!trial || !settings) return;
-    const raw = typedInput.trim();
-    if (!raw) return;
-    if (/^[A-Za-z ]+$/.test(raw)) { setImeHint(true); return; }
+    const raw = giveUp ? '' : typedInput.trim();
+    if (!giveUp) {
+      if (!raw) return;
+      if (/^[A-Za-z ]+$/.test(raw)) { setImeHint(true); return; }
+    }
 
     const set = sets.find((s) => s.id === trial.image.setId);
-    const m = matchName(raw, trial.image, settings.chosungMap, set?.domain !== 'cardFace');
-    const verdict: Verdict = m === 'exact' || m === 'alias' ? 'correct' : 'wrong';
+    const m: MatchKind = giveUp ? 'none' : matchName(raw, trial.image, settings.chosungMap, set?.domain !== 'cardFace');
+    const verdict: Verdict = !giveUp && (m === 'exact' || m === 'alias') ? 'correct' : 'wrong';
+    /*
+     * '모름' 은 오답으로 센다. 안 떠오른 것도 못 떠올린 것이고, 그래야 SRS 가 이 칸을 다시
+     * 앞으로 당긴다. 다만 반응시간은 0 으로 둬 표본에서 빠지게 한다 — 포기까지 걸린 시간은
+     * 회상 속도가 아니다.
+     */
+    const rtMs = giveUp ? 0 : rtRef.current;
 
     const attempt: DrillAttempt = {
       id: uid(), sessionId, order: idx,
       imageId: trial.image.id, setId: trial.image.setId, key: trial.image.key,
-      stimulus: trial.stimulus, rtMs: rtRef.current, verdict,
-      typedInput: raw, typedMatch: m, shownAt: Date.now(),
+      stimulus: trial.stimulus, rtMs, verdict,
+      typedInput: raw || undefined, typedMatch: m, shownAt: Date.now(),
     };
     const prevStat = await recordAttempt(attempt);
-    const next = [...results, { trial, rtMs: rtRef.current, verdict, typedInput: raw, typedMatch: m, attemptId: attempt.id, prevStat }];
+    const next = [...results, { trial, rtMs, verdict, typedInput: raw || undefined, typedMatch: m, attemptId: attempt.id, prevStat }];
 
     setResults(next);
     setTypedInput('');
@@ -297,7 +305,7 @@ export default function Drill() {
     setTimeout(() => setFlash(null), 340);
 
     if (verdict === 'correct') {
-      /* 맞으면 멈추지 않는다. 틀렸을 때만 이름을 보여주고 붙잡는다 (1·2단계와 같다). */
+      /* 맞으면 멈추지 않는다. 틀리거나 모르면 이름을 보여주고 붙잡는다 (1·2단계와 같다). */
       setStreak((v) => { const n = v + 1; setBestStreak((b) => Math.max(b, n)); return n; });
       if (idx + 1 >= queue.length) await finish(next);
       else setIdx(idx + 1);
@@ -576,13 +584,15 @@ export default function Drill() {
                             {r.verdict === 'correct' ? '○' : '×'}
                           </td>
                           <td className="px-2 py-1 text-xs text-muted">
-                            {r.typedInput && (
+                            {r.typedInput ? (
                               <>
                                 {r.typedInput}{' '}
                                 <span className={r.typedMatch === 'none' || r.typedMatch === 'chosung' ? 'text-bad' : 'text-good'}>
                                   {MATCH_LABEL[r.typedMatch ?? 'none']}
                                 </span>
                               </>
+                            ) : (
+                              <span className="text-bad">모름</span>
                             )}
                           </td>
                         </tr>
@@ -653,6 +663,8 @@ export default function Drill() {
                 onChange={(e) => onType(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') { e.preventDefault(); submit(); }
+                  /* Tab = 모름. 글자를 만들지 않는 키라 치는 도중에 눌러도 안전하다 */
+                  else if (e.key === 'Tab') { e.preventDefault(); submit(true); }
                   /* 아무것도 안 친 상태의 Backspace 는 앞 문제로 (1·2단계와 같은 규칙) */
                   else if (e.key === 'Backspace' && !e.currentTarget.value) { e.preventDefault(); undo(); }
                 }}
@@ -663,7 +675,8 @@ export default function Drill() {
                 spellCheck={false}
               />
               {/* 휴대폰에는 Enter 가 잘 안 보인다 */}
-              <Btn variant="primary" onClick={submit} disabled={!typedInput.trim()}>확인</Btn>
+              <Btn variant="primary" onClick={() => submit()} disabled={!typedInput.trim()}>확인</Btn>
+              <Btn onClick={() => submit(true)}>모름</Btn>
             </div>
             {imeHint && <span className="text-xs text-warn">한/영 을 한글로</span>}
           </div>
@@ -671,7 +684,7 @@ export default function Drill() {
 
         {phase === 'feedback' && last && (
           <div className="flex flex-col items-center gap-3">
-            <div className="text-sm text-bad">치신 것 — {last.typedInput || '—'}</div>
+            <div className="text-sm text-bad">{last.typedInput ? `치신 것 — ${last.typedInput}` : '모름'}</div>
             <div className="text-4xl font-semibold text-good">{last.trial.image.name}</div>
             {last.trial.image.note && <div className="text-sm text-muted">{last.trial.image.note}</div>}
             {last.typedMatch === 'chosung' && (

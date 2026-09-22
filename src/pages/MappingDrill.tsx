@@ -105,13 +105,18 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
   }, [sessionId]);
 
   const answer = useCallback(
-    async (given: string) => {
+    async (given: string, giveUp = false) => {
       const cur = queue[idx];
       if (!cur) return;
-      const rtMs = Math.round(performance.now() - t0.current);
-      const isCorrect = cur.groups
+      /*
+       * '모름' 은 오답으로 센다. 반응시간은 0 으로 둬 표본에서 빠진다 — 포기까지 걸린 시간은
+       * 회상 속도가 아니다. giveUp 을 따로 두는 이유: 빈 문자열은 `'ㄱㅋㄲ'.includes('')` 가
+       * true 라 그냥 넣으면 정답으로 채점된다.
+       */
+      const rtMs = giveUp ? 0 : Math.round(performance.now() - t0.current);
+      const isCorrect = !giveUp && (cur.groups
         ? cur.groups.every((g, i) => g.includes(given[i] ?? ''))
-        : given === cur.answer;
+        : given === cur.answer);
       const attempt: MappingAttempt = {
         id: uid(), sessionId, order: idx, stage, unit: cur.unit, direction: cur.direction,
         prompt: cur.prompt, answer: cur.answer, given, isCorrect, rtMs, shownAt: Date.now(),
@@ -183,6 +188,10 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     }
   }, [phase, results, sessionId, stage, undoing]);
 
+  const pass = useCallback(() => {
+    if (phase === 'asking') answer('', true);
+  }, [answer, phase]);
+
   /** 지우기 — 친 것이 남아 있으면 한 글자, 없으면 앞 문제로. 셸에서 하던 것과 같다. */
   const back = useCallback(() => {
     if (typed) setTyped((t) => t.slice(0, -1));
@@ -214,6 +223,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
       if (!q) return;
 
       if (e.key === 'Backspace') { e.preventDefault(); back(); return; }
+      if (e.key === 'Tab') { e.preventDefault(); pass(); return; }
 
       const ch = q.groups ? jamoFromKey(e) : (/^[0-9]$/.test(e.key) ? e.key : null);
       if (!ch) return;
@@ -222,7 +232,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [back, continueAfterWrong, finish, phase, push, q, results, undo]);
+  }, [back, continueAfterWrong, finish, pass, phase, push, q, results, undo]);
 
   /* ───────── 설정 ───────── */
   if (phase === 'setup') {
@@ -312,7 +322,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
                       <span className="tnum">{r.q.prompt}</span>
                       <span className="text-muted"> → </span>
                       <span className="text-good">{r.q.answer}</span>
-                      <span className="text-bad"> (답: {r.given || '—'})</span>
+                      <span className="text-bad"> (답: {r.given || '모름'})</span>
                     </li>
                   ))}
                 </ul>
@@ -388,12 +398,13 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
               onPress={push}
               onBackspace={back}
             />
+            <Btn size="sm" onClick={pass}>모름</Btn>
           </div>
         )}
 
         {phase === 'feedback' && last && (
           <div className="flex flex-col items-center gap-3">
-            <div className="text-sm text-bad">답하신 것 — {last.given || '—'}</div>
+            <div className="text-sm text-bad">{last.given ? `답하신 것 — ${last.given}` : '모름'}</div>
             <div className="text-4xl font-semibold text-good">{last.q.answer}</div>
             <Btn variant="primary" onClick={continueAfterWrong}>계속 (Enter)</Btn>
           </div>

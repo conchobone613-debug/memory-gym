@@ -24,7 +24,8 @@ export async function rebuildImageStats(): Promise<number> {
     cur.attempts += 1;
     if (a.verdict === 'correct') cur.correct += 1;
     if (a.verdict === 'wrong') cur.wrong += 1;
-    cur.rtSamples = [...cur.rtSamples, a.rtMs].slice(-MAX_SAMPLES);
+    /* record.ts 와 같은 규칙 — 반응시간이 없는 '모름' 은 표본에서 뺀다 */
+    if (a.rtMs > 0) cur.rtSamples = [...cur.rtSamples, a.rtMs].slice(-MAX_SAMPLES);
     cur.wrongStreak = a.verdict === 'wrong' ? cur.wrongStreak + 1 : 0;
     cur.lastSeenAt = Math.max(cur.lastSeenAt, a.shownAt);
     byImage.set(a.imageId, cur);
@@ -82,7 +83,7 @@ export async function rebuildMappingStats(): Promise<number> {
     };
     cur.attempts += 1;
     if (a.isCorrect) cur.correct += 1; else cur.wrong += 1;
-    cur.rtSamples = [...cur.rtSamples, a.rtMs].slice(-20);
+    if (a.rtMs > 0) cur.rtSamples = [...cur.rtSamples, a.rtMs].slice(-20);
     cur.wrongStreak = a.isCorrect ? 0 : cur.wrongStreak + 1;
     cur.lastSeenAt = Math.max(cur.lastSeenAt, a.shownAt);
     byKey.set(key, cur);
