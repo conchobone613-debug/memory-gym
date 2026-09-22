@@ -4,11 +4,12 @@ import { Link } from 'react-router-dom';
 import {
   db, getSettings, type DrillAttempt, type ImageSet, type ImageStat, type MemoImage, type PickMode, type Verdict,
 } from '../db/db';
-import { recordAttempt } from '../db/record';
+import { recordAttempt, undoAttempt } from '../db/record';
 import { buildQueue, median, rank } from '../lib/srs';
 import { matchName, type MatchKind } from '../lib/hangul';
 import { cardLabel, fullDeck, resolveCard } from '../lib/cards';
 import { pickOne, randBelow, uid } from '../lib/random';
+import { streaks } from '../lib/streak';
 import MappingDrill from './MappingDrill';
 import { type Stage } from '../lib/mapping';
 import { goalFor } from '../db/goals';
@@ -37,6 +38,9 @@ interface Result {
   verdict: Verdict;
   typedInput?: string;
   typedMatch?: MatchKind;
+  /** 되돌리기용 — 지울 원시 기록과 그 전의 통계 */
+  attemptId: string;
+  prevStat?: ImageStat;
 }
 
 const MODE_LABEL: Record<PickMode, string> = {
@@ -78,6 +82,7 @@ export default function Drill() {
   const [flash, setFlash] = useState<'good' | 'bad' | null>(null);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [undoing, setUndoing] = useState(false);
 
   const sessionStart = useRef(0);
   const [elapsed, setElapsed] = useState(0);
@@ -176,7 +181,7 @@ export default function Drill() {
         stimulus: trial.stimulus, rtMs: rtRef.current, verdict,
         typedInput: typedInput || undefined, typedMatch, shownAt: Date.now(),
       };
-      await recordAttempt(attempt);
+      const prevStat = await recordAttempt(attempt);
       setFlash(verdict === 'correct' ? 'good' : 'bad');
       setTimeout(() => setFlash(null), 340);
       if (verdict === 'correct') {
@@ -184,7 +189,14 @@ export default function Drill() {
       } else if (verdict === 'wrong') {
         setStreak(0);
       }
-      const next = [...results, { trial, rtMs: rtRef.current, verdict, typedInput: typedInput || undefined, typedMatch }];
+      const next = [
+        ...results,
+        {
+          trial, rtMs: rtRef.current, verdict,
+          typedInput: typedInput || undefined, typedMatch,
+          attemptId: attempt.id, prevStat,
+        },
+      ];
       setTypedInput('');
       setTypedMatch(undefined);
       if (idx + 1 >= queue.length) await finish(next);
@@ -192,6 +204,37 @@ export default function Drill() {
     },
     [finish, idx, queue, results, sessionId, typedInput, typedMatch],
   );
+
+  /**
+   * 한 문제 뒤로 — 판정을 잘못 눌렀을 때.
+   *
+   * 화면만 되돌리면 기록은 틀린 채로 남는다. 원시 기록과 통계까지 같이 되돌린다.
+   * 누를 때마다 한 칸씩 뒤로 가므로 몇 문제 전으로도 돌아갈 수 있다.
+   * 반응시간은 처음 것을 그대로 쓴다 — 다시 재는 것은 이미 답을 본 뒤라 의미가 없다.
+   */
+  const undo = useCallback(async () => {
+    if (undoing) return;
+    const last = results[results.length - 1];
+    if (!last) return;
+    setUndoing(true);
+    try {
+      await undoAttempt(last.attemptId, last.trial.image.id, last.prevStat);
+      if (phase === 'done' && sessionId) await db.drillSessions.update(sessionId, { endedAt: undefined });
+      const rest = results.slice(0, -1);
+      const s = streaks(rest.map((r) => r.verdict === 'correct'));
+      setResults(rest);
+      setStreak(s.cur);
+      setBestStreak(s.best);
+      setIdx(rest.length);
+      rtRef.current = last.rtMs;
+      setTypedInput(last.typedInput ?? '');
+      setTypedMatch(last.typedMatch);
+      setFlash(null);
+      setPhase('reveal');
+    } finally {
+      setUndoing(false);
+    }
+  }, [phase, results, sessionId, undoing]);
 
   const onSpace = useCallback(() => {
     rtRef.current = Math.round(performance.now() - t0.current);
@@ -216,6 +259,7 @@ export default function Drill() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); finish(results); return; }
       if (isTyping(e.target)) return;
+      if (e.key === 'Backspace') { e.preventDefault(); undo(); return; }
       if (phase === 'showing' && (e.code === 'Space' || e.key === ' ')) { e.preventDefault(); onSpace(); }
       else if (phase === 'reveal') {
         /* 화면 왼쪽이 맞음, 오른쪽이 틀림. 키보드에서도 D 가 F 왼쪽이라 순서가 맞는다. */
@@ -226,7 +270,7 @@ export default function Drill() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [commit, finish, onSpace, phase, results]);
+  }, [commit, finish, onSpace, phase, results, undo]);
 
   const submitTyped = () => {
     const trial = queue[idx];
@@ -388,7 +432,8 @@ export default function Drill() {
           <div className="mt-4 flex items-center gap-3">
             <Btn variant="primary" size="lg" disabled={namedCount === 0} onClick={start}>시작</Btn>
             <span className="text-xs text-muted">
-              출제 가능한 이미지 {namedCount}개 · <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 · <kbd>Esc</kbd> 중단
+              출제 가능한 이미지 {namedCount}개 · <kbd>Space</kbd> 떠올림 · <kbd>D</kbd> 맞음 · <kbd>F</kbd> 틀림 ·{' '}
+              <kbd>Backspace</kbd> 앞 문제 · <kbd>Esc</kbd> 중단
             </span>
           </div>
           {namedCount === 0 && (
@@ -452,9 +497,12 @@ export default function Drill() {
               </div>
             </>
           )}
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Btn variant="primary" onClick={() => setPhase('setup')}>다시 설정</Btn>
             <Btn onClick={start}>같은 조건으로 한 번 더</Btn>
+            {results.length > 0 && (
+              <Btn disabled={undoing} onClick={undo}>← 마지막 판정 고치기</Btn>
+            )}
             <LinkBtn to="/stats">대시보드</LinkBtn>
           </div>
         </Panel>
@@ -475,6 +523,15 @@ export default function Drill() {
         <div className="mx-4 h-1 flex-1 overflow-hidden rounded-full bg-line">
           <div className="h-full bg-accent transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
         </div>
+        {results.length > 0 && (
+          <button
+            className="mr-3 text-muted transition-colors hover:text-accent disabled:opacity-40"
+            disabled={undoing}
+            onClick={undo}
+          >
+            ← 앞 문제
+          </button>
+        )}
         <button className="text-muted hover:text-fg" onClick={() => finish(results)}>중단 (Esc)</button>
       </div>
 

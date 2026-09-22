@@ -3,9 +3,15 @@ import { mean, median } from '../lib/srs';
 
 const MAX_SAMPLES = 30;
 
-/** 시도 1건을 원시 저장하고 파생 통계를 갱신한다. 두 쓰기는 한 트랜잭션으로 묶는다. */
-export async function recordAttempt(a: DrillAttempt): Promise<void> {
-  await db.transaction('rw', db.drillAttempts, db.imageStats, async () => {
+/**
+ * 시도 1건을 원시 저장하고 파생 통계를 갱신한다. 두 쓰기는 한 트랜잭션으로 묶는다.
+ *
+ * 갱신 **직전의 통계**를 돌려준다. 회장이 판정을 잘못 누르고 뒤로 가실 때 이 값을 그대로
+ * 되돌려 놓으면 된다. 원시 기록에서 다시 계산하는 것보다 정확하고 싸다 — 되돌리는 순서가
+ * 항상 넣은 역순이라 어긋날 일이 없다.
+ */
+export async function recordAttempt(a: DrillAttempt): Promise<ImageStat | undefined> {
+  return db.transaction('rw', db.drillAttempts, db.imageStats, async () => {
     await db.drillAttempts.add(a);
     const prev = await db.imageStats.get(a.imageId);
     const base: ImageStat = prev ?? {
@@ -25,6 +31,16 @@ export async function recordAttempt(a: DrillAttempt): Promise<void> {
       lastSeenAt: a.shownAt,
     };
     await db.imageStats.put(next);
+    return prev;
+  });
+}
+
+/** 바로 앞 시도를 없던 일로 한다. 원시 기록을 지우고 통계는 찍어 둔 직전 값으로 되돌린다. */
+export async function undoAttempt(attemptId: string, imageId: string, prev?: ImageStat): Promise<void> {
+  await db.transaction('rw', db.drillAttempts, db.imageStats, async () => {
+    await db.drillAttempts.delete(attemptId);
+    if (prev) await db.imageStats.put(prev);
+    else await db.imageStats.delete(imageId);
   });
 }
 

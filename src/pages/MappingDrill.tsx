@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, getSettings, saveSettings, type MappingAttempt } from '../db/db';
-import { buildMappingQueue, mappingStatsFor, recordMapping } from '../db/mapping';
+import { db, getSettings, saveSettings, type MappingAttempt, type MappingStat } from '../db/db';
+import { buildMappingQueue, mappingStatsFor, recordMapping, undoMapping } from '../db/mapping';
 import { goalFor } from '../db/goals';
-import { makeQuestion, type Direction, type Question, type Stage } from '../lib/mapping';
+import { makeQuestion, statKey, type Direction, type Question, type Stage } from '../lib/mapping';
 import { jamoFromKey } from '../lib/keyjamo';
 import { uid } from '../lib/random';
 import { median } from '../lib/srs';
+import { streaks } from '../lib/streak';
 import { isTyping } from '../App';
 import { Btn, Field, Panel, Stat, Streak, fmtMs, fmtPct } from '../components/ui';
 import Keypad from '../components/Keypad';
@@ -25,6 +26,9 @@ interface Result {
   given: string;
   isCorrect: boolean;
   rtMs: number;
+  /** 되돌리기용 — 지울 원시 기록과 그 전의 통계 */
+  attemptId: string;
+  prevStat?: MappingStat;
 }
 
 const STAGE_TITLE: Record<Stage, string> = {
@@ -49,6 +53,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [sessionId, setSessionId] = useState('');
+  const [undoing, setUndoing] = useState(false);
 
   const t0 = useRef(0);
   const sessionStart = useRef(0);
@@ -111,8 +116,8 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
         id: uid(), sessionId, order: idx, stage, unit: cur.unit, direction: cur.direction,
         prompt: cur.prompt, answer: cur.answer, given, isCorrect, rtMs, shownAt: Date.now(),
       };
-      await recordMapping(attempt);
-      const r: Result = { q: cur, given, isCorrect, rtMs };
+      const prevStat = await recordMapping(attempt);
+      const r: Result = { q: cur, given, isCorrect, rtMs, attemptId: attempt.id, prevStat };
       const next = [...results, r];
       setResults(next);
       setTyped('');
@@ -150,6 +155,40 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     else { setIdx(idx + 1); setPhase('asking'); }
   }, [finish, idx, queue.length, results]);
 
+  /**
+   * 한 문제 뒤로 — 손이 미끄러져 엉뚱한 키를 눌렀을 때.
+   * 여기는 마지막 자음을 누르는 순간 바로 채점되므로 잡을 틈이 없다.
+   * 원시 기록과 통계를 같이 되돌리고 그 문제를 다시 낸다.
+   */
+  const undo = useCallback(async () => {
+    if (undoing) return;
+    const last = results[results.length - 1];
+    if (!last) return;
+    setUndoing(true);
+    try {
+      await undoMapping(last.attemptId, statKey(stage, last.q.unit), last.prevStat);
+      if (phase === 'done' && sessionId) await db.mappingSessions.update(sessionId, { endedAt: undefined });
+      const rest = results.slice(0, -1);
+      const s = streaks(rest.map((r) => r.isCorrect));
+      setResults(rest);
+      setStreak(s.cur);
+      setBestStreak(s.best);
+      setIdx(rest.length);
+      setTyped('');
+      setLast(null);
+      setFlash(null);
+      setPhase('asking');
+    } finally {
+      setUndoing(false);
+    }
+  }, [phase, results, sessionId, stage, undoing]);
+
+  /** 지우기 — 친 것이 남아 있으면 한 글자, 없으면 앞 문제로. 셸에서 하던 것과 같다. */
+  const back = useCallback(() => {
+    if (typed) setTyped((t) => t.slice(0, -1));
+    else undo();
+  }, [typed, undo]);
+
   useEffect(() => {
     if (phase === 'asking') t0.current = performance.now();
   }, [phase, idx]);
@@ -169,11 +208,12 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
 
       if (phase === 'feedback') {
         if (e.key === 'Enter' || e.code === 'Space' || e.key === ' ') { e.preventDefault(); continueAfterWrong(); }
+        else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
         return;
       }
       if (!q) return;
 
-      if (e.key === 'Backspace') { e.preventDefault(); setTyped((t) => t.slice(0, -1)); return; }
+      if (e.key === 'Backspace') { e.preventDefault(); back(); return; }
 
       const ch = q.groups ? jamoFromKey(e) : (/^[0-9]$/.test(e.key) ? e.key : null);
       if (!ch) return;
@@ -182,7 +222,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [continueAfterWrong, finish, phase, push, q, results]);
+  }, [back, continueAfterWrong, finish, phase, push, q, results, undo]);
 
   /* ───────── 설정 ───────── */
   if (phase === 'setup') {
@@ -243,6 +283,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
         <p className="mt-3 text-xs text-muted">
           답이 자음이면 자판의 자음 키를, 숫자면 숫자 키를 그냥 누르십시오. 한/영 상태는 상관없습니다.
           지울 땐 <kbd>Backspace</kbd>, 중단은 <kbd>Esc</kbd> 입니다.
+          잘못 눌러 넘어갔으면 아무것도 안 친 상태에서 <kbd>Backspace</kbd> 를 누르십시오 — 앞 문제로 돌아갑니다.
         </p>
 
       </Panel>
@@ -289,9 +330,12 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
             )}
           </>
         )}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <Btn variant="primary" onClick={start}>한 번 더</Btn>
           <Btn onClick={() => setPhase('setup')}>설정으로</Btn>
+          {results.length > 0 && (
+            <Btn disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Btn>
+          )}
         </div>
       </Panel>
       </div>
@@ -311,6 +355,15 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
         <div className="mx-4 h-1 flex-1 overflow-hidden rounded-full bg-line">
           <div className="h-full bg-accent transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
         </div>
+        {results.length > 0 && (
+          <button
+            className="mr-3 text-muted transition-colors hover:text-accent disabled:opacity-40"
+            disabled={undoing}
+            onClick={undo}
+          >
+            ← 앞 문제
+          </button>
+        )}
         <button className="text-muted hover:text-fg" onClick={() => finish(results)}>중단 (Esc)</button>
       </div>
 
@@ -346,7 +399,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
             <Keypad
               kind={q.groups ? 'jamo' : 'digit'}
               onPress={push}
-              onBackspace={() => setTyped((t) => t.slice(0, -1))}
+              onBackspace={back}
             />
           </div>
         )}

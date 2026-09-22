@@ -6,8 +6,9 @@ import { sample, spread } from '../lib/random';
 const MAX_SAMPLES = 20;
 const DAY = 86_400_000;
 
-export async function recordMapping(a: MappingAttempt): Promise<void> {
-  await db.transaction('rw', db.mappingAttempts, db.mappingStats, async () => {
+/** 갱신 직전의 통계를 돌려준다 (되돌리기용 — recordAttempt 와 같은 방식). */
+export async function recordMapping(a: MappingAttempt): Promise<MappingStat | undefined> {
+  return db.transaction('rw', db.mappingAttempts, db.mappingStats, async () => {
     await db.mappingAttempts.add(a);
     const key = statKey(a.stage, a.unit);
     const prev = await db.mappingStats.get(key);
@@ -26,6 +27,16 @@ export async function recordMapping(a: MappingAttempt): Promise<void> {
       wrongStreak: a.isCorrect ? 0 : base.wrongStreak + 1,
       lastSeenAt: a.shownAt,
     });
+    return prev;
+  });
+}
+
+/** 바로 앞 답을 없던 일로 한다. */
+export async function undoMapping(attemptId: string, key: string, prev?: MappingStat): Promise<void> {
+  await db.transaction('rw', db.mappingAttempts, db.mappingStats, async () => {
+    await db.mappingAttempts.delete(attemptId);
+    if (prev) await db.mappingStats.put(prev);
+    else await db.mappingStats.delete(key);
   });
 }
 
