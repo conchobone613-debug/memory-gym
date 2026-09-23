@@ -20,7 +20,8 @@ export function suggestNames(
   key: string,
   map: ChosungMap,
   usedNames: Iterable<string>,
-  limit = 10,
+  /* 화면은 5개씩 끊어 보여 준다. 여기서는 넉넉히 주고 '다른 후보' 로 넘겨 가며 본다. */
+  limit = 30,
 ): Suggestion[] {
   const used = new Set([...usedNames].map((n) => n.replace(/\s+/g, '')));
   const hits: string[] = [];

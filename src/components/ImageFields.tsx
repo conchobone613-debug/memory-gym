@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import type { MemoImage, SetDomain } from '../db/db';
 import { hintForKey, type ChosungMap } from '../lib/hangul';
 import { faceHint } from '../lib/cards';
@@ -29,6 +29,16 @@ export default function ImageFields({
   onNameKey?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
   const list = (v: string) => v.split(',').map((s) => s.trim()).filter(Boolean);
+
+  /*
+   * 후보는 5개씩만 보여 준다. 한 번에 다 깔면 고르는 일이 되고, 짧은 이름이 앞에 오도록
+   * 정렬돼 있으니 뒤로 갈수록 덜 좋은 것이 나온다. 마음에 안 드시면 '다른 후보' 로 넘긴다.
+   */
+  const PER_PAGE = 5;
+  const [page, setPage] = useState(0);
+  useEffect(() => setPage(0), [draft.key]);
+  const pages = Math.max(1, Math.ceil(suggestions.length / PER_PAGE));
+  const shown = suggestions.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
 
   return (
     <>
@@ -79,8 +89,8 @@ export default function ImageFields({
       {suggestions.length > 0 && (
         <div className="mt-3">
           <div className="mb-1.5 text-xs text-muted">이름 후보</div>
-          <div className="flex flex-wrap gap-1.5">
-            {suggestions.map((sg) => (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {shown.map((sg) => (
               <button
                 key={sg.name}
                 type="button"
@@ -95,6 +105,15 @@ export default function ImageFields({
                 {sg.name}
               </button>
             ))}
+            {pages > 1 && (
+              <button
+                type="button"
+                onClick={() => setPage((p) => (p + 1) % pages)}
+                className="rounded-md border border-line/70 px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-accent"
+              >
+                다른 후보 ↻
+              </button>
+            )}
           </div>
         </div>
       )}
