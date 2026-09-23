@@ -1,8 +1,9 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { MemoImage, SetDomain } from '../db/db';
 import { hintForKey, type ChosungMap } from '../lib/hangul';
 import { faceHint } from '../lib/cards';
 import type { Suggestion } from '../lib/suggest';
+import { askForNames } from '../lib/ai';
 import { Field } from './ui';
 
 /**
@@ -15,7 +16,7 @@ import { Field } from './ui';
  * 팝업은 그 자리에서 끝나기 때문에, 그 차이를 이 안에 넣으면 분기가 생긴다.
  */
 export default function ImageFields({
-  draft, onDraft, onSave, domain, map, suggestions, onPick, nameRef, onNameKey,
+  draft, onDraft, onSave, domain, map, suggestions, onPick, apiKey, used = [], nameRef, onNameKey,
 }: {
   draft: MemoImage;
   onDraft: (next: MemoImage) => void;
@@ -25,6 +26,10 @@ export default function ImageFields({
   suggestions: Suggestion[];
   /** 후보를 눌렀을 때. 넣고 바로 저장하는 쪽이 자연스러워 부르는 쪽에 맡긴다. */
   onPick: (name: string) => void;
+  /** 있으면 '다른 후보' 가 AI 에게 새로 물어본다. 없으면 사전을 넘겨 본다. */
+  apiKey?: string;
+  /** 다른 칸이 이미 쓰고 있는 이름 — AI 에게 빼 달라고 넘긴다 */
+  used?: string[];
   nameRef?: RefObject<HTMLInputElement | null>;
   onNameKey?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
@@ -36,9 +41,51 @@ export default function ImageFields({
    */
   const PER_PAGE = 5;
   const [page, setPage] = useState(0);
-  useEffect(() => setPage(0), [draft.key]);
+  /** AI 가 방금 지어 준 것. 있으면 사전 대신 이걸 보여 준다. */
+  const [ai, setAi] = useState<string[]>([]);
+  const [asking, setAsking] = useState(false);
+  const [err, setErr] = useState('');
+  const seen = useRef<string[]>([]);
+
+  useEffect(() => {
+    setPage(0);
+    setAi([]);
+    setErr('');
+    seen.current = [];
+  }, [draft.key]);
+
   const pages = Math.max(1, Math.ceil(suggestions.length / PER_PAGE));
-  const shown = suggestions.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+  const dict = suggestions.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+  const shown: Suggestion[] = ai.length ? ai.map((name) => ({ name, taken: false })) : dict;
+
+  /**
+   * 키가 있으면 누를 때마다 **새로 지어 온다.** 사전은 칸마다 7개쯤이라 두세 번이면 바닥난다.
+   * 키가 없으면 예전처럼 사전을 넘긴다 — 키를 안 넣으셔도 쓰던 대로 돌아간다.
+   */
+  const more = async () => {
+    if (!apiKey) { setPage((p) => (p + 1) % pages); return; }
+    setAsking(true);
+    setErr('');
+    try {
+      const exclude = [...new Set([...used, ...suggestions.map((s) => s.name), ...seen.current])];
+      const got = await askForNames({
+        apiKey, key: draft.key, isFace: domain === 'cardFace', map, exclude, count: PER_PAGE,
+      });
+      if (got.length === 0) {
+        setErr('쓸 만한 후보가 안 나왔습니다. 한 번 더 눌러 주십시오.');
+      } else {
+        seen.current = [...seen.current, ...got];
+        setAi(got);
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+      /* AI 가 안 되면 사전으로 되돌아간다. 버튼이 먹통이 되는 것보다 낫다. */
+      setAi([]);
+      setPage((p) => (p + 1) % pages);
+    } finally {
+      setAsking(false);
+    }
+  };
 
   return (
     <>
@@ -112,14 +159,15 @@ export default function ImageFields({
               */}
             <button
               type="button"
-              disabled={pages <= 1}
-              onClick={() => setPage((p) => (p + 1) % pages)}
-              title={pages > 1 ? undefined : '이 칸은 더 드릴 후보가 없습니다'}
+              disabled={asking || (!apiKey && pages <= 1)}
+              onClick={more}
+              title={apiKey || pages > 1 ? undefined : '이 칸은 더 드릴 후보가 없습니다 (설정에 AI 키를 넣으시면 계속 지어 드립니다)'}
               className="rounded-md border border-line/70 px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line/40 disabled:text-muted/40 disabled:hover:border-line/40 disabled:hover:text-muted/40"
             >
-              다른 후보 ↻
+              {asking ? '짓는 중…' : apiKey ? '다른 후보 ✨' : '다른 후보 ↻'}
             </button>
           </div>
+          {err && <div className="mt-1.5 text-[11px] text-bad">{err}</div>}
         </div>
       )}
     </>

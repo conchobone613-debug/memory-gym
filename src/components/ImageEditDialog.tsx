@@ -96,6 +96,8 @@ export default function ImageEditDialog({ imageId, onClose }: { imageId: string;
             map={settings.chosungMap}
             suggestions={suggestions}
             onPick={pick}
+            apiKey={settings.aiKey}
+            used={siblings.filter((i) => i.id !== draft.id && i.name.trim()).map((i) => i.name)}
             nameRef={nameRef}
             onNameKey={(e) => { if (e.key === 'Enter') { e.preventDefault(); close(); } }}
           />

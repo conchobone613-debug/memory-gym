@@ -33,8 +33,11 @@ async function collectAssets() {
   const [imageSets, images, palaces, loci, settings] = await Promise.all([
     db.imageSets.toArray(), db.images.toArray(), db.palaces.toArray(), db.loci.toArray(), getSettings(),
   ]);
-  /* settings 의 lastBackupAt·lastSyncAt 은 기기마다 다른 값이라 보내지 않는다 */
-  const { lastBackupAt: _b, lastSyncAt: _s, ...shared } = settings;
+  /*
+   * lastBackupAt·lastSyncAt 은 기기마다 다른 값이라 보내지 않는다.
+   * aiKey 는 **비밀이라** 보내지 않는다 — 기기마다 각자 넣는다.
+   */
+  const { lastBackupAt: _b, lastSyncAt: _s, aiKey: _k, ...shared } = settings;
   return { imageSets, images, palaces, loci, settings: shared };
 }
 

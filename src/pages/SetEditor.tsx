@@ -209,6 +209,8 @@ export default function SetEditor() {
             map={settings.chosungMap}
             suggestions={suggestions}
             onPick={useSuggestion}
+            apiKey={settings.aiKey}
+            used={images.filter((i) => i.id !== draft.id && i.name.trim()).map((i) => i.name)}
             nameRef={nameRef}
             onNameKey={onNameKey}
           />

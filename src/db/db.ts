@@ -171,6 +171,13 @@ export interface AppSettings {
   syncCode?: string;
   /** 마지막으로 동기화한 때. 기기마다 다른 값이라 동기화 대상에서 뺀다. */
   lastSyncAt?: number;
+  /**
+   * AI 이름 후보를 받을 때 쓰는 Anthropic 키.
+   *
+   * **이 브라우저 안에만 둔다.** 코드에 넣지 않고(저장소가 공개다) 기기 동기화에서도 뺀다
+   * (`sync/engine.ts` 의 collectAssets). 비어 있으면 사전 후보만 쓴다.
+   */
+  aiKey?: string;
   seededAt?: number;
 }
 

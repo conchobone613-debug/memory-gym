@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { DEFAULT_SETTINGS, db, getSettings, saveSettings, type AppSettings } from '../db/db';
 import { RANKS, SUITS, SUIT_NAME, type Rank, type Suit } from '../lib/cards';
 import { exportBackup, download, importBackup, pickFile } from '../lib/io';
+import { askForNames } from '../lib/ai';
 import { Btn, ConfirmBtn, Field, Panel } from '../components/ui';
 import ChosungKey from '../components/ChosungKey';
 import SyncPanel from '../components/SyncPanel';
@@ -13,6 +14,8 @@ export default function Settings() {
   const stored = useLiveQuery(() => getSettings(), []);
   const [s, setS] = useState<AppSettings | null>(null);
   const [msg, setMsg] = useState('');
+  const [aiTesting, setAiTesting] = useState(false);
+  const [aiMsg, setAiMsg] = useState('');
   const [params, setParams] = useSearchParams();
 
   /* 다른 기기에서 보낸 주소로 열면 코드를 자동으로 넣어 준다 */
@@ -25,6 +28,24 @@ export default function Settings() {
   }, [params, setParams]);
 
   useEffect(() => { if (stored && !s) setS(stored); }, [stored]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 키가 진짜 도는지 한 번 불러 본다. 나중에 후보 화면에서 처음 실패하는 것보다 낫다. */
+  const testAi = async () => {
+    if (!s?.aiKey) return;
+    setAiTesting(true);
+    setAiMsg('');
+    try {
+      await saveSettings({ aiKey: s.aiKey.trim() });
+      const got = await askForNames({
+        apiKey: s.aiKey.trim(), key: '12', isFace: false, map: s.chosungMap, exclude: [], count: 3,
+      });
+      setAiMsg(got.length ? `됩니다. 시험 삼아 받은 후보 — ${got.join(', ')}` : '연결은 됐는데 쓸 만한 후보가 안 왔습니다. 다시 눌러 보십시오.');
+    } catch (e) {
+      setAiMsg(`안 됩니다 — ${(e as Error).message}`);
+    } finally {
+      setAiTesting(false);
+    }
+  };
 
   if (!s) return null;
 
@@ -121,6 +142,42 @@ export default function Settings() {
               onBlur={() => commit({ drillCount: s.drillCount })} />
           </Field>
         </div>
+      </Panel>
+
+      <Panel title="AI 이름 후보">
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field
+            label="Anthropic API 키"
+            hint="이 브라우저에만 저장됩니다. 기기 동기화에도 올라가지 않습니다."
+          >
+            <input
+              type="password"
+              value={s.aiKey ?? ''}
+              onChange={(e) => setS({ ...s, aiKey: e.target.value.trim() })}
+              onBlur={() => commit({ aiKey: s.aiKey?.trim() || undefined })}
+              placeholder="sk-ant-…"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </Field>
+          <div className="flex items-end gap-2">
+            <Btn disabled={!s.aiKey || aiTesting} onClick={testAi}>
+              {aiTesting ? '확인 중…' : '연결 확인'}
+            </Btn>
+            {s.aiKey && (
+              <ConfirmBtn
+                label="키 지우기"
+                confirmLabel="이 브라우저에서 키를 지웁니다"
+                onConfirm={async () => { setS({ ...s, aiKey: undefined }); await commit({ aiKey: undefined }); setAiMsg(''); }}
+              />
+            )}
+          </div>
+        </div>
+        {aiMsg && <p className="mt-3 text-xs text-accent">{aiMsg}</p>}
+        <p className="mt-3 text-xs text-muted">
+          키를 넣으시면 이름 후보의 '다른 후보' 가 누를 때마다 새로 지어 옵니다. 안 넣으셔도
+          지금처럼 사전 후보로 돌아갑니다.
+        </p>
       </Panel>
 
       <SyncPanel />

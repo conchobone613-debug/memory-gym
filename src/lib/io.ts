@@ -113,9 +113,15 @@ export async function exportBackup(): Promise<string> {
       db.recallSessions.toArray(), db.recallCells.toArray(), db.palaces.toArray(), db.loci.toArray(),
       db.imageStats.toArray(), db.settings.toArray(),
     ]);
+  /*
+   * 백업 파일은 밖으로 나간다 — 메일로 보내거나 공용 드라이브에 둘 수 있다.
+   * AI 키는 비밀이므로 빼고 내보낸다. 새 기기에서는 설정에 다시 넣는다.
+   */
+  const safeSettings = settings.map(({ aiKey: _k, ...rest }) => rest);
   return JSON.stringify(
     { format: 'memory-gym', version: 1, exportedAt: new Date().toISOString(),
-      imageSets, images, drillSessions, drillAttempts, recallSessions, recallCells, palaces, loci, imageStats, settings },
+      imageSets, images, drillSessions, drillAttempts, recallSessions, recallCells, palaces, loci, imageStats,
+      settings: safeSettings },
     null, 2,
   );
 }
