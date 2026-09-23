@@ -435,7 +435,14 @@ export default function Drill() {
                         <div className="mt-1.5 ml-6">
                           <div className="flex flex-wrap gap-1">
                             {'0123456789'.split('').map((d) => {
-                              const count = mine.filter((i) => i.key[0] === d).length;
+                              /*
+                               * '카드' 일 때는 카드가 붙는 칸만 센다.
+                               * 무늬가 1~4 라 00~09 에는 붙는 카드가 아예 없다. 그대로 고를 수
+                               * 있게 두면 골라도 아무것도 안 나와 고장으로 보인다.
+                               */
+                              const count = mine.filter(
+                                (i) => i.key[0] === d && (style !== 'card' || cardsByImage.has(i.id)),
+                              ).length;
                               const active = picked.length === 0 || picked.includes(d);
                               const from = d + '0'.repeat(width - 1);
                               const to = d + '9'.repeat(width - 1);
