@@ -36,10 +36,14 @@ export default function Settings() {
     setAiMsg('');
     try {
       await saveSettings({ aiKey: s.aiKey.trim() });
-      const got = await askForNames({
+      const { names, raw } = await askForNames({
         apiKey: s.aiKey.trim(), key: '12', isFace: false, map: s.chosungMap, exclude: [], count: 3,
       });
-      setAiMsg(got.length ? `됩니다. 시험 삼아 받은 후보 — ${got.join(', ')}` : '연결은 됐는데 쓸 만한 후보가 안 왔습니다. 다시 눌러 보십시오.');
+      setAiMsg(
+        names.length
+          ? `됩니다. 시험 삼아 받은 후보 — ${names.join(', ')}`
+          : `연결은 됐는데 규칙에 맞는 후보가 안 왔습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 60)}`,
+      );
     } catch (e) {
       setAiMsg(`안 됩니다 — ${(e as Error).message}`);
     } finally {

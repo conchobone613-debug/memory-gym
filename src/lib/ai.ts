@@ -4,14 +4,15 @@ import { codeOfName, type ChosungMap } from './hangul';
  * 이름 후보를 AI 에게 물어본다.
  *
  * 서버가 없으므로 브라우저가 직접 부른다. 그래서 **키는 회장이 설정에 넣은 것만** 쓴다 —
- * 저장소가 공개라 코드에 넣으면 그대로 털리고, 기기 동기화에서도 빼 둔다(`sync/engine.ts`).
+ * 저장소가 공개라 코드에 넣으면 그대로 털리고, 기기 동기화·백업 파일에서도 빼 둔다
+ * (`sync/engine.ts` 의 collectAssets, `lib/io.ts` 의 exportBackup).
  *
- * 받은 이름은 **여기서 다시 검사한다.** 초성이 키와 안 맞는 이름은 버린다. 모델이 규칙을
- * 어길 수 있는데, 그걸 그대로 넣으면 회장이 잘못된 이름을 고르시게 된다.
+ * 받은 이름은 **여기서 다시 검사한다.** 초성이 키와 안 맞으면 버린다. 모델이 규칙을
+ * 어길 수 있는데, 그걸 그대로 넘기면 회장이 틀린 이름을 고르시게 된다.
  */
 
 const ENDPOINT = 'https://api.anthropic.com/v1/messages';
-/* 초성 제약을 지켜야 해서 값싼 모델로 내리지 않는다. 한 번에 200토큰이라 비용은 미미하다. */
+/* 초성 제약을 지켜야 해서 값싼 모델로 내리지 않는다. 한 번에 100여 토큰이라 비용은 미미하다. */
 const MODEL = 'claude-sonnet-5';
 
 export interface AiAsk {
@@ -27,42 +28,56 @@ export interface AiAsk {
 }
 
 function prompt({ key, isFace, map, exclude, count = 5 }: AiAsk): string {
-  const skip = exclude.length ? `\n- 다음 이름은 빼 주십시오: ${exclude.join(', ')}` : '';
+  const skip = exclude.length ? `\n빼 주십시오: ${exclude.slice(0, 60).join(', ')}` : '';
+
   if (isFace) {
-    return `기억술에 쓸 '사람 이미지' 후보를 ${count}개 지어 주십시오.
-
-- 카드 인물 한 장에 붙일 사람입니다. 초성 규칙은 없습니다.
-- 직업·역할·원형처럼 **생김새가 바로 그려지는 사람**으로. 실존 인물·고유명사는 빼십시오.
-- 서로 헷갈리지 않게 겹치지 않는 인상으로.${skip}
-
-한 줄에 하나씩, 이름만 적으십시오. 번호·설명·따옴표 없이.`;
+    return [
+      `기억술 카드에 붙일 '사람 이미지' 후보를 ${count}개 지어 주십시오.`,
+      '',
+      '- 초성 규칙은 없습니다.',
+      '- 직업·역할·원형처럼 **생김새가 바로 그려지는 사람**으로. 실존 인물·고유명사는 빼십시오.',
+      '- 맞는 예: 대장장이 · 잠수부 · 우체부 · 광대',
+      `- 서로 인상이 겹치지 않게.${skip}`,
+      '',
+      '답은 한 줄에 하나씩 낱말만 적으십시오. 인사말·설명·번호 없이.',
+    ].join('\n');
   }
+
   const rules = key
     .split('')
-    .map((d, i) => `- ${i + 1}번째 글자의 초성: ${(map[d] ?? '?').split('').join(' 또는 ')}`)
+    .map((d, i) => `- ${i + 1}번째 음절의 첫소리: ${(map[d] ?? '?').split('').join(' 또는 ')}`)
     .join('\n');
-  return `기억술에 쓸 이미지 이름 후보를 ${count}개 지어 주십시오.
 
-초성 규칙 (반드시 지킬 것)
-${rules}
-- ${key.length + 1}번째 글자부터는 어떤 초성이든 좋습니다. 글자 수는 ${key.length}자 이상이면 됩니다.
-
-그 밖의 조건
-- **눈에 보이고 만질 수 있는 것**만. 추상명사·고유명사·사람 이름은 빼십시오.
-- 머릿속에 그림이 바로 떠오르는 것. 짧을수록 좋습니다.
-- 흔히 쓰는 말로. 사전에만 있는 낱말은 빼십시오.${skip}
-
-한 줄에 하나씩, 이름만 적으십시오. 번호·설명·따옴표 없이.`;
+  /*
+   * 예시를 반드시 넣는다. 규칙만 적어 두면 모델이 '글자' 를 '낱말' 로 읽어
+   * '고양이 눈동자' 같은 두 낱말을 내놓는다 (실측). 틀린 예가 그걸 막는다.
+   */
+  return [
+    `'${key}' 칸에 쓸 기억술 이미지 이름 후보를 ${count}개 지어 주십시오.`,
+    '',
+    '규칙 — **띄어쓰기 없는 한 낱말**이고, 음절(글자)마다 첫소리가 정해져 있습니다.',
+    rules,
+    `- ${key.length + 1}번째 음절부터는 무엇이든 좋습니다.`,
+    '',
+    '맞는 예: 그네(그=ㄱ, 네=ㄴ) · 기념비(기=ㄱ, 념=ㄴ)',
+    "틀린 예: '고양이 눈동자' — 두 낱말입니다. / '고래' — 둘째 음절 '래' 의 첫소리가 ㄹ 입니다.",
+    '',
+    `그 밖의 조건: 눈에 보이고 만질 수 있는 것만. 추상명사·고유명사 금지. 짧을수록 좋습니다.${skip}`,
+    '',
+    '답은 한 줄에 하나씩 낱말만 적으십시오. 인사말·설명·번호 없이.',
+  ].join('\n');
 }
 
 /** 규칙을 지킨 이름만 남긴다. */
-function keep(names: string[], { key, isFace, map, exclude }: AiAsk): string[] {
+function keep(lines: string[], { key, isFace, map, exclude }: AiAsk): string[] {
   const norm = (s: string) => s.replace(/\s+/g, '');
   const blocked = new Set(exclude.map(norm));
   const out: string[] = [];
-  for (const raw of names) {
-    const name = raw.replace(/^[-*\d.)\s"'“”]+/, '').replace(/["'“”]+$/, '').trim();
-    if (!name || name.length > 12 || !/^[가-힣 ]+$/.test(name)) continue;
+
+  for (const line of lines) {
+    /* 줄 전체가 한글이길 요구하지 않는다 — '고니 (물새)' 처럼 군말이 붙어도 앞 낱말만 쓴다 */
+    const name = (line.match(/[가-힣]+/) ?? [''])[0];
+    if (!name || name.length > 12) continue;
     if (blocked.has(norm(name)) || out.some((o) => norm(o) === norm(name))) continue;
     if (!isFace) {
       const code = codeOfName(name, map);
@@ -73,7 +88,7 @@ function keep(names: string[], { key, isFace, map, exclude }: AiAsk): string[] {
   return out;
 }
 
-export async function askForNames(ask: AiAsk): Promise<string[]> {
+export async function askForNames(ask: AiAsk): Promise<{ names: string[]; raw: string }> {
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: {
@@ -86,6 +101,11 @@ export async function askForNames(ask: AiAsk): Promise<string[]> {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 300,
+      /*
+       * 생각을 끈다. 켜 두면 300토큰을 생각에 다 쓰고 답을 한 글자도 못 낸다
+       * (실측: thinking_tokens 297, text 블록 0개). 이름 몇 개 짓는 데 생각은 필요 없다.
+       */
+      thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: prompt(ask) }],
     }),
     signal: ask.signal,
@@ -99,6 +119,10 @@ export async function askForNames(ask: AiAsk): Promise<string[]> {
   }
 
   const data = await res.json();
-  const text: string = (data?.content ?? []).map((c: { text?: string }) => c.text ?? '').join('\n');
-  return keep(text.split('\n'), ask);
+  const raw: string = (data?.content ?? [])
+    .map((c: { type?: string; text?: string }) => c.text ?? '')
+    .join('\n');
+  if (!raw.trim()) throw new Error('AI 가 빈 답을 보냈습니다. 한 번 더 눌러 주십시오.');
+
+  return { names: keep(raw.split('\n'), ask), raw };
 }

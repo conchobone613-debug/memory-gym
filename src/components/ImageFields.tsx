@@ -68,14 +68,15 @@ export default function ImageFields({
     setErr('');
     try {
       const exclude = [...new Set([...used, ...suggestions.map((s) => s.name), ...seen.current])];
-      const got = await askForNames({
+      const { names, raw } = await askForNames({
         apiKey, key: draft.key, isFace: domain === 'cardFace', map, exclude, count: PER_PAGE,
       });
-      if (got.length === 0) {
-        setErr('쓸 만한 후보가 안 나왔습니다. 한 번 더 눌러 주십시오.');
+      if (names.length === 0) {
+        /* 무엇이 왔는지 보여 준다. 그냥 '안 나왔습니다' 로 끝내면 다음에 고칠 단서가 없다. */
+        setErr(`규칙에 맞는 이름이 안 나왔습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 40)}`);
       } else {
-        seen.current = [...seen.current, ...got];
-        setAi(got);
+        seen.current = [...seen.current, ...names];
+        setAi(names);
       }
     } catch (e) {
       setErr((e as Error).message);
