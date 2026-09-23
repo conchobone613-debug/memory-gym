@@ -7,7 +7,7 @@ import {
 } from '../db/db';
 import { recordAttempt, undoAttempt } from '../db/record';
 import { buildQueue, median, rank } from '../lib/srs';
-import { codeOfName, hintForKey, matchName, type ChosungMap, type MatchKind } from '../lib/hangul';
+import { codeOfName, matchName, type ChosungMap, type MatchKind } from '../lib/hangul';
 import { cardLabel, fullDeck, resolveCard } from '../lib/cards';
 import { pickOne, randBelow, uid } from '../lib/random';
 import { streaks } from '../lib/streak';
@@ -15,6 +15,7 @@ import MappingDrill from './MappingDrill';
 import { type Stage } from '../lib/mapping';
 import { goalFor } from '../db/goals';
 import GoalPanel from '../components/GoalPanel';
+import ImageEditDialog from '../components/ImageEditDialog';
 import { isTyping } from '../App';
 import { Btn, Empty, Field, LinkBtn, Panel, Stat, Streak, fmtMs, fmtPct } from '../components/ui';
 
@@ -54,46 +55,11 @@ const MATCH_LABEL: Record<MatchKind, string> = {
   exact: '정확', alias: '별칭', chosung: '초성만', none: '불일치',
 };
 
-/**
- * 결과 표에서 이름을 바로 고친다.
- *
- * 이름이 안 붙는다는 걸 아는 순간이 바로 여기다 — 방금 틀린 줄을 보면서. 세트 편집기까지
- * 가라고 하면 그 순간을 놓친다. 초성이 키와 맞는지도 옆에서 바로 알려 준다.
- */
-function NameCell({ image, map, isDigits }: { image: MemoImage; map: ChosungMap; isDigits: boolean }) {
-  const [v, setV] = useState(image.name);
-  const [saved, setSaved] = useState(false);
-  useEffect(() => setV(image.name), [image.name]);
-
-  const save = async () => {
-    const name = v.trim();
-    if (name === image.name) return;
-    await db.images.update(image.id, { name, updatedAt: Date.now() });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  };
-
-  const code = isDigits && v.trim() ? codeOfName(v, map) : null;
-  const bad = isDigits && !!v.trim() && !(code && code.startsWith(image.key));
-
-  return (
-    <span className="flex items-center gap-1.5">
-      <input
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-        className={`w-full min-w-0 px-1.5 py-0.5 text-sm ${bad ? 'border-bad/60' : ''}`}
-        aria-label={`${image.key} 이미지 이름`}
-      />
-      {bad && (
-        <span className="shrink-0 text-[11px] text-bad" title={`초성이 ${hintForKey(image.key, map)} 이어야 합니다`}>
-          초성 ✕
-        </span>
-      )}
-      {saved && <span className="shrink-0 text-[11px] text-good">저장</span>}
-    </span>
-  );
+/** 이름의 초성이 그 칸의 숫자와 맞는가. 숫자 세트에서만 따진다. */
+function badChosung(img: MemoImage, domain?: string, map?: ChosungMap): boolean {
+  if (!map || (domain !== 'digit2' && domain !== 'digit3') || !img.name.trim()) return false;
+  const code = codeOfName(img.name, map);
+  return !(code && code.startsWith(img.key));
 }
 
 export default function Drill() {
@@ -140,6 +106,8 @@ export default function Drill() {
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [undoing, setUndoing] = useState(false);
+  /** 결과 표에서 고칠 이미지. 팝업으로 세트 편집기와 같은 상자를 띄운다. */
+  const [editId, setEditId] = useState<string | null>(null);
 
   const sessionStart = useRef(0);
   const [elapsed, setElapsed] = useState(0);
@@ -570,13 +538,16 @@ export default function Drill() {
                         <tr key={i} className="border-t border-line/60">
                           <td className="tnum px-2 py-1">{r.trial.display}</td>
                           <td className="px-2 py-1">
-                            {settings && (
-                              <NameCell
-                                image={live}
-                                map={settings.chosungMap}
-                                isDigits={dom === 'digit2' || dom === 'digit3'}
-                              />
-                            )}
+                            <button
+                              className="flex w-full items-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-left transition-colors hover:border-accent/60 hover:bg-panel2"
+                              onClick={() => setEditId(live.id)}
+                              title="눌러서 고치기"
+                            >
+                              <span className="min-w-0 flex-1 truncate">{live.name || '—'}</span>
+                              {badChosung(live, dom, settings?.chosungMap) && (
+                                <span className="shrink-0 text-[11px] text-bad">초성 ✕</span>
+                              )}
+                            </button>
                           </td>
                           <td className="tnum px-2 py-1 text-right">{fmtMs(r.rtMs)}</td>
                           <td className={`px-2 py-1 text-center ${r.verdict === 'correct' ? 'text-good' : 'text-bad'}`}>
@@ -606,11 +577,12 @@ export default function Drill() {
             <Btn variant="primary" onClick={() => setPhase('setup')}>다시 설정</Btn>
             <Btn onClick={start}>같은 조건으로 한 번 더</Btn>
             {results.length > 0 && (
-              <Btn disabled={undoing} onClick={undo}>← 마지막 판정 고치기</Btn>
+              <Btn disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Btn>
             )}
             <LinkBtn to="/stats">대시보드</LinkBtn>
           </div>
         </Panel>
+        {editId && <ImageEditDialog imageId={editId} onClose={() => setEditId(null)} />}
       </div>
     );
   }

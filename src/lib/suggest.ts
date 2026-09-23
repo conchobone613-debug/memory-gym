@@ -1,5 +1,6 @@
 import { CONCRETE_NOUNS } from '../data/nouns';
 import { codeOfName, type ChosungMap } from './hangul';
+import type { SetDomain } from '../db/db';
 
 /**
  * 빈 칸에 넣을 이름 후보를 고른다.
@@ -41,3 +42,21 @@ export const FACE_SUGGESTIONS = [
   '뱃사공', '산신령', '선장', '소방관', '수녀', '신부', '어릿광대', '여왕', '왕', '요리사',
   '의적', '장군', '정원사', '천사', '카우보이', '탐정', '파일럿', '해녀', '해적', '화가',
 ];
+
+/**
+ * 한 칸의 후보를 그 칸이 속한 세트 기준으로 뽑는다.
+ * 세트 편집기와 결과 화면의 팝업이 같은 목록을 보여야 하므로 한 곳에 둔다.
+ */
+export function suggestFor(
+  draft: { id: string; key: string },
+  siblings: { id: string; name: string }[],
+  domain: SetDomain,
+  map: ChosungMap,
+): Suggestion[] {
+  const used = siblings.filter((i) => i.id !== draft.id && i.name.trim()).map((i) => i.name);
+  if (domain === 'cardFace') {
+    const taken = new Set(used.map((n) => n.replace(/\s+/g, '')));
+    return FACE_SUGGESTIONS.map((name) => ({ name, taken: taken.has(name) }));
+  }
+  return suggestNames(draft.key, map, used);
+}

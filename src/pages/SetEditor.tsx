@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, useParams } from 'react-router-dom';
 import { compareKeys, db, ensureKeys, getSettings, type MemoImage } from '../db/db';
-import { hintForKey } from '../lib/hangul';
-import { suggestNames, FACE_SUGGESTIONS } from '../lib/suggest';
-import { cardLabel, faceHint } from '../lib/cards';
+import { suggestFor } from '../lib/suggest';
+import { cardLabel } from '../lib/cards';
 import { download, importRows, pickFile, rowsFromCsv, setFileBase, toCsv } from '../lib/io';
 import { isTyping } from '../App';
-import { Btn, Empty, Field, LinkBtn, Panel } from '../components/ui';
+import { Btn, Empty, LinkBtn, Panel } from '../components/ui';
+import ImageFields from '../components/ImageFields';
 
 export default function SetEditor() {
   const { setId = '' } = useParams();
@@ -121,15 +121,10 @@ export default function SetEditor() {
   const filled = useMemo(() => images.filter((i) => i.name.trim()).length, [images]);
 
   /* 빈 칸에서 막히실 때 쓰실 후보. 이미 쓰고 있는 이름은 표시해 둔다. */
-  const suggestions = useMemo(() => {
-    if (!draft || !settings) return [];
-    const used = images.filter((i) => i.id !== draft.id && i.name.trim()).map((i) => i.name);
-    if (set?.domain === 'cardFace') {
-      const taken = new Set(used.map((n) => n.replace(/\s+/g, '')));
-      return FACE_SUGGESTIONS.map((name) => ({ name, taken: taken.has(name) }));
-    }
-    return suggestNames(draft.key, settings.chosungMap, used);
-  }, [draft?.key, draft?.id, images, settings, set?.domain]); // eslint-disable-line react-hooks/exhaustive-deps
+  const suggestions = useMemo(
+    () => (draft && settings && set ? suggestFor(draft, images, set.domain, settings.chosungMap) : []),
+    [draft, images, settings, set],
+  );
 
   const useSuggestion = async (name: string) => {
     if (!draft) return;
@@ -206,77 +201,17 @@ export default function SetEditor() {
         <Panel
           title={`${label(draft.key)} 편집`}
         >
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field
-              label="이미지 이름"
-              hint={
-                set.domain === 'cardFace'
-                  ? (faceHint(draft.key) ?? '인물 카드 — 초성 규칙 없음')
-                  : `초성 힌트 ${hintForKey(draft.key, settings.chosungMap)}`
-              }
-            >
-              <input
-                ref={nameRef}
-                value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                onBlur={() => save()}
-                onKeyDown={onNameKey}
-                placeholder="예: 기차"
-              />
-            </Field>
-            <Field label="별칭 (쉼표로 구분 — 채점 시 인정)">
-              <input
-                value={draft.aliases.join(', ')}
-                onChange={(e) =>
-                  setDraft({ ...draft, aliases: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })
-                }
-                onBlur={() => save()}
-                placeholder="열차, 증기기관차"
-              />
-            </Field>
-            <Field label="세부 묘사 (혼동 방지)">
-              <input
-                value={draft.note}
-                onChange={(e) => setDraft({ ...draft, note: e.target.value })}
-                onBlur={() => save()}
-                placeholder="검은 연기를 뿜는 증기기관차"
-              />
-            </Field>
-            <Field label="태그 (쉼표로 구분)">
-              <input
-                value={draft.tags.join(', ')}
-                onChange={(e) =>
-                  setDraft({ ...draft, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })
-                }
-                onBlur={() => save()}
-                placeholder="동물, 탈것"
-              />
-            </Field>
-          </div>
-          {suggestions.length > 0 && (
-            <div className="mt-3">
-              <div className="mb-1.5 text-xs text-muted">
-이름 후보
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((sg) => (
-                  <button
-                    key={sg.name}
-                    type="button"
-                    onClick={() => useSuggestion(sg.name)}
-                    title={sg.taken ? '다른 칸에서 이미 쓰고 있습니다' : undefined}
-                    className={`rounded-md border px-2.5 py-1 text-sm transition-colors ${
-                      sg.taken
-                        ? 'border-line/60 text-muted/50 line-through'
-                        : 'border-line bg-panel2 hover:border-accent hover:text-accent'
-                    }`}
-                  >
-                    {sg.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <ImageFields
+            draft={draft}
+            onDraft={setDraft}
+            onSave={() => save()}
+            domain={set.domain}
+            map={settings.chosungMap}
+            suggestions={suggestions}
+            onPick={useSuggestion}
+            nameRef={nameRef}
+            onNameKey={onNameKey}
+          />
 
           <div className="mt-3 flex gap-1.5">
             <Btn size="sm" variant="primary" onClick={() => save()}>저장</Btn>
