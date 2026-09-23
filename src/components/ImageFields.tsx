@@ -105,15 +105,20 @@ export default function ImageFields({
                 {sg.name}
               </button>
             ))}
-            {pages > 1 && (
-              <button
-                type="button"
-                onClick={() => setPage((p) => (p + 1) % pages)}
-                className="rounded-md border border-line/70 px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-accent"
-              >
-                다른 후보 ↻
-              </button>
-            )}
+            {/*
+              * 넘길 게 없어도 버튼은 남기고 흐리게만 둔다.
+              * 칸마다 버튼이 있다 없다 하면 고장으로 보인다 — 실제로 회장이 그렇게 보셨다.
+              * 흐린 버튼은 '더 없다' 를 말해 주지만, 없는 버튼은 아무 말도 못 한다.
+              */}
+            <button
+              type="button"
+              disabled={pages <= 1}
+              onClick={() => setPage((p) => (p + 1) % pages)}
+              title={pages > 1 ? undefined : '이 칸은 더 드릴 후보가 없습니다'}
+              className="rounded-md border border-line/70 px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line/40 disabled:text-muted/40 disabled:hover:border-line/40 disabled:hover:text-muted/40"
+            >
+              다른 후보 ↻
+            </button>
           </div>
         </div>
       )}
