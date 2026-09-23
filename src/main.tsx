@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { seedIfEmpty } from './db/db';
+import './pwa';
 
 seedIfEmpty()
   .catch((e) => console.error('seed failed', e))

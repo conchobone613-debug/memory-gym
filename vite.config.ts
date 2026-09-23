@@ -35,6 +35,8 @@ export default defineConfig({
         /* Firebase 조각은 미리 받지 않는다. 동기화는 어차피 연결이 있어야 하고, 안 쓰시면 460KB 를 아낀다. */
         globIgnores: ['**/firestore-*.js'],
         navigateFallback: `${BASE}index.html`,
+        /* 옛 버전 캐시는 새 서비스워커가 자리를 잡을 때 치운다 */
+        cleanupOutdatedCaches: true,
         /* 글꼴은 한 번 받아 두면 오프라인에서도 쓴다. 못 받아도 시스템 글꼴로 읽히기만 하면 된다. */
         runtimeCaching: [
           {

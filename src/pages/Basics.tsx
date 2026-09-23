@@ -51,10 +51,6 @@ const MODE_LABEL: Record<PickMode, string> = {
   unseen: '아직 안 본 것',
 };
 
-const MATCH_LABEL: Record<MatchKind, string> = {
-  exact: '정확', alias: '별칭', chosung: '초성만', none: '불일치',
-};
-
 /** 이름의 초성이 그 칸의 숫자와 맞는가. 숫자 세트에서만 따진다. */
 function badChosung(img: MemoImage, domain?: string, map?: ChosungMap): boolean {
   if (!map || (domain !== 'digit2' && domain !== 'digit3') || !img.name.trim()) return false;
@@ -518,58 +514,37 @@ export default function Drill() {
                 <Stat label="최고 연속" value={bestStreak} />
               </div>
               {m3 && <div className="mt-4"><GoalPanel goal={m3} celebrate /></div>}
-              <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-line">
-                {/* 좁은 화면에서는 이름칸이 짓눌리느니 가로로 밀리는 편이 낫다 */}
-                <table className="w-full min-w-[34rem] text-sm">
-                  <thead className="sticky top-0 bg-panel2 text-xs text-muted">
-                    <tr>
-                      <th className="w-16 px-2 py-1.5 text-left">자극</th>
-                      <th className="px-2 py-1.5 text-left">이미지</th>
-                      <th className="w-20 px-2 py-1.5 text-right">반응</th>
-                      <th className="w-12 px-2 py-1.5 text-center">판정</th>
-                      <th className="px-2 py-1.5 text-left">치신 것</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((r, i) => {
-                      const live = images.find((im) => im.id === r.trial.image.id) ?? r.trial.image;
-                      const dom = sets.find((st) => st.id === live.setId)?.domain;
-                      return (
-                        <tr key={i} className="border-t border-line/60">
-                          <td className="tnum px-2 py-1">{r.trial.display}</td>
-                          <td className="px-2 py-1">
-                            <button
-                              className="flex w-full items-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-left transition-colors hover:border-accent/60 hover:bg-panel2"
-                              onClick={() => setEditId(live.id)}
-                              title="눌러서 고치기"
-                            >
-                              <span className="min-w-0 flex-1 truncate">{live.name || '—'}</span>
-                              {badChosung(live, dom, settings?.chosungMap) && (
-                                <span className="shrink-0 text-[11px] text-bad">초성 ✕</span>
-                              )}
-                            </button>
-                          </td>
-                          <td className="tnum px-2 py-1 text-right">{fmtMs(r.rtMs)}</td>
-                          <td className={`px-2 py-1 text-center ${r.verdict === 'correct' ? 'text-good' : 'text-bad'}`}>
-                            {r.verdict === 'correct' ? '○' : '×'}
-                          </td>
-                          <td className="px-2 py-1 text-xs text-muted">
-                            {r.typedInput ? (
-                              <>
-                                {r.typedInput}{' '}
-                                <span className={r.typedMatch === 'none' || r.typedMatch === 'chosung' ? 'text-bad' : 'text-good'}>
-                                  {MATCH_LABEL[r.typedMatch ?? 'none']}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-bad">모름</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              {/*
+                * 표 대신 칸을 나눠 깐다.
+                * 한 줄에 한 문항씩 세로로 늘어놓으면 30문항이 화면을 넘겨 스크롤해야 본다.
+                * 이름칸이 입력칸이 아니라 글자가 된 뒤로 줄이 짧아졌으므로, 넓은 화면에서는
+                * 두세 칸으로 접어 한눈에 들어오게 한다.
+                */}
+              <div className="mt-4 grid max-h-[26rem] gap-1 overflow-auto sm:grid-cols-2 xl:grid-cols-3">
+                {results.map((r, i) => {
+                  const live = images.find((im) => im.id === r.trial.image.id) ?? r.trial.image;
+                  const dom = sets.find((st) => st.id === live.setId)?.domain;
+                  const ok = r.verdict === 'correct';
+                  /* 맞힌 문항의 '치신 것' 은 이름과 같으니 굳이 다시 쓰지 않는다 */
+                  const typed = ok && r.typedMatch === 'exact' ? null : (r.typedInput ?? '모름');
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setEditId(live.id)}
+                      title="눌러서 이름 고치기"
+                      className="flex items-baseline gap-2 rounded-md border border-line/60 bg-panel2/50 px-2 py-1.5 text-left transition-colors hover:border-accent/60 hover:bg-panel2"
+                    >
+                      <span className="tnum w-8 shrink-0 text-xs text-accent/70">{r.trial.display}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm">{live.name || '—'}</span>
+                      {badChosung(live, dom, settings?.chosungMap) && (
+                        <span className="shrink-0 text-[11px] text-bad">초성 ✕</span>
+                      )}
+                      {typed && <span className="max-w-[6rem] shrink truncate text-[11px] text-bad">{typed}</span>}
+                      <span className="tnum w-12 shrink-0 text-right text-xs text-muted">{fmtMs(r.rtMs)}</span>
+                      <span className={`shrink-0 text-xs ${ok ? 'text-good' : 'text-bad'}`}>{ok ? '○' : '×'}</span>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
