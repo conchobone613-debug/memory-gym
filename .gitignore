@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 비밀은 이 저장소에 들어오면 안 된다 — 공개 저장소다.
+# 실수로 키 파일을 프로젝트 폴더에 두더라도 커밋되지 않게 막는다.
+.env
+.env.*
+*.key
+*api-key*
+*api_key*
+*secret*
+*.pem
