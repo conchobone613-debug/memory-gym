@@ -154,16 +154,6 @@ export default function Drill() {
     });
   }, [selected, decades, mode, style, count]);
 
-  const pool = useMemo(
-    () =>
-      images.filter((i) => {
-        if (!selected.includes(i.setId) || !i.name.trim()) return false;
-        const picked = decades[i.setId];
-        return !picked || picked.length === 0 || picked.includes(i.key[0]);
-      }),
-    [images, selected, decades],
-  );
-
   /** 이미지 키 -> 그 이미지를 가리키는 카드들 */
   const cardsByImage = useMemo(() => {
     if (!settings) return new Map<string, string[]>();
@@ -181,6 +171,29 @@ export default function Drill() {
     }
     return map;
   }, [images, sets, settings]);
+
+  /** 고른 세트·열 묶음 안에서 이름이 채워진 칸 (자극 형태는 아직 안 따진다) */
+  const inRange = useMemo(
+    () =>
+      images.filter((i) => {
+        if (!selected.includes(i.setId) || !i.name.trim()) return false;
+        const picked = decades[i.setId];
+        return !picked || picked.length === 0 || picked.includes(i.key[0]);
+      }),
+    [images, selected, decades],
+  );
+
+  /**
+   * 실제로 출제할 칸.
+   *
+   * '카드' 로 내라고 하셨으면 **카드가 붙는 칸만** 낸다. 무늬가 1~4 라 00~09 처럼 카드가
+   * 없는 칸이 섞이는데, 그대로 두면 카드를 고르셨는데 숫자가 나온다 — 회장이 "카드를 안
+   * 골랐는데 카드가 나온다" 로 느끼신 혼선의 뒷면이다.
+   */
+  const pool = useMemo(
+    () => (style === 'card' ? inRange.filter((i) => cardsByImage.has(i.id)) : inRange),
+    [inRange, style, cardsByImage],
+  );
 
   const start = useCallback(async () => {
     const statMap = new Map(stats.map((s) => [s.imageId, s]));
@@ -468,8 +481,8 @@ export default function Drill() {
               </Field>
               <Field label="자극 형태">
                 <select value={style} onChange={(e) => setStyle(e.target.value as StimulusStyle)}>
-                  <option value="key">숫자·키</option>
-                  <option value="card">카드</option>
+                  <option value="key">숫자 그대로</option>
+                  <option value="card">카드로 (A~10)</option>
                   <option value="mix">섞기</option>
                 </select>
               </Field>
@@ -484,9 +497,15 @@ export default function Drill() {
             <Btn variant="primary" size="lg" disabled={namedCount === 0} onClick={start}>시작</Btn>
           </div>
           {namedCount === 0 && (
-            <p className="mt-3 text-sm text-warn">
-              이름이 채워진 이미지가 없습니다. <Link to="/assets/sets" className="text-accent underline">이미지 세트</Link>에서 먼저 채워 주십시오.
-            </p>
+            inRange.length > 0 ? (
+              <p className="mt-3 text-sm text-warn">
+                고르신 범위에는 카드로 낼 수 있는 칸이 없습니다. 자극 형태를 숫자로 바꾸시거나 다른 열 묶음을 고르십시오.
+              </p>
+            ) : (
+              <p className="mt-3 text-sm text-warn">
+                이름이 채워진 이미지가 없습니다. <Link to="/assets/sets" className="text-accent underline">이미지 세트</Link>에서 먼저 채워 주십시오.
+              </p>
+            )
           )}
         </Panel>
       </div>
