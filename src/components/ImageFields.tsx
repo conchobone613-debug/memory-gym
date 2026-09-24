@@ -61,6 +61,9 @@ export default function ImageFields({
   /**
    * 키가 있으면 누를 때마다 **새로 지어 온다.** 사전은 칸마다 7개쯤이라 두세 번이면 바닥난다.
    * 키가 없으면 예전처럼 사전을 넘긴다 — 키를 안 넣으셔도 쓰던 대로 돌아간다.
+   *
+   * count 는 **보여 드릴** 개수다. 넉넉히 청해 걸러내는 일과, 빈손일 때 한 번 더 청하는 일은
+   * askForNames 안에서 끝난다 — 여기서는 기다리는 동안 '짓는 중…' 만 길어진다.
    */
   const more = async () => {
     if (!apiKey) { setPage((p) => (p + 1) % pages); return; }
@@ -72,8 +75,11 @@ export default function ImageFields({
         apiKey, key: draft.key, isFace: domain === 'cardFace', map, exclude, count: PER_PAGE,
       });
       if (names.length === 0) {
-        /* 무엇이 왔는지 보여 준다. 그냥 '안 나왔습니다' 로 끝내면 다음에 고칠 단서가 없다. */
-        setErr(`규칙에 맞는 이름이 안 나왔습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 40)}`);
+        /*
+         * 여기까지 왔다는 건 askForNames 가 안에서 이미 두 번 청했다는 뜻이다.
+         * 무엇이 왔는지 보여 준다 — 그냥 '안 나왔습니다' 로 끝내면 다음에 고칠 단서가 없다.
+         */
+        setErr(`두 번 청했지만 규칙에 맞는 이름이 없었습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 40)}`);
       } else {
         seen.current = [...seen.current, ...names];
         setAi(names);

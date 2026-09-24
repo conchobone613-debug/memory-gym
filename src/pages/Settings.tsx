@@ -42,7 +42,7 @@ export default function Settings() {
       setAiMsg(
         names.length
           ? `됩니다. 시험 삼아 받은 후보 — ${names.join(', ')}`
-          : `연결은 됐는데 규칙에 맞는 후보가 안 왔습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 60)}`,
+          : `연결은 됐는데 두 번 청해도 규칙에 맞는 후보가 안 왔습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 60)}`,
       );
     } catch (e) {
       setAiMsg(`안 됩니다 — ${(e as Error).message}`);

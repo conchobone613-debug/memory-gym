@@ -15,6 +15,15 @@ const ENDPOINT = 'https://api.anthropic.com/v1/messages';
 /* 초성 제약을 지켜야 해서 값싼 모델로 내리지 않는다. 한 번에 100여 토큰이라 비용은 미미하다. */
 const MODEL = 'claude-sonnet-5';
 
+/*
+ * 보여 드릴 개수보다 **이만큼 더** 청한다.
+ *
+ * 모델이 초성 규칙을 심심찮게 흘리는데, 아래 keep() 이 그걸 걸러내므로 5개만 청하면
+ * 손에 남는 게 두세 개다. 넉넉히 받아 통과한 것 중 앞에서 다섯만 보여 드린다.
+ * 답이 '한 줄에 낱말 하나' 라서 세 개를 더 받아도 토큰은 거의 안 는다.
+ */
+const EXTRA = 3;
+
 export interface AiAsk {
   apiKey: string;
   /** 숫자 키('12') 또는 카드 코드('SJ') */
@@ -23,6 +32,7 @@ export interface AiAsk {
   map: ChosungMap;
   /** 이미 쓰고 있거나 방금 보여 준 이름 — 다시 주지 않게 */
   exclude: string[];
+  /** 규칙을 통과해 **보여 드릴** 개수. 실제로 청하는 개수는 이보다 EXTRA 만큼 많다. */
   count?: number;
   signal?: AbortSignal;
 }
@@ -88,7 +98,16 @@ function keep(lines: string[], { key, isFace, map, exclude }: AiAsk): string[] {
   return out;
 }
 
-export async function askForNames(ask: AiAsk): Promise<{ names: string[]; raw: string }> {
+/** 답에서 낱말만 뽑는다 — 규칙을 어겼어도 '이건 빼 주십시오' 로 되돌려 주기 위해. */
+function wordsIn(raw: string): string[] {
+  return raw
+    .split('\n')
+    .map((line) => (line.match(/[가-힣]+/) ?? [''])[0])
+    .filter((w) => w && w.length <= 12);
+}
+
+/** 한 번 청한다. */
+async function once(ask: AiAsk): Promise<{ names: string[]; raw: string }> {
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: {
@@ -125,4 +144,23 @@ export async function askForNames(ask: AiAsk): Promise<{ names: string[]; raw: s
   if (!raw.trim()) throw new Error('AI 가 빈 답을 보냈습니다. 한 번 더 눌러 주십시오.');
 
   return { names: keep(raw.split('\n'), ask), raw };
+}
+
+export async function askForNames(ask: AiAsk): Promise<{ names: string[]; raw: string }> {
+  const want = ask.count ?? 5;
+  const first = await once({ ...ask, count: want + EXTRA });
+  if (first.names.length > 0) return { names: first.names.slice(0, want), raw: first.raw };
+
+  /*
+   * 하나도 안 남으면 **여기서 알아서 한 번 더** 청한다. 빈손은 모델이 규칙을 흘린 것이지
+   * 회장 잘못이 아닌데, '다시 눌러 주십시오' 는 그 뒷수습을 회장께 떠넘기는 말이다.
+   * 방금 받은 틀린 낱말은 빼 달라고 같이 넘겨, 같은 답이 또 오지 않게 한다.
+   * 두 번까지만이다 — 더 돌면 버튼이 언제 끝날지 모르는 것이 된다.
+   */
+  const again = await once({
+    ...ask,
+    count: want + EXTRA,
+    exclude: [...ask.exclude, ...wordsIn(first.raw)],
+  });
+  return { names: again.names.slice(0, want), raw: again.raw };
 }
