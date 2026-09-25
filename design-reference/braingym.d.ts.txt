@@ -1,0 +1,47 @@
+/** 계산실 디자인 시스템 — 소리와 연출 도구. 부품 모양은 bundle.css 의 bg- 클래스. */
+declare namespace BrainGym {
+  /** 설정 두 개. 앱의 설정 화면에 연결한다. */
+  const settings: { sound: boolean; reduced: boolean };
+  namespace sfx {
+    /** 타자기 한 타. heavy = 큰 버튼 */
+    function key(heavy?: boolean): void;
+    /** 연속 단계 돌파 — 줄바꿈 소리 + 종 */
+    function carriage(): void;
+    /** 정답 종. n = 지금 연속 수(1부터), 12칸에서 멈춤 */
+    function good(n: number): void;
+    /** 오답 부저 */
+    function bad(): void;
+    /** 모름(Tab) */
+    function skip(): void;
+    /** 글자판 한 칸 */
+    function flap(): void;
+    /** 계수기 딸깍 */
+    function tick(i?: number): void;
+    /** 금별 i번째(0~2) */
+    function star(i: number): void;
+    /** 고무도장 */
+    function stamp(): void;
+    /** 좋아진 항목 */
+    function better(): void;
+    /** 아까움 — 시계 똑딱 */
+    function tense(): void;
+    /** 신기록 팡파르 */
+    function fanfare(): void;
+  }
+  namespace fx {
+    /** 가장자리 빛 한 번(.bg-edge). 기본 240ms */
+    function flash(edge: HTMLElement, peak?: number, durationMs?: number): void;
+    /** 조각 튀기기. floor = 이 y 아래로 내려가지 않음(측정 화면에서는 문제 카드 윗선) */
+    function spray(layer: HTMLElement, x: number, y: number, count: number, kind: 'chad' | 'tape', spread?: number, floor?: number): void;
+    /** 공항 글자판. 돌려받은 함수 = 즉시 끝 값 */
+    function flip(el: HTMLElement, text: string, delayMs?: number): () => void;
+    /** 기계식 계수기 값 */
+    function setCounter(counter: HTMLElement, n: number): void;
+    /** 연속 단계 0~4 (5·10·20·50) */
+    function tier(n: number): number;
+    /** 결과 공개 순서표. 돌려받은 함수 = 건너뛰기(end 를 한 번 부름) */
+    function sequence(steps: Array<[number, () => void]>, end?: () => void): () => void;
+    /** 움직임 줄이기가 켜졌는가(설정 또는 prefers-reduced-motion) */
+    function reduced(): boolean;
+  }
+}
