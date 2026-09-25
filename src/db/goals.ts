@@ -22,6 +22,11 @@ export interface GoalStatus {
   passed: boolean;
   /** 통과하면 무엇으로 넘어가는지 */
   next: string;
+  /** 이 단계의 기준값 (결과 화면 목표 막대가 이 값을 그대로 쓴다) */
+  rule: { reps: number; accuracy: number; rtMs: number };
+  /** reps 이상 본 칸 / 전체 칸 */
+  enough: number;
+  total: number;
 }
 
 /**
@@ -126,5 +131,7 @@ export async function goalFor(stage: AnyStage): Promise<GoalStatus> {
     checks,
     passed: checks.every((c) => c.ok),
     next: rule.next,
+    rule: { reps: rule.reps, accuracy: rule.accuracy, rtMs: rule.rtMs },
+    enough, total,
   };
 }

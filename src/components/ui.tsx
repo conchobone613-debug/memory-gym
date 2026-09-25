@@ -1,18 +1,26 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { sfx } from '../design/sfx';
 
+/*
+ * 앱 공통 기본 틀 — 1950년대 계산실 디자인(components/lp)의 모양을 따른다.
+ * 새 화면은 가능한 한 components/lp 의 부품(Folder · IndexCard · Key · Dymo …)을 직접 쓰고,
+ * 이 파일은 설정·표처럼 부품이 따로 없는 곳의 종이 상자·자판 버튼을 맡는다.
+ */
+
+/** 종이 한 장 상자. 제목은 간판 글씨. 목록은 IndexCard, 할 일 한 덩어리는 Folder 를 먼저 생각할 것. */
 export function Panel({ title, right, children, className = '' }: {
   title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-line/80 bg-panel shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset] ${className}`}>
+    <section className={`lp-panel ${className}`}>
       {(title || right) && (
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line/70 px-4 py-3">
-          <h2 className="font-display text-base leading-none">{title}</h2>
+        <header className="lp-panel-head">
+          <h2 className="lp-panel-title">{title}</h2>
           {right}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className="lp-panel-body">{children}</div>
     </section>
   );
 }
@@ -20,32 +28,35 @@ export function Panel({ title, right, children, className = '' }: {
 type Variant = 'primary' | 'ghost' | 'danger' | 'good';
 type Size = 'sm' | 'md' | 'lg';
 
+/* 빨간 자판은 화면의 주 동작 하나(Key tone="red")만 — 여기 변형은 남색·크림색으로 둔다. */
 const VARIANT: Record<Variant, string> = {
-  primary: 'bg-accent text-ink hover:brightness-110 border-transparent font-semibold',
-  good: 'bg-good text-ink hover:brightness-110 border-transparent font-semibold',
-  danger: 'bg-transparent text-bad border-bad/50 hover:bg-bad/10',
-  ghost: 'bg-panel2 border-line hover:border-accent/60',
+  primary: '',
+  good: '',
+  ghost: 'is-cream',
+  danger: 'is-cream is-danger',
 };
-const SIZE: Record<Size, string> = {
-  sm: 'px-2.5 py-1 text-xs',
-  md: 'px-3 py-1.5 text-sm',
-  lg: 'px-5 py-3 text-base',
-};
+const SIZE: Record<Size, string> = { sm: 'is-sm', md: '', lg: 'is-lg' };
 
-const btnClass = (variant: Variant, size: Size, extra: string) =>
-  `inline-block rounded-lg border text-center transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${VARIANT[variant]} ${SIZE[size]} ${extra}`;
+const btnClass = (variant: Variant, size: Size, extra: string) => `lp-key ${VARIANT[variant]} ${SIZE[size]} ${extra}`;
 
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size };
 
-export function Btn({ variant = 'ghost', size = 'md', className = '', ...rest }: BtnProps) {
-  return <button {...rest} className={btnClass(variant, size, className)} />;
+export function Btn({ variant = 'ghost', size = 'md', className = '', onPointerDown, ...rest }: BtnProps) {
+  return (
+    <button
+      type="button"
+      {...rest}
+      className={btnClass(variant, size, className)}
+      onPointerDown={(e) => { if (!rest.disabled) sfx.key(size === 'lg'); onPointerDown?.(e); }}
+    />
+  );
 }
 
 /** 링크는 Link 자체를 버튼처럼 칠한다. <Link><button/></Link> 은 잘못된 HTML 이라 클릭이 먹지 않는다. */
 export function LinkBtn({ to, variant = 'ghost', size = 'md', className = '', children }: {
   to: string; variant?: Variant; size?: Size; className?: string; children: ReactNode;
 }) {
-  return <Link to={to} className={btnClass(variant, size, className)}>{children}</Link>;
+  return <Link to={to} className={btnClass(variant, size, className)} onPointerDown={() => sfx.key(size === 'lg')}>{children}</Link>;
 }
 
 /**
@@ -71,8 +82,8 @@ export function ConfirmBtn({ label, confirmLabel, onConfirm, size = 'md' }: {
     return <Btn variant="danger" size={size} onClick={() => setArmed(true)}>{label}</Btn>;
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-lg border border-bad/60 bg-bad/10 px-1.5 py-0.5">
-      <span className="text-xs text-bad">{confirmLabel}</span>
+    <span className="inline-flex flex-wrap items-center gap-2 rounded-[4px] border border-dashed border-red bg-near px-2 py-1.5">
+      <span className="font-typek text-xs text-red">{confirmLabel}</span>
       <Btn variant="danger" size="sm" onClick={() => { setArmed(false); onConfirm(); }}>지웁니다</Btn>
       <Btn size="sm" onClick={() => setArmed(false)}>취소</Btn>
     </span>
@@ -82,23 +93,24 @@ export function ConfirmBtn({ label, confirmLabel, onConfirm, size = 'md' }: {
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-muted">{label}</span>
+      <span className="font-typek text-[11px] font-bold tracking-wide text-ink-2">{label}</span>
       {children}
-      {hint && <span className="text-[11px] text-muted">{hint}</span>}
+      {hint && <span className="font-typek text-[11px] text-ink-2">{hint}</span>}
     </label>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-10 text-center text-sm text-muted">{children}</p>;
+  return <p className="py-10 text-center font-typek text-[13px] text-ink-2">{children}</p>;
 }
 
+/** 작은 기록 칸 — 종이 쪽지 위 타자기 숫자 */
 export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-line/70 bg-panel2/70 px-3 py-2.5">
-      <div className="text-[11px] tracking-wide text-muted">{label}</div>
-      <div className="tnum mt-0.5 text-2xl leading-none font-semibold">{value}</div>
-      {sub && <div className="mt-1 text-[11px] text-muted">{sub}</div>}
+    <div className="lp-stat">
+      <div className="lp-stat-label">{label}</div>
+      <div className="lp-stat-value tnum">{value}</div>
+      {sub && <div className="lp-stat-sub">{sub}</div>}
     </div>
   );
 }
@@ -107,19 +119,19 @@ export function Kbd({ children }: { children: ReactNode }) {
   return <kbd>{children}</kbd>;
 }
 
-export const fmtMs = (x: number) => (x ? `${(x / 1000).toFixed(2)}s` : '—');
+/** 숫자는 단위를 붙여 짧게: 1.57초, 96% */
+export const fmtMs = (x: number) => (x ? `${(x / 1000).toFixed(2)}초` : '—');
 export const fmtPct = (x: number) => `${Math.round(x * 100)}%`;
 
-/** 연속 정답. 숫자가 바뀔 때마다 톡 튀어야 손맛이 난다. */
+/**
+ * 연속 정답(측정 화면이 아닌 곳의 작은 표시). 측정 화면은 components/lp 의 계수기(ComboCounter)를 쓴다.
+ * 이모지는 쓰지 않는다(디자인 시스템 「글」).
+ */
 export function Streak({ n }: { n: number }) {
   if (n < 2) return null;
   return (
-    <span
-      key={n}
-      className="mg-pop inline-flex items-center gap-1 rounded-full border border-accent/50 bg-accent/10 px-2.5 py-0.5 text-xs text-accent"
-    >
-      <span aria-hidden>🔥</span>
-      <span className="tnum font-semibold">{n}</span>
+    <span className="inline-flex items-center gap-1 rounded-[3px] bg-ink px-2 py-0.5 font-typek text-xs text-paper">
+      <span className="tnum font-bold">{n}</span>
       연속
     </span>
   );

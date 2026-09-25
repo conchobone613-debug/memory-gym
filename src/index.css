@@ -1,80 +1,112 @@
 @import "tailwindcss";
+@import "./design/tokens.css";
+@import "./design/lampadas.css";
 
 /*
- * 테마 — 기억의 궁전.
- * 회장님이 실제로 훈련에 쓰는 은유가 건축물이라 거기서 색을 가져왔다.
- * 먹빛 바탕에 오래된 돌·황동·상아. 차가운 남색 대신 따뜻한 검정을 쓴다.
+ * 테마 — 1950년대 계산실 (Lampadas 디자인 시스템).
+ * '컴퓨터'가 손으로 계산하는 사람의 직업이던 시절. 종이 바탕 · 남색 잉크 · 타자기 먹끈 빨강 · 칠판 · 황동.
+ * 토큰 값은 design/tokens.css 한 곳. 여기서는 Tailwind 이름으로 이어 줄 뿐이다.
+ *
+ * 색 쓰는 법(디자인 시스템 README 「색」):
+ *   red   — 화면마다 강조 한 곳(주 동작 '한 판 더', 도장, 목표선, 아까움 수치)
+ *   chalk — 진행·성공('정답' 글자, ▲ 좋아짐, 막대)
+ *   blue  — 오답 표시, 스승님 손글씨
+ *   brass — 보상 빛에만. 글자색 금지(paper 위 2.6:1)
  */
-@theme {
-  --color-ink: #0e0c0a;
-  --color-panel: #17140f;
-  --color-panel2: #201b15;
-  --color-line: #342c22;
-  --color-fg: #ece4d8;
-  --color-muted: #9b8f7d;
-  --color-accent: #d9a441;
-  --color-good: #86b96a;
-  --color-bad: #cf6049;
-  --color-warn: #d9912b;
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-card-edge: var(--card-edge);
+  --color-manila: var(--manila);
+  --color-manila-dark: var(--manila-dark);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-red: var(--red);
+  --color-blue: var(--blue);
+  --color-chalk: var(--chalk);
+  --color-brass: var(--brass);
+  --color-brass-light: var(--brass-light);
+  --color-track: var(--track);
+  --color-input: var(--input);
+  --color-key-cream: var(--key-cream);
+  --color-near: var(--near);
+  --color-desk: var(--desk);
+  --color-rule: var(--rule);
 
-  --font-display: "Gowun Batang", "Apple SD Gothic Neo", serif;
-  --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", "IBM Plex Sans KR", ui-monospace, monospace;
+  --font-sign: var(--font-sign);
+  --font-type: var(--font-type);
+  --font-typek: var(--font-typek);
+  --font-body: var(--font-body);
+  --font-hand: var(--font-hand);
 }
 
-html, body, #root { height: 100%; }
+/*
+ * 옛 테마 이름(먹빛 시절). 화면을 새 부품으로 옮기는 동안 아무것도 어둡게 깨지지 않도록
+ * 종이 테마 값으로 이어 둔다. 새 코드에서는 쓰지 않는다 — 옮기기가 끝나면 지운다.
+ * 주의: 옛 'ink' 는 바탕색이었다. 새 'ink' 는 글자색이다. 옛 bg-ink 는 bg-paper 로 옮긴다.
+ */
+@theme inline {
+  --color-panel: var(--card);
+  --color-panel2: var(--manila);
+  --color-line: var(--card-edge);
+  --color-fg: var(--ink);
+  --color-muted: var(--ink-2);
+  --color-accent: var(--chalk);
+  --color-good: var(--chalk);
+  --color-bad: var(--blue);
+  --color-warn: var(--red);
+  --font-display: var(--font-sign);
+  --font-mono: var(--font-type);
+}
+
+html, body, #root { min-height: 100%; }
 body {
   margin: 0;
-  background:
-    radial-gradient(120% 80% at 50% -10%, #1b1712 0%, transparent 60%),
-    var(--color-ink);
-  color: var(--color-fg);
-  font-family: var(--font-sans);
+  /* 넓은 화면에서 앱 기둥 바깥은 책상 */
+  background: var(--desk);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-body);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
 * { box-sizing: border-box; }
-::selection { background: var(--color-accent); color: #1a1408; }
+::selection { background: var(--brass-light); color: var(--ink); }
 
-h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
+h1, h2, h3 { font-family: var(--font-sign); font-weight: 400; letter-spacing: .01em; }
 
 button, a, input, select, textarea { touch-action: manipulation; }
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: 0.4rem;
-}
+:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
 input, textarea, select, button { font: inherit; color: inherit; }
 input, textarea, select {
-  background: var(--color-panel2);
-  border: 1px solid var(--color-line);
-  border-radius: .5rem;
+  background: var(--input);
+  border: 1px solid var(--card-edge);
+  border-bottom: 2px solid var(--ink-2);
+  border-radius: 2px;
   padding: .4rem .6rem;
   outline: none;
+  font-family: var(--font-typek);
+  font-size: 14px;
 }
-input:focus, textarea:focus, select:focus { border-color: var(--color-accent); }
+input:focus, textarea:focus, select:focus { border-bottom-color: var(--red); }
+input[type="checkbox"] { accent-color: var(--chalk); }
 
 kbd {
-  background: var(--color-panel2);
-  border: 1px solid var(--color-line);
+  background: var(--key-cream);
+  border: 1px solid var(--card-edge);
   border-bottom-width: 2px;
-  border-radius: .35rem;
+  border-radius: 3px;
   padding: .05rem .35rem;
   font-size: .8em;
-  font-family: var(--font-mono);
+  font-family: var(--font-type);
 }
-.tnum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* 측정·기록 숫자는 타자기 글꼴에 자릿수를 고정 */
+.tnum { font-family: var(--font-type); font-variant-numeric: tabular-nums; }
 .balance { text-wrap: balance; }
 
-/* ── 맞고 틀리는 순간의 반응 ──────────────────────────────
-   훈련 화면에서 장식은 해롭지만 판정 피드백은 다르다. 맞았는지 틀렸는지가
-   몸에 남아야 학습이 된다. 대신 transform·opacity 만 건드리고 250ms 안에 끝낸다. */
-@keyframes mg-good {
-  0%   { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-good) 70%, transparent); }
-  40%  { transform: scale(1.03); box-shadow: 0 0 0 12px color-mix(in srgb, var(--color-good) 0%, transparent); }
-  100% { transform: scale(1);    box-shadow: 0 0 0 0 transparent; }
-}
+/* ── 옛 판정 연출 ──────────────────────────────
+   새 화면은 이것을 쓰지 않는다 — 판정 연출은 연출 층(design/fx.ts, components/lp/JudgeLayer)에서만.
+   문제 카드에 걸면 다음 문제의 반응시간 측정과 겹친다(디자인 시스템 「측정 구간」). 옮기기가 끝나면 지운다. */
 @keyframes mg-bad {
   0%, 100% { transform: translateX(0); }
   20%      { transform: translateX(-7px); }
@@ -90,24 +122,17 @@ kbd {
   from { transform: translateY(6px); opacity: 0; }
   to   { transform: translateY(0);   opacity: 1; }
 }
-@keyframes mg-sheen {
-  from { transform: translateX(-120%); }
-  to   { transform: translateX(120%); }
-}
-
-.mg-good  { animation: mg-good 320ms ease-out; }
 .mg-bad   { animation: mg-bad 260ms ease-out; }
 .mg-pop   { animation: mg-pop 220ms cubic-bezier(.34,1.56,.64,1); }
 .mg-rise  { animation: mg-rise 260ms ease-out both; }
-.mg-sheen { animation: mg-sheen 900ms ease-out; }
 
 /*
  * 움직임 줄이기. 앱 설정이 기기 설정보다 앞선다 — <html data-motion="reduce|full">.
  * 설정을 비워 두면(data-motion 없음) 기기의 prefers-reduced-motion 을 따른다.
  */
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.mg-good, .mg-bad, .mg-pop, .mg-rise, .mg-sheen) { animation: none !important; }
+  :root:not([data-motion="full"]) :is(.mg-bad, .mg-pop, .mg-rise) { animation: none !important; }
   :root:not([data-motion="full"]) * { transition-duration: 1ms !important; }
 }
-:root[data-motion="reduce"] :is(.mg-good, .mg-bad, .mg-pop, .mg-rise, .mg-sheen) { animation: none !important; }
+:root[data-motion="reduce"] :is(.mg-bad, .mg-pop, .mg-rise) { animation: none !important; }
 :root[data-motion="reduce"] * { transition-duration: 1ms !important; }

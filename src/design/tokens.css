@@ -1,0 +1,107 @@
+/*
+ * Lampadas 디자인 토큰 — 1950년대 계산실.
+ * 원본은 디자인 시스템(https://claude.ai/artifact/BkPiAec2kapUZoaeZgKem9)의 tokens.json,
+ * 저장소 사본은 design-reference/tokens.json. 값을 바꿀 때는 디자인 시스템을 먼저 고치고 여기를 맞춘다.
+ * 테마는 paper 하나다(밝은/어두운 전환 없음).
+ */
+:root {
+  color-scheme: light;
+
+  /* 색 */
+  --paper: #f4ead3;
+  --card: #fbf5e6;
+  --card-edge: #d6c9ab;
+  --manila: #ecdcb8;
+  --manila-dark: #d9c392;
+  --ink: #1e2838;
+  --ink-2: #5b5446;
+  --red: #b3342b;
+  --blue: #36507a;
+  --chalk: #2f4a3e;
+  --chalk-light: #3d5e50;
+  --brass: #b58a3c;
+  --brass-light: #e2c275;
+  --bulb: #ffe7a3;
+  --bulb-off: #5a5040;
+  --bulb-halo: #ffcf5a;
+  --rule: #9fb3d160;
+  --track: #e6dcc4;
+  --input: #fffdf7;
+  --key-cream: #efe4c9;
+  --dymo-ink: #f7f3ea;
+  --dymo-black: #151515;
+  --dymo-black-top: #232323;
+  --dymo-red: #9c2b22;
+  --dymo-red-top: #c23a2f;
+  --dymo-blue: #2a4166;
+  --dymo-blue-top: #3c5b8a;
+  --bezel: #3a2b1f;
+  --bezel-light: #5a4331;
+  --bezel-dark: #2a1f16;
+  --crt-black: #111111;
+  --counter: #2b2f36;
+  --counter-label: #d9d2c2;
+  --wheel-edge: #d9d2c2;
+  --tile: #22262d;
+  --tile-ink: #f7f1e3;
+  --near: #fff3d6;
+  --banner: #1e2838e6;
+  --desk: #221a13;
+
+  /* 글꼴 */
+  --font-sign: "Do Hyeon", "Gowun Batang", sans-serif;
+  --font-type: "Courier Prime", "Nanum Gothic Coding", monospace;
+  --font-typek: "Nanum Gothic Coding", "Courier Prime", monospace;
+  --font-body: "Gowun Batang", serif;
+  --font-hand: "Nanum Pen Script", "Gowun Batang", cursive;
+
+  /* 모서리 */
+  --radius-paper: 4px;
+  --radius-label: 3px;
+  --radius-folder: 10px;
+  --radius-key-big: 14px;
+  --radius-pill: 999px;
+  --radius-tv: 20px;
+  --radius-crt-x: 16px;
+  --radius-crt-y: 22px;
+
+  /* 그림자 */
+  --paper-lift: 0 1px 2px #00000033, 0 6px 16px -10px #00000077;
+  --folder: inset 0 1px 0 #ffffff66, 0 2px 0 #d9c392, 0 6px 14px -8px #00000088;
+  --key-up: 0 0 0 3px #c9ccd1, 0 0 0 4px #8b8f96, 0 5px 0 1px #3d3f44, 0 7px 10px #00000077;
+  --key-down: 0 0 0 3px #c9ccd1, 0 0 0 4px #8b8f96, 0 1px 0 1px #3d3f44, 0 2px 4px #00000066;
+  --crt-inner: inset 0 0 24px 6px #0000008c;
+  --glow-good: inset 0 0 0 3px #b58a3c, inset 0 0 44px 14px #e2c275b3;
+  --glow-bad: inset 0 0 0 3px #36507a, inset 0 0 36px 8px #36507a73;
+  --bulb-glow: 0 0 6px 2px #ffd36b;
+
+  /* 움직임 — 연출 층 전용. 측정 구간의 문제 카드에는 쓰지 않는다. */
+  --dur-press: 80ms;
+  --dur-feedback: 240ms;
+  --dur-feedback-bad: 280ms;
+  --dur-pop: 180ms;
+  --dur-mark: 180ms;
+  --dur-wheel: 200ms;
+  --dur-page-out: 150ms;
+  --dur-page-in: 220ms;
+  --dur-list-step: 30ms;
+  --dur-scroll-in: 300ms;
+  --dur-flap: 55ms;
+  --dur-bar: 480ms;
+  --dur-star: 220ms;
+  --dur-stamp: 190ms;
+  --dur-stage: 500ms;
+  --dur-banner: 420ms;
+  --dur-result-max: 2800ms;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --ease-spring: cubic-bezier(.3,1.6,.6,1);
+  --ease-slam: cubic-bezier(.5,0,.8,.4);
+  --ease-bits: cubic-bezier(.2,.7,.3,1);
+
+  /* 층 */
+  --layer-fx: 8;
+  --layer-banner: 9;
+
+  /* 브라운관 색감 */
+  --crt: saturate(.95) sepia(.26) contrast(1.04) brightness(1.08) blur(.3px);
+}

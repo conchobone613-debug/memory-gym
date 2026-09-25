@@ -1,0 +1,226 @@
+/*
+ * Lampadas 부품 스타일 — 디자인 시스템 bundle.css 를 앱으로 옮긴 것.
+ * 원본 접두어 bg- 는 Tailwind 의 bg-* 와 부딪혀 lp- 로 바꿨다. 색·글꼴은 tokens.css 변수만 쓴다.
+ * 부품 설명은 디자인 시스템의 components/<이름>/README.md.
+ */
+
+/* ── 앱 기둥: 휴대폰 폭. 넓은 화면에서는 가운데 두고 바깥을 책상 색으로 (디자인 시스템 「화면 틀」) ── */
+:root { --col-w: 480px; }
+
+/* ── 바탕: 종이 결 ── */
+.lp-grain { position: relative; isolation: isolate; }
+.lp-grain::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .45;
+  background-image: radial-gradient(#00000012 1px, transparent 1.3px), radial-gradient(#ffffff30 1px, transparent 1.3px);
+  background-size: 4px 4px, 6px 6px; background-position: 0 0, 1px 2px; }
+
+/* ── 버튼: 타자기 자판 ── 누르면 4px 쑥 들어간다(80ms). 소리는 sfx.key() */
+.lp-key {
+  --k: var(--ink); --kt: var(--paper);
+  position: relative; display: inline-block; text-align: center; text-decoration: none;
+  font: 700 15px/1 var(--font-typek); color: var(--kt); cursor: pointer; user-select: none;
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--k) 80%, #fff) 0%, var(--k) 70%);
+  border: 0; border-radius: var(--radius-pill); padding: 11px 20px 12px;
+  box-shadow: var(--key-up); transition: transform var(--dur-press) var(--ease-spring), box-shadow var(--dur-press);
+}
+.lp-key:active, .lp-key.is-down { transform: translateY(4px); box-shadow: var(--key-down); }
+.lp-key:focus-visible { outline: 3px solid var(--red); outline-offset: 5px; }
+.lp-key.is-red { --k: var(--red); }
+.lp-key.is-cream { --k: var(--key-cream); --kt: var(--ink); }
+.lp-key.is-round { width: 50px; height: 50px; padding: 0; display: inline-grid; place-items: center; font-size: 18px; }
+.lp-key.is-big { display: block; width: 100%; font-size: 17px; padding: 14px 20px 15px; border-radius: var(--radius-key-big); }
+.lp-key.is-sm { font-size: 13px; padding: 8px 14px 9px; }
+.lp-key small { display: block; margin-top: 3px; font-size: 10px; font-weight: 400; opacity: .75; }
+.lp-key:disabled, .lp-key[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; box-shadow: var(--key-up); }
+
+/* ── 중간 제목: 다이모 라벨 테이프 ── */
+.lp-dymo {
+  display: inline-block; font: 17px/1 var(--font-sign); letter-spacing: .14em; color: var(--dymo-ink);
+  background: linear-gradient(var(--dymo-black-top), var(--dymo-black)); padding: 7px 14px 6px; border-radius: var(--radius-label);
+  text-shadow: 0 -1px 0 #0009, 0 1px 0 #ffffff40; box-shadow: 0 1px 0 #ffffff14 inset, 0 2px 3px #0008;
+  clip-path: polygon(0 12%, 4px 0, calc(100% - 4px) 0, 100% 12%, 100% 88%, calc(100% - 4px) 100%, 4px 100%, 0 88%);
+}
+.lp-dymo.is-red { background: linear-gradient(var(--dymo-red-top), var(--dymo-red)); }
+.lp-dymo.is-blue { background: linear-gradient(var(--dymo-blue-top), var(--dymo-blue)); }
+.lp-dymo.is-sm { font-size: 13px; padding: 5px 10px 4px; letter-spacing: .12em; }
+
+/* ── 상자: 서류철 ── 윗면 탭에 무엇인지 적는다(data-tab) */
+.lp-folder { position: relative; background: var(--manila); color: var(--ink); border-radius: 0 var(--radius-folder) var(--radius-folder) var(--radius-folder); padding: 14px; margin-top: 20px; box-shadow: var(--folder); }
+.lp-folder::before { content: attr(data-tab); position: absolute; left: 0; bottom: 100%; background: var(--manila); padding: 4px 16px 2px 12px; border-radius: 8px 12px 0 0;
+  font: 700 12px var(--font-typek); letter-spacing: .06em; color: var(--ink-2); }
+.lp-clip { position: absolute; right: 18px; top: -12px; width: 18px; height: 44px; z-index: 2; }
+
+/* ── 상자: 도서관 목록 카드 ── 빨간 윗줄 · 파란 괘선 · 아래 가운데 구멍 */
+.lp-index { position: relative; display: block; text-decoration: none; background-color: var(--card); color: var(--ink); border-radius: var(--radius-paper); padding: 12px 14px 22px; box-shadow: var(--paper-lift);
+  background-image: linear-gradient(transparent 29px, var(--red) 29px, var(--red) 30px, transparent 30px), repeating-linear-gradient(transparent 0 21px, var(--rule) 21px 22px);
+  background-position: 0 0, 0 32px; background-repeat: no-repeat, repeat; }
+.lp-index::after { content: ""; position: absolute; left: 50%; bottom: 7px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--manila-dark); box-shadow: inset 0 1px 2px #0006; }
+.lp-index-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; height: 22px; }
+.lp-index-title { font: 20px var(--font-sign); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-index-meta { font: 700 14px var(--font-type); color: var(--red); white-space: nowrap; }
+.lp-index-body { display: block; margin-top: 8px; font: 12.5px/22px var(--font-typek); color: var(--ink-2); }
+.lp-index.is-locked { filter: saturate(.6); }
+.lp-index.is-locked .lp-index-title, .lp-index.is-locked .lp-index-body { opacity: .55; }
+.lp-index-lock { position: absolute; right: 12px; bottom: 16px; font: 13px var(--font-sign); letter-spacing: .1em; color: var(--red); border: 2px solid var(--red); padding: 0 6px; border-radius: var(--radius-paper); transform: rotate(-8deg); opacity: .8; }
+.lp-index.is-in { animation: lp-slidein var(--dur-scroll-in) var(--ease-out); }
+@keyframes lp-slidein { from { transform: translateY(18px) rotate(-1.2deg); } to { transform: none; } }
+
+/* ── 기록: 뜯는 탁상 달력 ── */
+.lp-cal { width: 74px; background: var(--card); border-radius: 5px; overflow: hidden; text-align: center; box-shadow: 0 2px 0 var(--card-edge), 0 4px 8px -4px #0007; }
+.lp-cal-head { background: var(--red); color: var(--paper); font: 700 10px var(--font-typek); padding: 3px 0; letter-spacing: .1em; }
+.lp-cal-num { display: block; font: 700 32px/1.1 var(--font-type); padding-top: 2px; color: var(--ink); }
+.lp-cal-unit { display: block; padding-bottom: 4px; font: 10px var(--font-typek); color: var(--ink-2); }
+
+/* ── 기록: 오늘 채운 시간 게이지 ── */
+.lp-gauge { background: var(--card); border-radius: 8px; padding: 8px 10px; box-shadow: 0 2px 0 var(--card-edge); display: flex; flex-direction: column; gap: 5px; font: 12px var(--font-typek); color: var(--ink-2); }
+.lp-gauge b { color: var(--ink); font-family: var(--font-type); }
+.lp-gauge-track { position: relative; height: 12px; background: var(--track); border-radius: 3px; overflow: hidden; }
+.lp-gauge-fill { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, var(--chalk) 0 6px, var(--chalk-light) 6px 8px); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform var(--dur-bar) var(--ease-out); }
+.lp-gauge-ticks { height: 6px; background: repeating-linear-gradient(90deg, var(--ink-2) 0 1px, transparent 1px 10%); opacity: .5; }
+
+/* ── 그림: 브라운관 텔레비전 ── 모든 사진·영상은 이 안에 넣는다 */
+.lp-tv { position: relative; padding: 9px; border-radius: var(--radius-tv); background: linear-gradient(145deg, var(--bezel-light), var(--bezel) 60%, var(--bezel-dark)); box-shadow: inset 0 1px 0 #ffffff26, 0 6px 14px -6px #000a; }
+.lp-crt { position: relative; overflow: hidden; border-radius: var(--radius-crt-x) / var(--radius-crt-y); background: var(--crt-black); box-shadow: inset 0 0 0 2px #0008; isolation: isolate; }
+.lp-crt.is-bw { --crt: grayscale(1) sepia(.2) contrast(1.16) brightness(1.05) blur(.35px); }
+.lp-crt img, .lp-crt video { display: block; width: 100%; height: 100%; object-fit: cover; filter: url(#lp-rgb) var(--crt); }
+.lp-crt::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2; border-radius: inherit; box-shadow: var(--crt-inner);
+  background: radial-gradient(120% 90% at 30% 20%, #ffffff22, transparent 40%), radial-gradient(ellipse at center, transparent 60%, #00000078 100%),
+    repeating-linear-gradient(0deg, #0000002e 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, #ff00000d 0 1px, #00ff000a 1px 2px, #0000ff0d 2px 3px); }
+
+/* ── 스승님 쪽지: 손글씨 + 파란 괘선 ── 스승님이 직접 하는 말에만 쓴다 */
+.lp-note { margin: 0; font: 21px/1.15 var(--font-hand); color: var(--blue); background: repeating-linear-gradient(transparent 0 23px, var(--rule) 23px 24px); }
+.lp-note.is-s { font-size: 19px; }
+.lp-sage { display: grid; grid-template-columns: 66px 1fr; gap: 12px; align-items: start; }
+.lp-sage .lp-tv { padding: 5px; border-radius: 12px; }
+.lp-sage .lp-crt { height: 70px; border-radius: 9px / 12px; }
+.lp-sage .lp-crt img { object-position: 50% 18%; }
+.lp-sage.is-s { grid-template-columns: 38px 1fr; gap: 8px; background: var(--manila); border-radius: var(--radius-paper); padding: 8px 10px; }
+.lp-sage.is-s .lp-tv { padding: 3px; border-radius: 8px; }
+.lp-sage.is-s .lp-crt { height: 34px; border-radius: 6px / 8px; }
+
+/* ── 측정 화면: 머리띠 · 계수기 · 판정 ── */
+.lp-hud { display: flex; justify-content: space-between; align-items: center; height: 44px; font: 12px var(--font-typek); color: var(--ink-2); }
+.lp-hud b { color: var(--ink); font-family: var(--font-type); }
+.lp-counter { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--counter); border-radius: 10px; box-shadow: inset 0 2px 4px #000a, 0 1px 0 #fff4; }
+.lp-counter small { color: var(--counter-label); font: 10px var(--font-typek); letter-spacing: .06em; }
+.lp-wheels { display: inline-flex; gap: 2px; }
+.lp-wheel { width: 17px; height: 24px; overflow: hidden; border-radius: 2px; background: linear-gradient(var(--wheel-edge), var(--card) 45%, var(--card) 55%, var(--wheel-edge)); }
+.lp-wheel > span { display: flex; flex-direction: column; transition: transform var(--dur-wheel) var(--ease-spring); }
+.lp-wheel.is-rewind > span { transition-duration: 360ms; }
+.lp-wheel b { display: block; height: 24px; font: 700 17px/24px var(--font-type); text-align: center; color: var(--ink); }
+.lp-bulbs { position: absolute; inset: -7px; pointer-events: none; }
+.lp-bulb { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--bulb-off); box-shadow: inset 0 1px 1px #0008; transition: background 150ms, box-shadow 150ms; }
+.lp-bulb.is-on { background: var(--bulb); box-shadow: var(--bulb-glow); }
+.lp-judge { font: 22px var(--font-sign); color: var(--chalk); white-space: nowrap; }
+.lp-judge.is-bad { color: var(--blue); }
+.lp-judge.is-skip { color: var(--ink-2); }
+.lp-question { padding: 30px 12px 22px; border-radius: var(--radius-paper); background-color: var(--card); box-shadow: var(--paper-lift); display: flex; flex-direction: column; align-items: center; gap: 14px;
+  background-image: linear-gradient(transparent 16px, var(--red) 16px, var(--red) 17px, transparent 17px); background-repeat: no-repeat; }
+.lp-question-num { font: 700 94px/1 var(--font-type); letter-spacing: .02em; color: var(--ink); text-align: center; }
+.lp-question-input { width: 80%; text-align: center; font: 18px var(--font-typek); color: var(--ink); background: var(--input); border: 0; border-bottom: 2px solid var(--ink-2); border-radius: 0; padding: 8px; }
+.lp-question-input:focus { outline: none; border-bottom-color: var(--red); }
+.lp-question-help { font: 11px var(--font-typek); color: var(--ink-2); }
+.lp-held { padding: 10px 12px; font: 13px var(--font-typek); color: var(--ink-2); background: var(--manila); border-radius: var(--radius-paper); }
+.lp-held b { font: 19px var(--font-sign); font-weight: 400; color: var(--ink); }
+
+/* ── 연출 층: 화면 전체를 덮지만 입력을 막지 않는다 ── */
+.lp-fx { position: fixed; top: 0; bottom: 0; left: 50%; width: min(100vw, var(--col-w)); transform: translateX(-50%); z-index: var(--layer-fx); pointer-events: none; overflow: hidden; }
+.lp-edge { position: absolute; inset: 0; opacity: 0; }
+.lp-edge.is-good { box-shadow: var(--glow-good); }
+.lp-edge.is-bad { box-shadow: var(--glow-bad); }
+.lp-bit { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+
+/* ── 결과: 성적표 ── */
+.lp-sheet { position: relative; background: var(--card); border-radius: var(--radius-paper); padding: 12px; box-shadow: var(--paper-lift); outline: 1px solid var(--ink); outline-offset: -6px; }
+.lp-sheet-title { margin: 2px 0 10px; font: 24px var(--font-sign); text-align: center; letter-spacing: .04em; color: var(--ink); }
+.lp-flaps { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.lp-flaps small { display: block; font: 10.5px var(--font-typek); color: var(--ink-2); margin-bottom: 3px; }
+.lp-flap-unit { font: 12px var(--font-typek); color: var(--ink-2); margin-left: 3px; }
+.lp-flap { display: inline-flex; gap: 2px; align-items: baseline; }
+.lp-flap-tile { position: relative; display: inline-grid; place-items: center; width: 20px; height: 30px; perspective: 120px; }
+.lp-flap-tile > span { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 3px; background: var(--tile); color: var(--tile-ink); font: 700 20px var(--font-type); backface-visibility: hidden;
+  background-image: linear-gradient(transparent 49%, #000 49%, #000 51%, transparent 51%); }
+.lp-flap-tile.is-sep { width: 8px; }
+.lp-flap-tile.is-sep > span { background: none; color: var(--ink); }
+.lp-up { font: 700 11px var(--font-type); color: var(--chalk); margin-left: 4px; }
+.lp-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.lp-bar { display: grid; grid-template-columns: 64px 1fr 40px; gap: 8px; align-items: center; font: 11px var(--font-typek); color: var(--ink-2); }
+.lp-bar-track { position: relative; height: 9px; background: var(--track); border-radius: 2px; }
+.lp-bar-fill { position: absolute; inset: 0; background: var(--chalk); border-radius: 2px; transform-origin: left; transform: scaleX(var(--w, 0)); }
+.lp-bar-goal { position: absolute; right: 0; top: -4px; bottom: -4px; width: 2px; background: var(--red); }
+.lp-bar-num { font: 700 11px var(--font-type); color: var(--ink); text-align: right; }
+.lp-awards { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 64px; padding: 0 4px; }
+.lp-stars { display: flex; gap: 4px; }
+.lp-star { width: 42px; height: 42px; }
+.lp-star.is-off { opacity: .15; filter: grayscale(1); }
+.lp-stamp { display: inline-grid; place-items: center; font: 26px/1 var(--font-sign); letter-spacing: .12em; color: var(--red); padding: 6px 14px 4px 18px; border: 4px double var(--red); border-radius: 8px; transform: rotate(-9deg); filter: url(#lp-rough); }
+.lp-stamp.is-blue { color: var(--blue); border-color: var(--blue); }
+.lp-near { text-align: center; font: 13px var(--font-typek); padding: 7px; border-radius: var(--radius-paper); background: var(--near); border: 1px dashed var(--red); color: var(--ink); }
+.lp-near b { font: 700 16px var(--font-type); color: var(--red); }
+.lp-skip { font: 10.5px var(--font-typek); color: var(--ink-2); text-align: center; }
+
+/* ── 신기록: 퀴즈쇼 무대 ── */
+.lp-stage { position: fixed; top: 0; bottom: 0; left: 50%; width: min(100vw, var(--col-w)); transform: translateX(-50%); z-index: 0; opacity: 0; pointer-events: none; border-radius: 0; }
+.lp-stage img { object-position: 50% 40%; }
+.lp-marquee { position: fixed; top: 6px; bottom: 6px; left: 50%; width: calc(min(100vw, var(--col-w)) - 12px); transform: translateX(-50%); border-radius: 18px; pointer-events: none; z-index: 7; opacity: 0; }
+.lp-marquee i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--bulb); box-shadow: 0 0 8px 3px var(--bulb-halo); }
+.lp-banner { display: inline-block; font: 26px/1 var(--font-sign); color: var(--bulb); letter-spacing: .06em; padding: 7px 18px 6px; background: var(--banner); border: 3px solid var(--brass-light); border-radius: 12px; text-shadow: 0 0 14px var(--bulb-halo); }
+.lp-banner small { display: block; margin-top: 4px; font: 12px var(--font-typek); color: var(--brass-light); text-align: center; letter-spacing: .1em; text-shadow: none; }
+
+/* ── 모의 대회: 3-2-1 ── */
+.lp-count { font: 700 32px/1.1 var(--font-type); color: var(--ink); }
+
+/* 움직임 줄이기: 기기 설정 또는 앱 설정(<html data-motion="reduce">). 앱 설정 '줄이지 않음'(full)은 기기 설정을 이긴다. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) :is(.lp-key:active, .lp-key.is-down) { transform: none; }
+  :root:not([data-motion="full"]) .lp-wheel > span { transition: none; }
+  :root:not([data-motion="full"]) .lp-index.is-in { animation: none; }
+}
+:root[data-motion="reduce"] :is(.lp-key:active, .lp-key.is-down) { transform: none; }
+:root[data-motion="reduce"] .lp-wheel > span { transition: none; }
+:root[data-motion="reduce"] .lp-index.is-in { animation: none; }
+
+/* ── 판정 글자 · 연필 표시 (연출 층과 머리띠에서만) ── */
+.lp-judge-show { opacity: 0; animation: lp-judge 620ms ease-out forwards; pointer-events: none; }
+@keyframes lp-judge { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
+.lp-mark { flex: none; animation: lp-mark-fade 650ms 180ms forwards; }
+.lp-mark path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: lp-draw var(--dur-mark) ease-out forwards; }
+@keyframes lp-draw { to { stroke-dashoffset: 0; } }
+@keyframes lp-mark-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 문제 글자 크기 — 화면마다 하나로 고정 */
+.lp-question-num.is-l { font-size: 60px; }
+.lp-question-num.is-m { font-size: 40px; }
+
+/* ── 화면 넘김: 들어오는 화면이 아래에서 떠오른다(T1) ── */
+.lp-page-in { animation: lp-page-in var(--dur-page-in) var(--ease-out); }
+@keyframes lp-page-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ── 모의 대회 3-2-1 ── */
+.lp-countdown { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 92%, transparent); }
+.lp-countdown b { font: 700 120px/1 var(--font-type); color: var(--ink); animation: lp-count-pop 700ms var(--ease-spring) both; }
+.lp-countdown b.is-go { font: 64px/1 var(--font-sign); color: var(--red); }
+@keyframes lp-count-pop { 0% { opacity: 0; transform: scale(.4); } 40% { opacity: 1; transform: scale(1.1); } 100% { opacity: 1; transform: none; } }
+
+/* 움직임 줄이기: 판정·표시는 색이 서서히 바뀌는 것만 */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .lp-judge-show { animation-name: lp-judge-calm; }
+  :root:not([data-motion="full"]) .lp-mark path { animation: none; stroke-dashoffset: 0; }
+  :root:not([data-motion="full"]) :is(.lp-page-in, .lp-countdown b) { animation: none; }
+}
+:root[data-motion="reduce"] .lp-judge-show { animation-name: lp-judge-calm; }
+:root[data-motion="reduce"] .lp-mark path { animation: none; stroke-dashoffset: 0; }
+:root[data-motion="reduce"] :is(.lp-page-in, .lp-countdown b) { animation: none; }
+@keyframes lp-judge-calm { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ── 앱 확장: 디자인 시스템에 따로 없는 기본 틀(설정·표 상자, 작은 기록 칸) ──
+   종이 물건의 규칙을 그대로 따른다: 모서리 radius-paper, 그림자 paper-lift, 제목 간판 글씨. */
+.lp-panel { background: var(--card); color: var(--ink); border-radius: var(--radius-paper); box-shadow: var(--paper-lift); }
+.lp-panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 8px; border-bottom: 1px solid var(--card-edge); }
+.lp-panel-title { margin: 0; font: 20px/1.1 var(--font-sign); color: var(--ink); }
+.lp-panel-body { padding: 12px 14px 14px; }
+.lp-stat { background: var(--card); border-radius: 6px; padding: 8px 10px; box-shadow: 0 2px 0 var(--card-edge); }
+.lp-stat-label { font: 700 11px var(--font-typek); letter-spacing: .04em; color: var(--ink-2); }
+.lp-stat-value { margin-top: 2px; font: 700 24px/1.1 var(--font-type); color: var(--ink); }
+.lp-stat-sub { margin-top: 2px; font: 11px var(--font-typek); color: var(--ink-2); }
+.lp-key.is-lg { font-size: 17px; padding: 13px 24px 14px; }
+.lp-key.is-danger { --kt: var(--red); }
