@@ -178,7 +178,109 @@ export interface AppSettings {
    * (`sync/engine.ts` 의 collectAssets). 비어 있으면 사전 후보만 쓴다.
    */
   aiKey?: string;
+  /** 움직임 줄이기. 없으면 기기 설정(prefers-reduced-motion)을 따른다. */
+  reduceMotion?: boolean;
+  /** 효과음. 없으면 켬(디자인 시스템 기본값, 회장 청취 확인 전). */
+  soundOn?: boolean;
+  /** 하루 목표 시간(분). 짧은 세션도 '오늘 채운 분' 으로 쌓인다. */
+  dailyMinutes: number;
   seededAt?: number;
+}
+
+/* ── 계산 영역 (DB v3) ── */
+
+/** 연습 = 보조를 켜는 자리, 모의 대회 = 규정대로 혼자 치르는 판 */
+export type CalcMode = 'practice' | 'contest';
+
+/** 규정·연습 설정 값. 칸 목록은 종목 등록부가 정한다. */
+export type RuleValues = Record<string, number | string>;
+
+export interface CalcSession {
+  id: string;
+  disciplineId: string;
+  mode: CalcMode;
+  /** 그때 쓴 규정 사본. 규정을 나중에 바꿔도 옛 기록의 뜻이 흐트러지지 않는다. */
+  rules: RuleValues;
+  /** 연습 설정(자릿수·개수 등) */
+  params: RuleValues;
+  /** 같은 시드면 같은 문제 — 복기·재도전, 2단계에서 서버가 같은 문제를 검증하는 토대 */
+  seed: string;
+  startedAt: number;
+  endedAt?: number;
+  correct: number;
+  wrong: number;
+  score: number;
+}
+
+export interface CalcStep {
+  name: string;
+  ms: number;
+  given?: string;
+  ok?: boolean;
+}
+
+/** 문항 하나. drillAttempts·recallCells 와 같은 원시 데이터 — 지우거나 요약으로 바꾸지 않는다. */
+export interface CalcItem {
+  id: string;
+  sessionId: string;
+  index: number;
+  /** 문제 유형 (서프라이즈의 'sq:3' 같은 것) */
+  kind: string;
+  prompt: string;
+  expected: string;
+  answered: string;
+  isCorrect: boolean;
+  rtMs: number;
+  /** 달력 단계 입력처럼 단계마다 잰 시간 */
+  steps?: CalcStep[];
+  shownAt: number;
+}
+
+/** 대회 규정 한 벌. 지금은 종목마다 '내 규정' 하나(id = `${disciplineId}:default`). */
+export interface Ruleset {
+  id: string;
+  disciplineId: string;
+  name: string;
+  values: RuleValues;
+  isDefault: boolean;
+  updatedAt: number;
+}
+
+/* ── 스승님과 커리큘럼 (DB v3) ── */
+
+export interface CoachLog {
+  id: string;
+  kind: 'course' | 'review' | 'weekly';
+  at: number;
+  /** 보낸 훈련 요약표 */
+  input: unknown;
+  /** 받은 답 원문 */
+  output: string;
+  /** 코스를 실제로 따라 했는가 — 스승님과 규칙 코치를 견주는 근거 */
+  followed?: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+/** 큰 목표 하나. 주간 이정표는 저장하지 않고 지금 최고 기록과 기한 사이를 코드가 나눈다. */
+export interface Target {
+  id: string;
+  disciplineId: string;
+  /** 무엇으로 재나 (예: 'count60s', 'totalMs') — 종목이 정한다 */
+  metric: string;
+  value: number;
+  deadline?: number;
+  setBy: 'chairman' | 'coach';
+  status: 'active' | 'done' | 'dropped';
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 사다리 위치. 통과 여부는 기록에서 계산하고, 여기는 '지금 어느 칸에서 하나'만 남는다(한 칸 내리기 때문). */
+export interface LadderState {
+  ladderId: string;
+  currentLevel: string;
+  updatedAt: number;
 }
 
 /* ── 초급 단계 (자음 매핑 외우기) ── */
@@ -237,6 +339,12 @@ class MemoryGymDB extends Dexie {
   mappingSessions!: Table<MappingSession, string>;
   mappingAttempts!: Table<MappingAttempt, string>;
   mappingStats!: Table<MappingStat, string>;
+  calcSessions!: Table<CalcSession, string>;
+  calcItems!: Table<CalcItem, string>;
+  rulesets!: Table<Ruleset, string>;
+  coachLogs!: Table<CoachLog, string>;
+  targets!: Table<Target, string>;
+  ladderState!: Table<LadderState, string>;
 
   constructor() {
     super('memory-gym');
@@ -259,6 +367,16 @@ class MemoryGymDB extends Dexie {
       mappingAttempts: 'id, sessionId, shownAt, unit',
       mappingStats: 'key, stage, lastSeenAt',
     });
+
+    /* v3: 계산 영역 · 규정 · 스승님 · 커리큘럼. 표를 더하기만 한다 — 기존 표는 모양도 내용도 그대로다. */
+    this.version(3).stores({
+      calcSessions: 'id, startedAt, disciplineId',
+      calcItems: 'id, sessionId, shownAt, [sessionId+index]',
+      rulesets: 'id, disciplineId',
+      coachLogs: 'id, at, kind',
+      targets: 'id, disciplineId, status',
+      ladderState: 'ladderId',
+    });
   }
 }
 
@@ -271,6 +389,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   rankDigits: DEFAULT_RANK_DIGITS,
   drillCount: 30,
   mappingDirection: 'toConsonant',
+  dailyMinutes: 15,
 };
 
 export async function getSettings(): Promise<AppSettings> {

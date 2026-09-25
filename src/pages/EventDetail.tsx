@@ -14,7 +14,7 @@ export default function EventDetail() {
   const { eventId = '' } = useParams();
   const ev = MEMORY_EVENTS.find((e) => e.id === eventId);
 
-  /* 이 종목으로 남긴 실전 기록만 추린다 */
+  /* 이 종목으로 남긴 기록만 추린다 (연습·모의 대회) */
   const sessions = useLiveQuery(
     async () => (await db.recallSessions.orderBy('startedAt').reverse().toArray()).filter((s) => s.eventId === eventId),
     [eventId],
@@ -74,16 +74,16 @@ export default function EventDetail() {
           </div>
         </Panel>
 
-        <Panel title="실전">
+        <Panel title="모의 대회">
           <p className="text-sm text-muted">
             대회 규격 시간으로 잽니다. 암기 시간이 끝나면 자동으로 회상으로 넘어가고, 채점에서 칸마다
             틀린 원인을 달아 둘 수 있습니다.
           </p>
           <div className="mt-3">
             {open && ev.to ? (
-              <LinkBtn to={`${ev.to}&run=real`} variant="primary">실전 시작</LinkBtn>
+              <LinkBtn to={`${ev.to}&run=real`} variant="primary">모의 대회 시작</LinkBtn>
             ) : (
-              <Btn disabled>실전 시작</Btn>
+              <Btn disabled>모의 대회 시작</Btn>
             )}
           </div>
         </Panel>
@@ -95,7 +95,7 @@ export default function EventDetail() {
             <b className="text-fg">열려면</b> — {ev.needs}
           </p>
           <p className="mt-2 text-xs text-muted">
-            준비되는 대로 이 화면의 연습·실전 버튼이 그대로 켜집니다. 종목 자리는 미리 잡아 두었습니다.
+            준비되는 대로 이 화면의 연습·모의 대회 버튼이 그대로 켜집니다. 종목 자리는 미리 잡아 두었습니다.
           </p>
         </Panel>
       )}
@@ -114,7 +114,7 @@ export default function EventDetail() {
               <Stat
                 label="마지막"
                 value={localDayKey(sessions[0].startedAt)}
-                sub={sessions[0].runMode === 'easy' ? '연습' : '실전'}
+                sub={sessions[0].runMode === 'easy' ? '연습' : '모의 대회'}
               />
             </div>
             <ul className="max-h-64 overflow-auto text-sm">
@@ -124,7 +124,7 @@ export default function EventDetail() {
                   <li key={s.id} className="flex items-center gap-2 border-t border-line/60 py-1.5 first:border-0">
                     <span className="text-xs text-muted">{localDayKey(s.startedAt)}</span>
                     <span className="rounded border border-line px-1.5 text-[11px] text-muted">
-                      {s.runMode === 'easy' ? '연습' : '실전'}
+                      {s.runMode === 'easy' ? '연습' : '모의 대회'}
                     </span>
                     <span className="tnum ml-auto">
                       {s.correct}/{total} · {total ? fmtPct(s.correct / total) : '—'}

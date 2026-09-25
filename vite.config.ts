@@ -15,9 +15,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: '기억력 훈련소',
-        short_name: 'MemGym',
-        description: '기억력 스포츠 개인 훈련 — 변환 드릴 · 실전 · 궁전',
+        /* 이름은 가제. 주소(start_url·scope)와 저장 이름은 그대로 두어 설치된 앱과 기록이 이어진다. */
+        name: '브레인 짐',
+        short_name: '브레인 짐',
+        description: '기억력·암산 개인 훈련 — 기초 드릴 · 종목 · 모의 대회',
         lang: 'ko',
         start_url: BASE,
         scope: BASE,

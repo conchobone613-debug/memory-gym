@@ -26,6 +26,7 @@ const LOG_TABLES = [
   'drillSessions', 'drillAttempts',
   'recallSessions', 'recallCells',
   'mappingSessions', 'mappingAttempts',
+  'calcSessions', 'calcItems',
 ] as const;
 type LogTable = (typeof LOG_TABLES)[number];
 

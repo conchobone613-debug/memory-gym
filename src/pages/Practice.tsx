@@ -283,7 +283,7 @@ export default function Practice() {
   /* ───────── 설정 ───────── */
   if (phase === 'setup') {
     return (
-      <Panel title={easy ? '연습' : '실전'}>
+      <Panel title={easy ? '연습' : '모의 대회'}>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-3">
             <Field label="프리셋">

@@ -7,6 +7,7 @@ import { askForNames } from '../lib/ai';
 import { Btn, ConfirmBtn, Field, Panel } from '../components/ui';
 import ChosungKey from '../components/ChosungKey';
 import SyncPanel from '../components/SyncPanel';
+import RulesPanel from '../components/RulesPanel';
 import { useSearchParams } from 'react-router-dom';
 import { isValidSyncCode } from '../sync/config';
 
@@ -28,6 +29,12 @@ export default function Settings() {
   }, [params, setParams]);
 
   useEffect(() => { if (stored && !s) setS(stored); }, [stored]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 종목 화면의 '규정 바꾸기' 로 오면 그 칸으로 내려 준다 */
+  const at = params.get('at');
+  useEffect(() => {
+    if (s && at) document.getElementById(at)?.scrollIntoView({ block: 'start' });
+  }, [s, at]);
 
   /** 키가 진짜 도는지 한 번 불러 본다. 나중에 후보 화면에서 처음 실패하는 것보다 낫다. */
   const testAi = async () => {
@@ -138,15 +145,43 @@ export default function Settings() {
         </div>
       </Panel>
 
-      <Panel title="드릴 기본값">
+      <Panel title="훈련 기본값">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Field label="문항 수">
+          <Field label="드릴 문항 수">
             <input type="number" min={5} max={300} value={s.drillCount}
               onChange={(e) => setS({ ...s, drillCount: Number(e.target.value) })}
               onBlur={() => commit({ drillCount: s.drillCount })} />
           </Field>
+          <Field label="하루 목표 (분)" hint="홈의 '오늘 채운 시간' 이 이 값을 봅니다.">
+            <input type="number" inputMode="numeric" min={1} max={600} value={s.dailyMinutes}
+              onChange={(e) => setS({ ...s, dailyMinutes: Number(e.target.value) })}
+              onBlur={() => commit({ dailyMinutes: Math.min(600, Math.max(1, Math.round(s.dailyMinutes) || 15)) })} />
+          </Field>
         </div>
       </Panel>
+
+      <Panel title="화면과 소리">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Field label="움직임 줄이기">
+            <select
+              value={s.reduceMotion === undefined ? 'device' : s.reduceMotion ? 'on' : 'off'}
+              onChange={(e) => commit({ reduceMotion: e.target.value === 'device' ? undefined : e.target.value === 'on' })}
+            >
+              <option value="device">기기 설정 따름</option>
+              <option value="on">줄임</option>
+              <option value="off">줄이지 않음</option>
+            </select>
+          </Field>
+          <Field label="효과음" hint="효과음은 새 디자인을 입힐 때 들어갑니다.">
+            <select value={s.soundOn === false ? 'off' : 'on'} onChange={(e) => commit({ soundOn: e.target.value === 'on' })}>
+              <option value="on">켬</option>
+              <option value="off">끔</option>
+            </select>
+          </Field>
+        </div>
+      </Panel>
+
+      <div id="rules" className="scroll-mt-20"><RulesPanel /></div>
 
       <Panel title="AI 이름 후보">
         <div className="grid gap-3 md:grid-cols-2">

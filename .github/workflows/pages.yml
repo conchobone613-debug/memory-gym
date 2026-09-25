@@ -24,6 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # 시험이 깨지면 배포하지 않는다 — 기록 보존 시험(저장소 업그레이드·백업 복원)이 여기 들어 있다
+      - run: npm test
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -101,7 +101,13 @@ kbd {
 .mg-rise  { animation: mg-rise 260ms ease-out both; }
 .mg-sheen { animation: mg-sheen 900ms ease-out; }
 
+/*
+ * 움직임 줄이기. 앱 설정이 기기 설정보다 앞선다 — <html data-motion="reduce|full">.
+ * 설정을 비워 두면(data-motion 없음) 기기의 prefers-reduced-motion 을 따른다.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .mg-good, .mg-bad, .mg-pop, .mg-rise, .mg-sheen { animation: none !important; }
-  * { transition-duration: 1ms !important; }
+  :root:not([data-motion="full"]) :is(.mg-good, .mg-bad, .mg-pop, .mg-rise, .mg-sheen) { animation: none !important; }
+  :root:not([data-motion="full"]) * { transition-duration: 1ms !important; }
 }
+:root[data-motion="reduce"] :is(.mg-good, .mg-bad, .mg-pop, .mg-rise, .mg-sheen) { animation: none !important; }
+:root[data-motion="reduce"] * { transition-duration: 1ms !important; }

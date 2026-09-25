@@ -8,16 +8,22 @@
  * '길이를 정해 놓고 시간을 잰다'. 방향이 반대다. 열린 종목도 이 점에서는 대회와 다르다.
  */
 
+/*
+ * 종목 등록부. 영역(기억력·계산 …)마다 종목을 한 줄씩 적는다.
+ * 홈·대시보드·스승님은 이 파일만 본다 — 새 종목이나 새 영역이 생겨도 그쪽은 고치지 않는다.
+ */
+
+export type Domain = 'memory' | 'calc';
+
+export const DOMAIN_NAME: Record<Domain, string> = { memory: '기억력', calc: '계산' };
+
 export type EventStatus = 'ready' | 'locked';
 
-export interface MemoryEvent {
+interface DisciplineBase {
   id: string;
+  domain: Domain;
   name: string;
-  /** 암기 시간 표기 */
-  memorize: string;
-  /** 회상 시간 표기 */
-  recall: string;
-  /** 무엇을 외우는 종목인가 */
+  /** 무엇을 하는 종목인가 */
   what: string;
   status: EventStatus;
   /** 열린 종목: 어디로 가면 되는지 */
@@ -26,8 +32,30 @@ export interface MemoryEvent {
   needs?: string;
 }
 
+export interface MemoryEvent extends DisciplineBase {
+  domain: 'memory';
+  /** 암기 시간 표기 */
+  memorize: string;
+  /** 회상 시간 표기 */
+  recall: string;
+}
+
+/** 규정 칸 하나. 값은 설정 화면에서 바꾸고 세션마다 사본으로 남는다. */
+export type RuleField =
+  | { key: string; label: string; kind: 'number'; default: number; min: number; max: number; unit?: string; hint?: string }
+  | { key: string; label: string; kind: 'choice'; default: string; options: { value: string; label: string }[]; hint?: string };
+
+export interface CalcEvent extends DisciplineBase {
+  domain: 'calc';
+  /** 모의 대회 규정. 기본값은 요청서 값이며, 공식 규정은 회장이 확인해 덮어쓴다(기획서 §5.1). */
+  rules: RuleField[];
+}
+
+export type Discipline = MemoryEvent | CalcEvent;
+
 export const MEMORY_EVENTS: MemoryEvent[] = [
   {
+    domain: 'memory',
     id: 'speed-numbers',
     name: '스피드 숫자',
     memorize: '5분',
@@ -37,6 +65,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     to: '/practice?preset=d80&event=speed-numbers',
   },
   {
+    domain: 'memory',
     id: 'hour-numbers',
     name: '1시간 숫자',
     memorize: '60분',
@@ -46,6 +75,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     to: '/practice?preset=h-num&event=hour-numbers',
   },
   {
+    domain: 'memory',
     id: 'speed-cards',
     name: '스피드 카드',
     memorize: '5분 안에 최대한 빨리',
@@ -55,6 +85,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     to: '/practice?preset=c52&event=speed-cards',
   },
   {
+    domain: 'memory',
     id: 'spoken-numbers',
     name: '듣고 외우는 숫자',
     memorize: '초당 한 개씩 낭독',
@@ -64,6 +95,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     needs: '숫자를 초당 하나씩 읽어 주는 기능. 브라우저 음성 합성으로 만들 수 있어 사진이 필요한 종목보다 쉽다.',
   },
   {
+    domain: 'memory',
     id: 'binary',
     name: '이진수',
     memorize: '30분',
@@ -73,15 +105,17 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     needs: '이진수를 몇 자리씩 묶어 십진수로 바꾸는 규칙. 바꾸고 나면 회장님 숫자 이미지를 그대로 쓴다.',
   },
   {
+    domain: 'memory',
     id: 'hour-cards',
     name: '1시간 카드',
     memorize: '60분',
     recall: '120분',
     what: '여러 벌을 최대한 많이. 벌마다 궁전을 갈아탄다.',
     status: 'locked',
-    needs: '카드 여러 벌 지원. 지금 실전 모드는 한 벌 52장까지만 낸다.',
+    needs: '카드 여러 벌 지원. 지금 종목 화면은 한 벌 52장까지만 낸다.',
   },
   {
+    domain: 'memory',
     id: 'words',
     name: '무작위 단어',
     memorize: '15분',
@@ -91,6 +125,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     needs: '한국어 명사 목록. 변환이 필요 없는 종목이라 목록만 있으면 곧장 만들 수 있다.',
   },
   {
+    domain: 'memory',
     id: 'names',
     name: '이름과 얼굴',
     memorize: '15분',
@@ -100,6 +135,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     needs: '얼굴 사진과 이름 묶음. 회장님이 직접 넣으셔야 해서 손이 많이 간다.',
   },
   {
+    domain: 'memory',
     id: 'dates',
     name: '역사적 날짜',
     memorize: '5분',
@@ -109,6 +145,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     needs: '사건 문장 목록. 연도는 숫자 이미지로 처리하면 된다.',
   },
   {
+    domain: 'memory',
     id: 'images',
     name: '추상 이미지',
     memorize: '15분',
@@ -118,3 +155,97 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     needs: '무늬 이미지 자료. 말로 못 옮기는 그림이라 이 앱의 이미지 체계와 방식이 다르다.',
   },
 ];
+
+/* ── 계산 (암산 대회 MCWC 대비) ── */
+
+/** 제한시간 0 = 아직 공식 값을 넣지 않음. 모의 대회는 시간을 재기만 하고 끊지 않는다. */
+const timeLimit = (dflt: number): RuleField => ({
+  key: 'timeLimitSec', label: '제한시간', kind: 'number', default: dflt, min: 0, max: 3600, unit: '초',
+  hint: dflt ? undefined : '0 = 아직 공식 값을 넣지 않음',
+});
+const penalty: RuleField = {
+  key: 'penaltyPerWrong', label: '오답 감점', kind: 'number', default: 0, min: 0, max: 100, unit: '점',
+};
+const items = (dflt: number): RuleField => ({
+  key: 'items', label: '문항 수', kind: 'number', default: dflt, min: 1, max: 100, unit: '문제',
+});
+const ROUNDING: RuleField = {
+  key: 'rounding', label: '끝자리', kind: 'choice', default: 'trunc',
+  options: [{ value: 'trunc', label: '버림' }, { value: 'round', label: '반올림' }],
+};
+
+export const CALC_EVENTS: CalcEvent[] = [
+  {
+    domain: 'calc',
+    id: 'calendar',
+    name: '달력',
+    what: '1600–2099년 무작위 날짜의 요일. 1분 안에 최대한 많이.',
+    status: 'locked',
+    needs: '날짜 문제 생성기와 요일 채점기, 연도 코드·월 코드 드릴. 모든 날짜를 대조하는 정답 시험을 붙여 연다.',
+    rules: [
+      timeLimit(60),
+      penalty,
+      { key: 'yearFrom', label: '시작 연도', kind: 'number', default: 1600, min: 1600, max: 2099 },
+      { key: 'yearTo', label: '끝 연도', kind: 'number', default: 2099, min: 1600, max: 2099 },
+      {
+        key: 'weekBase', label: '요일 번호', kind: 'choice', default: 'sun0',
+        options: [{ value: 'sun0', label: '일요일 = 0' }, { value: 'mon1', label: '월요일 = 1' }],
+      },
+    ],
+  },
+  {
+    domain: 'calc',
+    id: 'sqrt',
+    name: '제곱근',
+    what: '6자리 수의 제곱근을 유효숫자 8자리까지.',
+    status: 'locked',
+    needs: '큰 정수로 정답을 만드는 계산기와 유효숫자 채점기. 버림·반올림 경계 시험을 붙여 연다.',
+    rules: [
+      items(10), timeLimit(0), penalty,
+      { key: 'digits', label: '자릿수', kind: 'number', default: 6, min: 2, max: 12, unit: '자리' },
+      { key: 'sigDigits', label: '유효숫자', kind: 'number', default: 8, min: 2, max: 12, unit: '자리' },
+      ROUNDING,
+    ],
+  },
+  {
+    domain: 'calc',
+    id: 'surprise',
+    name: '서프라이즈',
+    what: '대회의 깜짝 라운드 대비. 제곱·곱셈·괄호 계산·나눗셈·덧셈을 섞는다.',
+    status: 'locked',
+    needs: '유형 등록부와 첫 다섯 유형. 덧셈·곱셈 생성기를 부품으로 쓰므로 그 뒤에 연다.',
+    rules: [items(10), timeLimit(0), penalty, ROUNDING],
+  },
+  {
+    domain: 'calc',
+    id: 'addition',
+    name: '덧셈',
+    what: '10자리 수 10개의 합.',
+    status: 'locked',
+    needs: '자릿수·개수를 고르는 문제 생성기와 플래시 암산 화면.',
+    rules: [
+      items(10), timeLimit(0), penalty,
+      { key: 'digits', label: '자릿수', kind: 'number', default: 10, min: 1, max: 15, unit: '자리' },
+      { key: 'terms', label: '더할 수의 개수', kind: 'number', default: 10, min: 2, max: 30, unit: '개' },
+    ],
+  },
+  {
+    domain: 'calc',
+    id: 'multiplication',
+    name: '곱셈',
+    what: '8자리 × 8자리.',
+    status: 'locked',
+    needs: '2×2 부터 8×8 까지 단계별 생성기와 교차곱셈 해설.',
+    rules: [
+      items(10), timeLimit(0), penalty,
+      { key: 'digitsA', label: '앞 수 자릿수', kind: 'number', default: 8, min: 1, max: 12, unit: '자리' },
+      { key: 'digitsB', label: '뒤 수 자릿수', kind: 'number', default: 8, min: 1, max: 12, unit: '자리' },
+    ],
+  },
+];
+
+export const DISCIPLINES: Discipline[] = [...MEMORY_EVENTS, ...CALC_EVENTS];
+
+export function findDiscipline(id: string): Discipline | undefined {
+  return DISCIPLINES.find((d) => d.id === id);
+}

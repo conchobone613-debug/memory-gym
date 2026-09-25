@@ -31,10 +31,10 @@ export async function weeklyMarkdown(days = 7): Promise<string> {
   L.push(`| 변환 드릴 시도 | ${totalAttempts}회 |`);
   L.push(`| 정확도 | ${totalAttempts ? pct(totalCorrect / totalAttempts) : '—'} |`);
   L.push(`| 평균 반응시간(일별 중앙값 평균) | ${ms(avgRt)} |`);
-  L.push(`| 실전 세션 | ${sessions.length}회 |`, '');
+  L.push(`| 종목 세션 | ${sessions.length}회 |`, '');
 
   L.push('## 일별 추이', '');
-  L.push('| 날짜 | 시도 | 정확도 | 중앙 반응시간 | 실전 |', '| --- | ---: | ---: | ---: | ---: |');
+  L.push('| 날짜 | 시도 | 정확도 | 중앙 반응시간 | 종목 |', '| --- | ---: | ---: | ---: | ---: |');
   for (const r of rows) {
     L.push(`| ${r.day} | ${r.attempts} | ${r.attempts ? pct(r.accuracy) : '—'} | ${ms(r.medianRt)} | ${r.practiceSessions} |`);
   }
@@ -59,7 +59,7 @@ export async function weeklyMarkdown(days = 7): Promise<string> {
     L.push('');
   }
   if (sessions.length) {
-    L.push('## 실전 기록', '');
+    L.push('## 종목 기록', '');
     L.push('| 날짜 | 모드 | 정답 | 오답 | 미기입 | 정확도 |', '| --- | --- | ---: | ---: | ---: | ---: |');
     for (const s of sessions) {
       const total = s.correct + s.wrong + s.blank;

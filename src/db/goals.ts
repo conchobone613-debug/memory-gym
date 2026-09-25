@@ -32,8 +32,38 @@ export interface GoalStatus {
 const RULES: Record<AnyStage, { reps: number; accuracy: number; rtMs: number; next: string }> = {
   1: { reps: 3, accuracy: 0.95, rtMs: 1500, next: '2단계 · 자음 두 개' },
   2: { reps: 3, accuracy: 0.95, rtMs: 3000, next: '3단계 · 이미지 변환' },
-  3: { reps: 3, accuracy: 0.95, rtMs: 3000, next: '실전 모드' },
+  3: { reps: 3, accuracy: 0.95, rtMs: 3000, next: '종목 · 모의 대회' },
 };
+
+/*
+ * 사다리 — 종목마다 부하가 커지는 단계 목록 (기획서 §6.6).
+ * 사다리와 통과 기준은 코드가 정하고, 스승님은 그 위에서 오늘 할 칸을 고른다.
+ * 기초 세 단계가 첫 사다리다. 종목을 만들 때마다 여기에 사다리를 더한다.
+ */
+export interface LadderLevel {
+  id: string;
+  name: string;
+  to: string;
+  stage: AnyStage;
+}
+
+export interface Ladder {
+  id: string;
+  name: string;
+  levels: LadderLevel[];
+}
+
+export const LADDERS: Ladder[] = [
+  {
+    id: 'basics',
+    name: '기초',
+    levels: [
+      { id: 'basics-1', name: '자음 하나', to: '/basics?stage=1', stage: 1 },
+      { id: 'basics-2', name: '두 자리', to: '/basics?stage=2', stage: 2 },
+      { id: 'basics-3', name: '이미지', to: '/basics?stage=3', stage: 3 },
+    ],
+  },
+];
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const sec = (ms: number) => (ms ? `${(ms / 1000).toFixed(2)}초` : '—');

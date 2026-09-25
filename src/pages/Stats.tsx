@@ -67,7 +67,7 @@ export default function Stats() {
         <Stat label={`최근 ${days}일 시도`} value={totals.attempts} />
         <Stat label="정확도" value={totals.attempts ? fmtPct(totals.accuracy) : '—'} />
         <Stat label="평균 중앙 반응시간" value={fmtMs(totals.medianRt)} />
-        <Stat label="실전 세션" value={totals.practice} />
+        <Stat label="종목 세션" value={totals.practice} />
         <Stat label="측정된 이미지" value={`${measured.length}/${cells.length}`} />
       </div>
 
@@ -152,7 +152,7 @@ export default function Stats() {
               <span className="flex items-center gap-1"><i className="inline-block size-3 rounded-sm" style={{ background: 'var(--color-good)' }} /> 빠름</span>
               <span className="flex items-center gap-1"><i className="inline-block size-3 rounded-sm" style={{ background: 'var(--color-warn)' }} /> 느림</span>
               <span className="flex items-center gap-1"><i className="inline-block size-3 rounded-sm" style={{ background: 'var(--color-bad)' }} /> 오답률 34% 이상</span>
-              <span>숫자는 중앙 반응시간(초) · ✕ 는 실전 오답만 있고 드릴 기록 없음</span>
+              <span>숫자는 중앙 반응시간(초) · ✕ 는 종목 회상 오답만 있고 드릴 기록 없음</span>
             </div>
           </>
         )}

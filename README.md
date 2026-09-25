@@ -1,6 +1,7 @@
-# 기억력 훈련소 (memory-gym)
+# 브레인 짐 (가제, memory-gym)
 
-기억력 스포츠 개인 훈련용 PWA. 서버 없이 브라우저 안에서만 돈다.
+기억력·암산 개인 훈련용 PWA. 서버 없이 브라우저 안에서만 돈다.
+이름은 가제이며, 저장소 이름·주소·브라우저 저장소 이름(`memory-gym`)은 기록을 잇기 위해 그대로 둔다.
 
 **https://conchobone613-debug.github.io/memory-gym/**
 
@@ -8,6 +9,7 @@
 npm install
 npm run dev     # http://localhost:5173/memory-gym/  (base 가 /memory-gym/ 이다)
 npm run build   # dist/ 로 정적 빌드 (PWA 포함)
+npm test        # 시험 (저장소 업그레이드·백업 복원·통합 기록·규정 값)
 ```
 
 master 에 밀면 GitHub Actions 가 빌드해 Pages 로 올린다 (`.github/workflows/pages.yml`).
@@ -32,10 +34,12 @@ master 에 밀면 GitHub Actions 가 빌드해 Pages 로 올린다 (`.github/wor
 | `/assets` | **자산** — 내가 만들어 두는 것 |
 | `/assets/sets` · `/assets/sets/:id` | 이미지 세트 목록 · 10×10 편집기 |
 | `/assets/palaces` | 궁전·장소 CRUD, 워크스루 |
+| `/memory` | **기억력** 갈림길 — 기초와 종목 (휴대폰 아래 탭 '기억') |
 | `/basics` | **기초** — 1단계 자음 / 2단계 두 자리 / 3단계 이미지 |
-| `/events` · `/events/:id` | **종목** — 표준 10종목 목록 · 종목 상세(연습·실전·내 기록) |
-| `/practice` | 실행기. 종목에서 `?preset=…&event=…&run=easy\|real` 로 들어온다 |
-| `/stats` | 대시보드 |
+| `/events` · `/events/:id` | **기억력 종목** — 표준 10종목 목록 · 종목 상세(연습·모의 대회·내 기록) |
+| `/practice` | 실행기. 종목에서 `?preset=…&event=…&run=easy\|real` 로 들어온다 (`real` = 모의 대회) |
+| `/calc` · `/calc/:id` | **계산 종목** — 달력·제곱근·서프라이즈·덧셈·곱셈 (규정은 설정에서) |
+| `/stats` | 기록(대시보드) |
 | `/settings` | 설정 |
 
 ## 왜 세 층인가

@@ -106,41 +106,43 @@ export async function importRows(setId: string, rows: ImportRow[]): Promise<{ up
 
 /* ── 전체 백업 ── */
 
+/**
+ * 모든 표를 빠짐없이 내보낸다. 표 이름을 손으로 나열하면 새 표가 생길 때 빠진다 —
+ * 실제로 자음 매핑 기록(v2)이 백업에서 빠져 있었다(2026-09-25 발견).
+ */
 export async function exportBackup(): Promise<string> {
-  const [imageSets, images, drillSessions, drillAttempts, recallSessions, recallCells, palaces, loci, imageStats, settings] =
-    await Promise.all([
-      db.imageSets.toArray(), db.images.toArray(), db.drillSessions.toArray(), db.drillAttempts.toArray(),
-      db.recallSessions.toArray(), db.recallCells.toArray(), db.palaces.toArray(), db.loci.toArray(),
-      db.imageStats.toArray(), db.settings.toArray(),
-    ]);
+  const tables: Record<string, unknown[]> = {};
+  for (const t of db.tables) tables[t.name] = await t.toArray();
   /*
    * 백업 파일은 밖으로 나간다 — 메일로 보내거나 공용 드라이브에 둘 수 있다.
    * AI 키는 비밀이므로 빼고 내보낸다. 새 기기에서는 설정에 다시 넣는다.
    */
-  const safeSettings = settings.map(({ aiKey: _k, ...rest }) => rest);
+  tables.settings = (tables.settings as { aiKey?: string }[]).map(({ aiKey: _k, ...rest }) => rest);
   return JSON.stringify(
-    { format: 'memory-gym', version: 1, exportedAt: new Date().toISOString(),
-      imageSets, images, drillSessions, drillAttempts, recallSessions, recallCells, palaces, loci, imageStats,
-      settings: safeSettings },
+    { format: 'memory-gym', version: 2, exportedAt: new Date().toISOString(), ...tables },
     null, 2,
   );
 }
 
+/**
+ * 파일에 **들어 있는 표만** 비우고 채운다. 파일에 없는 표는 건드리지 않는다.
+ * 옛 백업(version 1)에는 자음 매핑 기록이 없어서, 전부 비우고 채우면 그 기록이 통째로 사라졌다.
+ */
 export async function importBackup(json: string): Promise<void> {
   const d = JSON.parse(json);
   if (d.format !== 'memory-gym') throw new Error('이 앱의 백업 파일이 아닙니다.');
+  const present = db.tables.filter((t) => Array.isArray(d[t.name]));
+  const keepKey = (await db.settings.get('app'))?.aiKey;
   await db.transaction('rw', db.tables, async () => {
-    for (const t of db.tables) await t.clear();
-    await db.imageSets.bulkAdd(d.imageSets ?? []);
-    await db.images.bulkAdd(d.images ?? []);
-    await db.drillSessions.bulkAdd(d.drillSessions ?? []);
-    await db.drillAttempts.bulkAdd(d.drillAttempts ?? []);
-    await db.recallSessions.bulkAdd(d.recallSessions ?? []);
-    await db.recallCells.bulkAdd(d.recallCells ?? []);
-    await db.palaces.bulkAdd(d.palaces ?? []);
-    await db.loci.bulkAdd(d.loci ?? []);
-    await db.imageStats.bulkAdd(d.imageStats ?? []);
-    await db.settings.bulkAdd(d.settings ?? []);
+    for (const t of present) {
+      await t.clear();
+      await t.bulkAdd(d[t.name]);
+    }
+    /* 키는 파일에 없으므로, 복원했다고 이 기기에 넣어 둔 키가 사라지지 않게 한다 */
+    if (keepKey && present.some((t) => t.name === 'settings')) {
+      const s = await db.settings.get('app');
+      if (s) await db.settings.put({ ...s, aiKey: keepKey });
+    }
   });
 }
 

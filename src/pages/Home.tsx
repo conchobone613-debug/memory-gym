@@ -2,7 +2,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
 import { db } from '../db/db';
 import { dailyRows, localDayKey } from '../db/analytics';
-import { goalFor, type GoalStatus } from '../db/goals';
+import { LADDERS, goalFor, type GoalStatus } from '../db/goals';
+import { dayStreak, loadSummaries } from '../db/sessions';
+import { getSettings } from '../db/db';
 import { LinkBtn, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
 import BackupNudge from '../components/BackupNudge';
 
@@ -67,7 +69,9 @@ function pickNext(filled: number, g1?: GoalStatus, g2?: GoalStatus, g3?: GoalSta
 export default function Home() {
   const rows = useLiveQuery(() => dailyRows(7), [], []);
   const images = useLiveQuery(() => db.images.toArray(), [], []);
-  const sessions = useLiveQuery(() => db.recallSessions.orderBy('startedAt').reverse().limit(4).toArray(), [], []);
+  /* 연속일을 세려면 과거로 끊김 없이 이어진 날을 봐야 해서 1년 치를 읽는다 */
+  const summaries = useLiveQuery(() => loadSummaries(Date.now() - 366 * 86_400_000), [], []);
+  const settings = useLiveQuery(() => getSettings(), []);
   const g1 = useLiveQuery(() => goalFor(1), []);
   const g2 = useLiveQuery(() => goalFor(2), []);
   const g3 = useLiveQuery(() => goalFor(3), []);
@@ -81,11 +85,11 @@ export default function Home() {
   const filled = images.filter((i) => i.name.trim()).length;
   const next = pickNext(filled, g1, g2, g3);
 
-  const stages = [
-    { n: '1', name: '자음 하나', g: g1 },
-    { n: '2', name: '두 자리', g: g2 },
-    { n: '3', name: '이미지', g: g3 },
-  ];
+  const goals = { 1: g1, 2: g2, 3: g3 };
+  const stages = LADDERS[0].levels.map((l) => ({ n: String(l.stage), name: l.name, to: l.to, g: goals[l.stage] }));
+  const day = dayStreak(summaries);
+  const goalMin = settings?.dailyMinutes ?? 15;
+  const todayMin = Math.floor(day.todayMs / 60_000);
 
   return (
     <div className="mg-rise flex flex-col gap-5">
@@ -115,7 +119,7 @@ export default function Home() {
           return (
             <Link
               key={s.n}
-              to={`/basics?stage=${s.n}`}
+              to={s.to}
               className={`rounded-xl border p-4 transition-colors ${
                 passed ? 'border-good/40 bg-good/5' : 'border-line bg-panel hover:border-accent/50'
               }`}
@@ -140,7 +144,9 @@ export default function Home() {
       </div>
 
       {/* 숫자는 작게, 아래로 */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+        <Stat label="연속" value={`${day.streak}일째`} sub={day.doneToday ? '오늘 채움' : day.streak ? '오늘 하면 이어집니다' : '오늘부터 시작'} />
+        <Stat label="오늘 채운 시간" value={`${todayMin}분`} sub={`목표 ${goalMin}분${todayMin >= goalMin ? ' · 달성' : ''}`} />
         <Stat label="오늘 시도" value={today?.attempts ?? 0} sub={today?.attempts ? `정확도 ${fmtPct(today.accuracy)}` : '아직'} />
         <Stat label="이번 주" value={week.attempts} sub={week.attempts ? `정확도 ${fmtPct(week.correct / week.attempts)}` : '아직'} />
         <Stat label="주간 반응시간" value={fmtMs(rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 0)} />
@@ -148,34 +154,32 @@ export default function Home() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="최근 실전">
-          {sessions.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">아직 실전 기록이 없습니다.</p>
+        <Panel title="최근 기록">
+          {summaries.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">아직 기록이 없습니다.</p>
           ) : (
             <ul className="text-sm">
-              {sessions.map((s) => {
-                const total = s.correct + s.wrong + s.blank;
-                return (
-                  <li key={s.id} className="flex items-center gap-2 border-t border-line/60 py-2 first:border-0">
-                    <span className="text-xs text-muted">{localDayKey(s.startedAt)}</span>
-                    <span className="rounded border border-line px-1.5 text-[11px] text-muted">
-                      {s.runMode === 'easy' ? '연습' : '실전'}
-                    </span>
-                    <span className="flex-1 truncate px-1">{s.presetName}</span>
-                    <span className="tnum">{total ? fmtPct(s.correct / total) : '—'}</span>
-                  </li>
-                );
-              })}
+              {summaries.slice(0, 5).map((s) => (
+                <li key={s.id} className="flex items-center gap-2 border-t border-line/60 py-2 first:border-0">
+                  <span className="text-xs text-muted">{localDayKey(s.startedAt).slice(5)}</span>
+                  <span className="rounded border border-line px-1.5 text-[11px] text-muted">
+                    {s.mode === 'practice' ? '연습' : '모의 대회'}
+                  </span>
+                  <span className="flex-1 truncate px-1">{s.title}</span>
+                  <span className="tnum">{fmtPct(s.accuracy)}</span>
+                </li>
+              ))}
             </ul>
           )}
         </Panel>
 
         <Panel title="빠른 이동">
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2">
             {[
               { to: '/assets', t: '자산', d: '이미지 세트 · 궁전' },
               { to: '/basics', t: '기초', d: '자음 → 이미지' },
-              { to: '/events', t: '종목', d: '표준 10종목' },
+              { to: '/events', t: '기억력 종목', d: '표준 10종목' },
+              { to: '/calc', t: '계산 종목', d: '달력 · 제곱근 · 암산' },
             ].map((c) => (
               <Link
                 key={c.to}
@@ -194,7 +198,7 @@ export default function Home() {
               <li>기초 1·2단계: 자판의 자음 키 · 숫자 키 (한/영 무관, 화면 버튼도 있음) · <kbd>Tab</kbd> 모름</li>
               <li>이미지 드릴: 이름 입력 후 <kbd>Enter</kbd> · <kbd>Tab</kbd> 모름 · <kbd>Esc</kbd> 중단 (앞 문제는 '← 앞 문제' 버튼)</li>
               <li>세트 편집: 방향키 이동 · <kbd>Enter</kbd> 저장·다음 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 다음 빈칸</li>
-              <li>실전: 암기 중 <kbd>Enter</kbd> 조기 종료 · 회상 중 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 제출</li>
+              <li>모의 대회: 암기 중 <kbd>Enter</kbd> 조기 종료 · 회상 중 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 제출</li>
               <li>채점: <kbd>1</kbd>–<kbd>4</kbd> 원인 태그 · <kbd>↑</kbd><kbd>↓</kbd> 칸 이동</li>
             </ul>
           </details>

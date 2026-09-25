@@ -1,27 +1,27 @@
 import { Link } from 'react-router-dom';
-import { MEMORY_EVENTS } from '../data/events';
+import { CALC_EVENTS } from '../data/events';
 import { Panel } from '../components/ui';
 
-export default function Events() {
-  const ready = MEMORY_EVENTS.filter((e) => e.status === 'ready');
+/** 계산 종목 목록. 기억력 종목과 같은 틀 — 목록 → 종목 상세(연습 / 모의 대회 / 내 기록). */
+export default function Calc() {
+  const ready = CALC_EVENTS.filter((e) => e.status === 'ready');
 
   return (
     <div className="flex flex-col gap-4">
       <Panel
-        title="대회 표준 10종목"
-        right={<span className="tnum text-xs text-muted">열림 {ready.length} / {MEMORY_EVENTS.length}</span>}
+        title="계산 종목"
+        right={<span className="tnum text-xs text-muted">열림 {ready.length} / {CALC_EVENTS.length}</span>}
       >
         <p className="mb-3 text-xs text-muted">
-          시간은 WMSC·IAM 기준이며 연맹과 해에 따라 다릅니다.
+          암산 대회(MCWC) 종목입니다. 규정 값은 설정에서 바꿀 수 있고, 공식 값으로 덮어쓰시면 그대로 따릅니다.
         </p>
-
         <ul className="grid gap-2 md:grid-cols-2">
-          {MEMORY_EVENTS.map((e) => {
+          {CALC_EVENTS.map((e) => {
             const open = e.status === 'ready';
             return (
               <li key={e.id}>
                 <Link
-                  to={`/events/${e.id}`}
+                  to={`/calc/${e.id}`}
                   className={`flex h-full flex-col rounded-lg border px-3 py-2.5 transition hover:border-accent/60 ${
                     open ? 'border-line bg-panel2' : 'border-line/50 bg-transparent'
                   }`}
@@ -36,23 +36,12 @@ export default function Events() {
                       {open ? '열림' : '잠김'}
                     </span>
                   </div>
-                  <div className="tnum mt-0.5 text-xs text-muted">
-                    암기 {e.memorize} · 회상 {e.recall}
-                  </div>
                   <p className={`mt-1 text-sm ${open ? 'text-muted' : 'text-muted/70'}`}>{e.what}</p>
                 </Link>
               </li>
             );
           })}
         </ul>
-      </Panel>
-
-      <Panel title="대회와 다른 점 하나">
-        <p className="text-sm text-muted">
-          대회는 <b className="text-fg">정해진 시간 안에 최대한 많이</b> 외우는 방식입니다. 반면 지금 모의 대회는
-          <b className="text-fg"> 길이를 정해 놓고 시간을 잽니다</b>. 방향이 반대라, 열린 종목도 이 점에서는
-          대회와 같지 않습니다. 기록을 대회 성적과 바로 견주지는 마십시오.
-        </p>
       </Panel>
     </div>
   );
