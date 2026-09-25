@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, db, getSettings, saveSettings, type AppSettings } fro
 import { RANKS, SUITS, SUIT_NAME, type Rank, type Suit } from '../lib/cards';
 import { exportBackup, download, importBackup, pickFile } from '../lib/io';
 import { askForNames } from '../lib/ai';
+import { AUTO_CALL_CAP, PRICE_PER_M, usageThisMonth } from '../coach';
 import { Btn, ConfirmBtn, Field } from '../components/ui';
 import { Dymo, Folder } from '../components/lp';
 import ChosungKey from '../components/ChosungKey';
@@ -31,6 +32,8 @@ export default function Settings() {
   const [aiTesting, setAiTesting] = useState(false);
   const [aiMsg, setAiMsg] = useState<Msg | null>(null);
   const [params, setParams] = useSearchParams();
+  /* 이번 달 스승님 사용량 — coachLogs 의 토큰으로 코드가 센다(이름 후보 호출은 들어가지 않는다) */
+  const usage = useLiveQuery(() => usageThisMonth(), []);
 
   /* 다른 기기에서 보낸 주소로 열면 코드를 자동으로 넣어 준다 */
   useEffect(() => {
@@ -204,11 +207,11 @@ export default function Settings() {
 
       <div id="rules" className="scroll-mt-20"><RulesPanel /></div>
 
-      <Folder tab="AI 이름후보">
+      <Folder tab="AI 스승님">
         <div className="flex flex-col gap-3">
           <Field
             label="Anthropic API 키"
-            hint="이 브라우저에만 저장됩니다. 기기 동기화에도 올라가지 않습니다."
+            hint="이 브라우저에만 저장됩니다. 기기 동기화와 백업 파일에도 들어가지 않습니다."
           >
             <input
               type="password"
@@ -235,9 +238,37 @@ export default function Settings() {
           </div>
         </div>
         {aiMsg && <p className={`mt-3 font-typek text-[12px] ${msgCls(aiMsg)}`} role="status">{aiMsg.t}</p>}
+
+        <label className="mt-4 flex items-start gap-2 font-typek text-[13px] text-ink">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 shrink-0"
+            checked={s.coachAuto !== false}
+            onChange={(e) => commit({ coachAuto: e.target.checked })}
+          />
+          <span>홈을 열 때 하루 한 번 코스 짜기</span>
+        </label>
+
+        <div className="mt-3 rounded-[4px] bg-card px-3 py-2.5 font-typek text-[12px] leading-relaxed text-ink">
+          <div className="font-bold">이번 달 사용량</div>
+          {usage ? (
+            <span className="tnum">
+              호출 {usage.calls}회 · 토큰 {(usage.inputTokens + usage.outputTokens).toLocaleString('ko-KR')}
+              {' '}(입력 {usage.inputTokens.toLocaleString('ko-KR')} · 출력 {usage.outputTokens.toLocaleString('ko-KR')})
+              {' '}· 약 ${usage.usd > 0 && usage.usd < 0.01 ? '0.01 미만' : usage.usd.toFixed(2)}
+            </span>
+          ) : '—'}
+          <div className={`mt-1 ${usage && usage.calls >= AUTO_CALL_CAP ? 'font-bold text-ink' : 'text-ink-2'}`}>
+            {usage && usage.calls >= AUTO_CALL_CAP
+              ? `이번 달 호출이 ${AUTO_CALL_CAP}회에 이르러 하루 한 번 자동 코스를 멈췄습니다. 다음 달 1일에 다시 켜집니다.`
+              : `안전판 — 이번 달 호출이 ${AUTO_CALL_CAP}회에 이르면 자동 코스를 멈춥니다. 직접 누르는 코스·복기는 막지 않습니다.`}
+          </div>
+        </div>
+
         <p className={`mt-3 ${note}`}>
-          키를 넣으시면 이름 후보의 '다른 후보' 가 누를 때마다 새로 지어 옵니다. 안 넣으셔도
-          지금처럼 사전 후보로 돌아갑니다.
+          키를 넣으시면 스승님이 기록 요약을 읽고 오늘의 코스와 한 판 복기를 짜 드리고, 이름 후보의 '다른 후보' 도
+          새로 지어 옵니다. 안 넣으셔도 규칙으로 짠 코스와 사전 후보로 돌아갑니다. 사용량은 이 기기에서 부른 스승님 호출(코스·복기)만 세며
+          값은 입력 백만 토큰당 {PRICE_PER_M.input}달러 · 출력 {PRICE_PER_M.output}달러로 어림한 것입니다.
         </p>
       </Folder>
 

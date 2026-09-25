@@ -159,8 +159,31 @@ function wordsIn(raw: string): string[] {
     .filter((w) => w && w.length <= 12);
 }
 
-/** 모델을 한 번 부르고 답 글자만 돌려준다. */
-async function call(apiKey: string, content: string, signal?: AbortSignal, maxTokens = 300): Promise<string> {
+/*
+ * 모든 AI 호출은 아래 post() 한 곳을 지난다(기획서 §6.4) — 헤더·모델·생각 끄기·오류 문구가 한 벌이다.
+ * 이름 후보는 call(글자 답), 스승님은 callJson(정해진 형식의 답)을 쓴다.
+ */
+
+/** 이번 호출에 쓴 토큰 — 설정 화면의 이번 달 사용량이 이것을 더한다 */
+export interface AiUsage { input: number; output: number }
+
+/** 답을 받은 뒤에 난 오류는 이미 쓴 토큰을 함께 들고 온다(사용량에서 빠지지 않게) */
+export class AiError extends Error {
+  usage?: AiUsage;
+  constructor(message: string, usage?: AiUsage) {
+    super(message);
+    this.name = 'AiError';
+    this.usage = usage;
+  }
+}
+
+interface ApiReply {
+  content?: { type?: string; text?: string }[];
+  stop_reason?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+async function post(apiKey: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<ApiReply> {
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: {
@@ -172,28 +195,63 @@ async function call(apiKey: string, content: string, signal?: AbortSignal, maxTo
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: maxTokens,
       /*
        * 생각을 끈다. 켜 두면 300토큰을 생각에 다 쓰고 답을 한 글자도 못 낸다
-       * (실측: thinking_tokens 297, text 블록 0개). 이름 몇 개 짓는 데 생각은 필요 없다.
+       * (실측: thinking_tokens 297, text 블록 0개). 짧은 답에 생각은 필요 없다.
        */
       thinking: { type: 'disabled' },
-      messages: [{ role: 'user', content }],
+      ...body,
     }),
     signal,
   });
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    if (res.status === 401) throw new Error('키가 거부되었습니다. 설정에서 다시 확인해 주십시오.');
-    if (res.status === 429) throw new Error('요청이 몰렸습니다. 잠시 뒤에 다시 눌러 주십시오.');
-    throw new Error(`AI 가 응답하지 않았습니다 (${res.status}). ${detail.slice(0, 120)}`);
+    if (res.status === 401) throw new AiError('키가 거부되었습니다. 설정에서 다시 확인해 주십시오.');
+    if (res.status === 429) throw new AiError('요청이 몰렸습니다. 잠시 뒤에 다시 눌러 주십시오.');
+    throw new AiError(`AI 가 응답하지 않았습니다 (${res.status}). ${detail.slice(0, 120)}`);
   }
+  return res.json();
+}
 
-  const data = await res.json();
-  return (data?.content ?? [])
-    .map((c: { type?: string; text?: string }) => c.text ?? '')
-    .join('\n');
+const textOf = (data: ApiReply) => (data.content ?? []).map((c) => c.text ?? '').join('\n');
+
+/** 모델을 한 번 부르고 답 글자만 돌려준다. */
+async function call(apiKey: string, content: string, signal?: AbortSignal, maxTokens = 300): Promise<string> {
+  return textOf(await post(apiKey, { max_tokens: maxTokens, messages: [{ role: 'user', content }] }, signal));
+}
+
+export interface JsonAsk {
+  apiKey: string;
+  system: string;
+  user: string;
+  /** JSON 스키마 — 모든 object 에 additionalProperties:false 와 required. minimum·maxItems 같은 제약은 쓰지 않는다(코드가 검사) */
+  schema: Record<string, unknown>;
+  maxTokens: number;
+  signal?: AbortSignal;
+}
+
+/**
+ * 정해진 형식(JSON 스키마)으로 답을 받는다. 스키마대로 왔는지는 부르는 쪽이 다시 검사한다 —
+ * 형식이 맞아도 값(종목 id·범위·말투)은 틀릴 수 있다.
+ */
+export async function callJson({ apiKey, system, user, schema, maxTokens, signal }: JsonAsk): Promise<{ data: unknown; text: string; usage: AiUsage }> {
+  const reply = await post(apiKey, {
+    max_tokens: maxTokens,
+    system,
+    messages: [{ role: 'user', content: user }],
+    output_config: { format: { type: 'json_schema', schema } },
+  }, signal);
+  const usage = { input: reply.usage?.input_tokens ?? 0, output: reply.usage?.output_tokens ?? 0 };
+  const text = textOf(reply);
+  /* 잘린 JSON 은 읽혀도 뒤가 빠져 있다 — 읽기 전에 거른다 */
+  if (reply.stop_reason === 'max_tokens') throw new AiError('답이 길어 중간에 잘렸습니다. 한 번 더 눌러 주십시오.', usage);
+  if (!text.trim()) throw new AiError('AI 가 빈 답을 보냈습니다. 한 번 더 눌러 주십시오.', usage);
+  try {
+    return { data: JSON.parse(text), text, usage };
+  } catch {
+    throw new AiError(`AI 답을 읽지 못했습니다. ${text.slice(0, 80)}`, usage);
+  }
 }
 
 /** 한 번 청한다 — 짓고, 초성으로 거르고, 남은 것을 모델에게 다시 검사받는다. */

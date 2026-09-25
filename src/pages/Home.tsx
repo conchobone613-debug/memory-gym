@@ -1,81 +1,175 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/db';
+import { db, getSettings, type CoachLog } from '../db/db';
 import { dailyRows, localDayKey } from '../db/analytics';
-import { LADDERS, goalFor, type GoalStatus } from '../db/goals';
+import { LADDERS, goalFor } from '../db/goals';
 import { dayStreak, loadSummaries } from '../db/sessions';
-import { getSettings } from '../db/db';
 import { CALC_EVENTS, needsHead } from '../data/events';
+import {
+  courseHref, courseRowsOn, estimateMs, itemLabel, NO_USABLE_ITEMS, shouldAutoAsk, todayCourse, usageThisMonth, type CoachSummary,
+} from '../coach';
 import { APP_NAME, APP_NAME_KO } from '../brand';
 import { Empty, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
-import { art, Dymo, Folder, Gauge, IndexCard, KeyLink, SageNote, TearCalendar, TvVideo } from '../components/lp';
+import { art, Dymo, Folder, Gauge, IndexCard, Key, KeyLink, SageNote, TearCalendar, TvVideo } from '../components/lp';
 import BackupNudge from '../components/BackupNudge';
+import { coachErrorText } from '../components/CoachReview';
+import {
+  courseJob, defaultCourseMinutes, labelParts, markOpened, MINUTE_OPTIONS, minuteOptions, nextCourseIndex, startCourseJob, type CourseJob,
+} from '../components/course';
 
-interface NextStep {
-  /** 스승님이 하는 말(하게체). 숫자는 코드가 계산한 값만 */
-  say: string;
-  to: string;
-  cta: string;
-  sub: string;
-}
-
-
-/* 못 넘은 값이 반올림으로 기준과 같은 숫자(95%·1.50초)로 찍히지 않게 — 정확도는 내리고 반응은 올린다 */
-const pctDown = (x: number) => `${Math.floor(x * 100 + 1e-9)}%`;
-const secUp = (ms: number) => `${(Math.ceil(ms / 10) / 100).toFixed(2)}초`;
-
-/** 아직 못 넘은 첫 조건을 실제 값으로 한 문장. 기록이 없으면 지어내지 않고 비워 둔다. */
-function gap(g?: GoalStatus): string {
-  if (!g?.attempts) return '';
-  const [cover, acc, rt] = g.checks;
-  if (!cover.ok) return ` ${g.rule.reps}번 이상 본 칸이 ${g.total}칸 중 ${g.enough}칸일세. 남은 칸을 채워 보세.`;
-  if (!acc.ok) return ` 정확도가 지금 ${pctDown(g.accuracy)}일세. ${fmtPct(g.rule.accuracy)}까지 올려 보세.`;
-  if (!rt.ok && g.medianRt) return ` 반응이 지금 ${secUp(g.medianRt)}일세. ${fmtMs(g.rule.rtMs)} 안으로 줄여 보세.`;
-  return '';
+/** 기본 분량 — 하루 목표에서 오늘 채운 분을 뺀 값, 최소 5분 */
+async function defaultMinutes(now: number): Promise<number> {
+  const [s, sums] = await Promise.all([getSettings(), loadSummaries(new Date(now).setHours(0, 0, 0, 0))]);
+  return defaultCourseMinutes(s.dailyMinutes, dayStreak(sums, now).todayMs);
 }
 
 /**
- * 빈 화면에 0 을 네 개 띄우는 건 성적표지 초대장이 아니다.
- * 스승님은 '지금 무엇을 하면 되는지' 한 가지만 말한다.
+ * 오늘의 코스 — 홈에 보이는 것은 늘 오늘의 가장 최근 코스 행(todayCourse)이다.
+ * 없으면 규칙 코스를 곧바로 짜서 보이고, 하루 한 번 자동 조건(shouldAutoAsk)이면 스승님께 묻는다.
+ * 이미 시작한 코스는 갈아 끼우지 않으므로 그때는 묻지도 않는다.
  */
-function pickNext(filled: number, g1?: GoalStatus, g2?: GoalStatus, g3?: GoalStatus): NextStep {
-  if (filled === 0) {
-    return {
-      say: '먼저 숫자마다 떠올릴 이미지를 정하게. 추천 목록을 한 번에 넣을 수도 있네.',
-      to: '/assets/sets',
-      cta: '이미지 세트 열기',
-      sub: '추천 목록을 한 번에',
-    };
+function useTodayCourse() {
+  const row = useLiveQuery(() => todayCourse(), []);
+  const hasKey = !!useLiveQuery(() => getSettings(), [])?.aiKey?.trim();
+  /** 짜는 중인 분량(스승님께 묻는 중이면 ai) */
+  const [busy, setBusy] = useState<{ minutes: number; ai: boolean } | null>(null);
+  const [notice, setNotice] = useState('');
+
+  /* 짜는 동안 '짜는 중' 을 띄우고, 끝나면 거둔다. 새 행은 live query 가 받아 띄운다 */
+  const follow = useCallback((job: CourseJob) => {
+    setBusy({ minutes: job.minutes, ai: job.ai });
+    setNotice('');
+    job.promise.catch((e) => setNotice(coachErrorText(e))).finally(() => setBusy(null));
+  }, []);
+
+  const remake = useCallback((minutes: number, useAi: boolean, base?: CoachLog, auto?: Parameters<typeof startCourseJob>[3]) => {
+    if (!courseJob()) follow(startCourseJob(minutes, useAi, base, auto));
+  }, [follow]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const job = courseJob();
+      if (job) { follow(job); return; }
+      const now = Date.now();
+      const [s, rows, usage] = await Promise.all([getSettings(), courseRowsOn(now), usageThisMonth(now)]);
+      if (!alive || courseJob()) return;
+      const cur = rows.find((r) => !!r.course) ?? await startCourseJob(await defaultMinutes(now), false).promise;
+      if (!alive) return;
+      /* 자리는 remake 안에서 한 번 더 잡는다(claimAutoAsk) — 다른 창이 먼저 물었으면 묻지 않는다 */
+      if (shouldAutoAsk(s, rows, usage) && !cur.done?.some((d) => d != null)) {
+        remake(cur.minutes ?? s.dailyMinutes, true, cur, { settings: s, usage });
+      }
+    })().catch((e) => { if (alive) setNotice(coachErrorText(e)); });
+    return () => { alive = false; };
+  }, [follow, remake]);
+
+  return { row, hasKey, busy, notice, remake };
+}
+
+/**
+ * 스승님 서류철 — 스승님 말 · 오늘 쓸 시간 · 코스 항목 카드 · 코스 시작(또는 이어 하기) · 다시 짜기.
+ * 시간을 고르거나 다시 짜기를 누르면 그 분량으로 새로 짠다(키가 있으면 스승님, 없으면 규칙).
+ */
+function CourseFolder({ needImages }: { needImages: boolean }) {
+  const { row, hasKey, busy, notice, remake } = useTodayCourse();
+  const course = row?.course;
+
+  if (!row || !course) {
+    return (
+      <Folder tab="스승님" clip>
+        <p className="m-0 font-typek text-[13px] text-ink-2">{notice || '오늘의 코스를 준비하는 중입니다.'}</p>
+      </Folder>
+    );
   }
-  if (!g1?.passed) {
-    return {
-      say: '숫자를 보면 자음이 바로 나와야 하네. 여기가 안 붙으면 뒤가 전부 느려지네.' + gap(g1),
-      to: '/basics?stage=1',
-      cta: '1단계 시작',
-      sub: '숫자와 자음',
-    };
-  }
-  if (!g2?.passed) {
-    return {
-      say: '1단계는 통과했군. 이제 두 자리를 한 호흡에 읽어 보세.' + gap(g2),
-      to: '/basics?stage=2',
-      cta: '2단계 시작',
-      sub: '두 자리 한 번에',
-    };
-  }
-  if (!g3?.passed) {
-    return {
-      say: '자음까지 붙었군. 이제 숫자에서 곧장 이미지가 떠올라야 하네.' + gap(g3),
-      to: '/basics?stage=3',
-      cta: '3단계 시작',
-      sub: '이미지 변환',
-    };
-  }
-  return {
-    say: '기초 세 단계를 모두 통과했군. 이제 시간을 재고 겨뤄 보세.',
-    to: '/events',
-    cta: '종목 고르기',
-    sub: '기억력 표준 종목',
-  };
+
+  const items = course.items;
+  const done = items.map((_, i) => row.done?.[i] ?? null);
+  const next = nextCourseIndex(done);
+  const started = done.some((d) => d != null);
+  /* 합계는 항목별로 반올림한 분을 더하지 않고 한 번만 반올림한다(15분 코스가 '약 16분' 으로 보이지 않게) */
+  const total = Math.max(1, Math.round(items.reduce((a, it) => a + estimateMs(it, row.input as CoachSummary), 0) / 60_000));
+  const minutes = row.minutes ?? MINUTE_OPTIONS[2];
+  const shown = busy?.minutes ?? minutes;
+  const opts = minuteOptions(minutes);
+
+  const caption = busy?.ai
+    ? '스승님이 코스를 짜는 중…'
+    : row.aiError === NO_USABLE_ITEMS
+      ? `스승님 답을 쓸 수 없어 규칙으로 짠 ${minutes}분 코스입니다.`
+      : row.aiError
+        ? `스승님께 묻지 못해 규칙으로 짰습니다 — ${coachErrorText(row.aiError)}`
+        : row.source === 'ai'
+          ? `스승님이 짠 ${minutes}분 코스입니다.`
+          : `규칙으로 짠 ${minutes}분 코스입니다.${hasKey ? '' : ' 설정에 AI 키를 넣으면 스승님이 짭니다.'}`;
+
+  return (
+    <Folder tab="스승님" clip>
+      <SageNote>{course.say}</SageNote>
+      <p className="mt-2 mb-0 line-clamp-2 font-typek text-[12px] leading-snug text-ink-2" role="status">{caption}</p>
+      {notice && <p className="mt-1 mb-0 font-typek text-[12px] font-bold text-ink" role="status">{notice}</p>}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="오늘 쓸 시간">
+        {opts.map((m) => (
+          <Key
+            key={m}
+            size="sm"
+            tone={m === shown ? 'ink' : 'cream'}
+            aria-pressed={m === shown}
+            disabled={!!busy}
+            style={{ padding: '8px 10px 9px' }}
+            className="tnum"
+            onClick={() => { if (m !== minutes) remake(m, hasKey, row); }}
+          >
+            {m}분
+          </Key>
+        ))}
+      </div>
+
+      {/* 코스 항목·시작 자판을 누르면 '이 코스를 열었다' 고 적어 둔다 — 묻던 새 코스가 늦게 와도 하던 코스를 밀어내지 않게 */}
+      <div onClickCapture={() => markOpened(row.id)}>
+        <div className="mt-3 flex flex-col gap-2.5">
+          {items.map((it, i) => {
+            const [title, detail] = labelParts(it);
+            return (
+              <IndexCard
+                key={i}
+                to={courseHref(it, row.id, i)}
+                title={title}
+                meta={done[i] ? '마침' : `${it.estMinutes}분`}
+                className={done[i] ? 'opacity-60' : undefined}
+                body={<>{detail && <span className="block font-bold text-ink">{detail}</span>}{it.why}</>}
+              />
+            );
+          })}
+        </div>
+
+        {next < 0 ? (
+          items.length > 0 && <p className="mt-4 mb-0 text-center font-sign text-[20px] text-chalk">오늘 코스를 마쳤습니다</p>
+        ) : (
+          <KeyLink
+            to={courseHref(items[next], row.id, next)}
+            size="big"
+            className="mt-4"
+            sub={started ? itemLabel(items[next]) : `${items.length}가지 · 약 ${total}분`}
+          >
+            {started ? `이어 하기 ${next + 1}/${items.length}` : '오늘의 코스 시작'}
+          </KeyLink>
+        )}
+      </div>
+      <div className="mt-3 flex justify-center">
+        <Key tone="cream" size="sm" disabled={!!busy} onClick={() => remake(minutes, hasKey, row)}>다시 짜기</Key>
+      </div>
+
+      {needImages && (
+        <p className="mt-3 mb-0 font-typek text-[12px] leading-relaxed text-ink-2">
+          이미지 이름이 아직 비어 있습니다. <Link to="/assets/sets" className="font-bold text-ink underline">이미지 세트</Link>를
+          먼저 채우면 3단계와 기억력 종목을 제대로 할 수 있습니다.
+        </p>
+      )}
+    </Folder>
+  );
 }
 
 /** 둘러보는 화면 — 텔레비전 · 이름 · 오늘의 상태 · 스승님 서류철 · 다이모로 나눈 목록 카드 */
@@ -96,7 +190,6 @@ export default function Home() {
   );
   const rts = rows.filter((r) => r.medianRt > 0).map((r) => r.medianRt);
   const filled = images.filter((i) => i.name.trim()).length;
-  const next = pickNext(filled, g1, g2, g3);
 
   const goals = { 1: g1, 2: g2, 3: g3 };
   const stages = LADDERS[0].levels.map((l) => ({ n: String(l.stage), name: l.name, to: l.to, g: goals[l.stage] }));
@@ -129,11 +222,9 @@ export default function Home() {
         />
       </div>
 
-      {/* 오늘 할 일 한 가지 — 스승님 말과 주 동작 하나 */}
-      <Folder tab="스승님" clip>
-        <SageNote>{next.say}</SageNote>
-        <KeyLink to={next.to} size="big" sub={next.sub} className="mt-3">{next.cta}</KeyLink>
-      </Folder>
+      {/* 오늘의 코스 — 스승님 말과 주 동작 하나(코스 시작) */}
+      {/* 이미지 칸이 다 비어 있을 때만 세트 안내(불러오는 동안은 빈 목록이라 띄우지 않는다) */}
+      <CourseFolder needImages={images.length > 0 && filled === 0} />
 
       <section className="flex flex-col gap-2.5">
         <Dymo tone="red" small className="self-start">기억력 종목</Dymo>

@@ -15,12 +15,17 @@ import { Key, SageNote, Stamp, Star, art } from './basic';
  * 신기록 무대는 화면 뒤(고정 층)에 켜지므로, 결과와 함께 보일 내용은 children 으로 넘긴다.
  */
 
-export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', actions, children }: {
+export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', actions, sage, children }: {
   outcome: RunOutcome;
   onAgain?: () => void;
   againLabel?: string;
   /** '한 판 더' 아래 보조 동작(크림색 자판 등) */
   actions?: ReactNode;
+  /**
+   * 스승님 쪽지 자리를 바꿔 끼운다(스승님 복기가 오면). 한 화면에 쪽지는 하나라 outcome.sage 와 함께 두지 않는다.
+   * outcome 을 바꾸면 공개가 처음부터 다시 돌므로, 쪽지만 따로 받는다.
+   */
+  sage?: ReactNode;
   children?: ReactNode;
 }) {
   const stars = starsOf(outcome);
@@ -270,7 +275,7 @@ export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', acti
           </div>
         )}
 
-        {outcome.sage && <SageNote small>{outcome.sage}</SageNote>}
+        {sage ?? (outcome.sage && <SageNote small>{outcome.sage}</SageNote>)}
 
         {onAgain && (
           <div ref={againRef}>

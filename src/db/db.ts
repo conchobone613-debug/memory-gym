@@ -5,6 +5,7 @@ import {
   type RankDigits, type SuitDigits,
 } from '../lib/cards';
 import { uid } from '../lib/random';
+import type { Course, Review } from '../coach/types';
 
 /* ───────────────── 타입 ───────────────── */
 
@@ -184,6 +185,8 @@ export interface AppSettings {
   soundOn?: boolean;
   /** 하루 목표 시간(분). 짧은 세션도 '오늘 채운 분' 으로 쌓인다. */
   dailyMinutes: number;
+  /** 스승님이 하루 한 번 스스로 코스를 짜 줄지. 없으면 켬(키가 있을 때만 부른다) */
+  coachAuto?: boolean;
   seededAt?: number;
 }
 
@@ -260,6 +263,32 @@ export interface CoachLog {
   followed?: boolean;
   inputTokens?: number;
   outputTokens?: number;
+  /*
+   * 아래는 색인이 아닌 칸이라 DB 버전을 올리지 않고 더했다(P2).
+   * AI 를 부른 행 = source 'ai' 이거나 aiError 가 있는 행 — 이번 달 사용량과 자동 호출 상한이 이것을 센다.
+   */
+  /** 코스를 누가 짰나. 복기 행은 늘 'ai' */
+  source?: 'ai' | 'rule';
+  /** 스승님께 물었다가 실패한 까닭 — 이때 course 는 규칙 코치가 짠 것이다 */
+  aiError?: string;
+  /** 검사를 마친 코스(코스 행) */
+  course?: Course;
+  /** 항목별로 끝낸 세션 id(아직이면 null). 다 차면 followed = true */
+  done?: (string | null)[];
+  /** 코스를 짠 분량(분) */
+  minutes?: number;
+  /** 코스를 짠 날(YYYY-MM-DD, 현지) */
+  day?: string;
+  /**
+   * 코스 행: 다른 코스로 갈아 끼웠거나(다시 짜기·시간 바꾸기·자동 스승님 코스) 하던 코스 뒤로 물려 끝내 보이지 않은 행.
+   * AI 코스와 규칙 코스를 '따라 한 비율' 로 견줄 때(§8.2) 이런 행은 뺀다.
+   * course 가 없는 코스 행은 자동 호출의 자리표(묻는 중이거나, 묻다 창이 닫혀 답을 못 받은 것)다 — 호출 1회로만 센다.
+   */
+  superseded?: boolean;
+  /** 복기 행: 어느 판을 복기했나 */
+  sessionId?: string;
+  /** 복기 행: 검사를 마친 스승님 말 */
+  review?: Review;
 }
 
 /** 큰 목표 하나. 주간 이정표는 저장하지 않고 지금 최고 기록과 기한 사이를 코드가 나눈다. */

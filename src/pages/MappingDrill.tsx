@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useSearchParams } from 'react-router-dom';
 import { db, getSettings, saveSettings, type MappingAttempt, type MappingStat } from '../db/db';
 import { buildMappingQueue, mappingStatsFor, recordMapping, undoMapping } from '../db/mapping';
 import { goalFor } from '../db/goals';
@@ -17,6 +18,9 @@ import { Held, Hud, Key, QuestionCard, ResultSheet, useJudge } from '../componen
 import Keypad from '../components/Keypad';
 import ChosungKey from '../components/ChosungKey';
 import GoalPanel from '../components/GoalPanel';
+import CourseBar from '../components/CourseBar';
+import { useCoachReview } from '../components/CoachReview';
+import { courseStep } from '../coach';
 
 type Phase = 'setup' | 'asking' | 'feedback' | 'done';
 
@@ -80,10 +84,18 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
   const { show: showJudge, shake, reset: resetJudge } = judge;
   const cardRef = useRef<HTMLDivElement>(null);
 
+  /* 코스로 열면 주소의 문항 수(?n)로. 이 화면은 문항 수를 저장하지 않으므로 이번 판에만 쓰인다 */
+  const [params] = useSearchParams();
+  const search = params.toString();
+  const course = courseStep(params);
   useEffect(() => {
+    const n = Math.round(Number(params.get('n')));
     setPhase('setup');
-    setCount(stage === 1 ? 20 : 30);
-  }, [stage]);
+    setCount(n > 0 ? Math.min(200, Math.max(5, n)) : stage === 1 ? 20 : 30);
+  }, [stage, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 스승님 복기 — 성적표가 나온 판에서만 */
+  const coach = useCoachReview('mapping', phase === 'done' && results.length > 0 ? sessionId : '');
 
   useEffect(() => {
     if (settings) setDir(settings.mappingDirection);
@@ -296,6 +308,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     const total = stage === 1 ? 10 : 100;
     return (
       <div className="flex flex-col gap-4">
+      <CourseBar step={course} />
       {header}
       <Panel title={STAGE_TITLE[stage]}>
         {settings && (
@@ -376,11 +389,16 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
       <ResultSheet
         outcome={outcome}
         onAgain={start}
+        sage={coach.sage}
         actions={
-          <div className="flex flex-wrap justify-center gap-x-3 gap-y-4 pt-1">
-            <Btn onClick={() => setPhase('setup')}>설정으로</Btn>
-            <Btn disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Btn>
-          </div>
+          <>
+            <CourseBar step={course} sessionId={sessionId} />
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-4 pt-1">
+              <Btn onClick={() => setPhase('setup')}>설정으로</Btn>
+              <Btn disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Btn>
+            </div>
+            {coach.action}
+          </>
         }
       >
         <div className="grid grid-cols-3 gap-2">

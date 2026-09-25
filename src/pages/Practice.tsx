@@ -6,6 +6,7 @@ import {
 } from '../db/db';
 import { markRecallWrong } from '../db/record';
 import { MEMORY_EVENTS } from '../data/events';
+import { PRESETS } from '../data/presets';
 import { cardLabel, fullDeck, normalizeCardInput } from '../lib/cards';
 import { resolveCellImage } from '../lib/resolveImage';
 import { randBelow, shuffle, uid } from '../lib/random';
@@ -13,6 +14,9 @@ import { compareBest, flapClock, NEAR_MISS, type RunOutcome } from '../lib/outco
 import { isTyping } from '../App';
 import { Empty, Field, Panel, Stat, fmtPct } from '../components/ui';
 import { Countdown, Folder, Hud, Key, KeyLink, ResultSheet, useFocusMode, useFullscreen } from '../components/lp';
+import CourseBar from '../components/CourseBar';
+import { useCoachReview } from '../components/CoachReview';
+import { courseStep } from '../coach';
 
 /*
  * 종목 실행기 — 숫자·카드 암기 → 회상 → 채점(원인 태그) → 성적표.
@@ -21,19 +25,6 @@ import { Countdown, Folder, Hud, Key, KeyLink, ResultSheet, useFocusMode, useFul
  */
 
 type Phase = 'setup' | 'countdown' | 'memorize' | 'recall' | 'grade' | 'done';
-
-interface Preset {
-  id: string; label: string; mode: PracticeMode; length: number; memorizeSec: number; recallSec: number; chunk: number;
-}
-
-const PRESETS: Preset[] = [
-  { id: 'd80', label: '숫자 80자리 (5분 / 15분)', mode: 'digits', length: 80, memorizeSec: 300, recallSec: 900, chunk: 2 },
-  { id: 'd40', label: '숫자 40자리 (2분 / 5분)', mode: 'digits', length: 40, memorizeSec: 120, recallSec: 300, chunk: 2 },
-  { id: 'c52', label: '카드 52장 (5분 / 5분)', mode: 'cards', length: 52, memorizeSec: 300, recallSec: 300, chunk: 1 },
-  { id: 'c20', label: '카드 20장 (2분 / 3분)', mode: 'cards', length: 20, memorizeSec: 120, recallSec: 180, chunk: 1 },
-  /* 대회 지구력 종목. 대회는 '시간 안에 최대한 많이' 지만 여기서는 길이를 넉넉히 잡아 흉내만 낸다. */
-  { id: 'h-num', label: '1시간 숫자 600자리 (60분 / 120분)', mode: 'digits', length: 600, memorizeSec: 3600, recallSec: 7200, chunk: 2 },
-];
 
 const TAGS: ErrorTag[] = ['image', 'locus', 'link', 'order'];
 
@@ -135,8 +126,16 @@ export default function Practice() {
   const answersRef = useRef<string[]>([]);
 
   const preset = PRESETS.find((p) => p.id === presetId)!;
+  /* 코스 진행 표시 — 아래에서 주소를 비우므로 처음 값을 붙들어 둔다 */
+  const [course, setCourse] = useState(() => courseStep(params));
+  /* 스승님 복기 — 성적표가 나온 판에서만 */
+  const coach = useCoachReview('recall', phase === 'done' && outcome ? sessionId : '');
 
-  /* 종목 화면에서 ?preset=... 으로 넘어오면 그 프리셋으로 맞춰 둔다 */
+  /*
+   * 종목 화면에서 ?preset=... 으로 넘어오면 그 프리셋으로 맞춰 둔다.
+   * 이 화면은 주소만 바뀌면 새로 열리지 않으므로(App 은 경로로만 가른다) 코스의 다음 종목으로 넘어왔을 때
+   * 앞 판의 성적표가 남아 있으면 설정 화면으로 되돌린다(Basics·MappingDrill 과 같다).
+   */
   useEffect(() => {
     const want = params.get('preset');
     const run = params.get('run');
@@ -145,6 +144,8 @@ export default function Practice() {
     if (want && PRESETS.some((p) => p.id === want)) { setCustom(false); setPresetId(want); }
     if (run === 'easy' || run === 'real') setRunMode(run);
     if (ev) setEventId(ev);
+    setCourse(courseStep(params));
+    setPhase((p) => (p === 'done' ? 'setup' : p));
     setParams({}, { replace: true });
   }, [params, setParams]);
 
@@ -385,6 +386,7 @@ export default function Practice() {
     const evName = MEMORY_EVENTS.find((e) => e.id === eventId)?.name;
     return (
       <div className="flex flex-col gap-1">
+        {course && <div className="mb-2"><CourseBar step={course} /></div>}
         <h1 className="m-0 text-[30px] leading-tight text-ink">{easy ? '연습' : '모의 대회'}</h1>
         <p className="m-0 font-typek text-xs text-ink-2">
           {evName && `${evName} · `}
@@ -638,11 +640,16 @@ export default function Practice() {
     <ResultSheet
       outcome={outcome}
       onAgain={begin}
+      sage={coach.sage}
       actions={
-        <div className="flex gap-2">
-          <Key tone="cream" className="flex-1" onClick={() => setPhase('setup')}>설정 바꾸기</Key>
-          <KeyLink to="/stats" tone="cream" className="flex-1">기록 보기</KeyLink>
-        </div>
+        <>
+          <CourseBar step={course} sessionId={sessionId} played={{ kind: 'event', presetId: custom ? null : presetId, run: runMode }} />
+          <div className="flex gap-2">
+            <Key tone="cream" className="flex-1" onClick={() => setPhase('setup')}>설정 바꾸기</Key>
+            <KeyLink to="/stats" tone="cream" className="flex-1">기록 보기</KeyLink>
+          </div>
+          {coach.action}
+        </>
       }
     >
       <Panel title="채점 상세">

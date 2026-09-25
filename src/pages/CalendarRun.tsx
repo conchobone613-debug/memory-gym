@@ -21,6 +21,9 @@ import {
 import { contestOutcome, practiceOutcome } from '../calc/calendarOutcome';
 import { newSeed, seeded, type Rng } from '../calc/rng';
 import { Btn, Empty, Field, Panel, Stat } from '../components/ui';
+import CourseBar from '../components/CourseBar';
+import { useCoachReview } from '../components/CoachReview';
+import { courseStep } from '../coach';
 import {
   Countdown, Dymo, Folder, Held, Hud, IndexCard, Key, KeyLink, QuestionCard, ResultSheet,
   pressVisual, useFocusMode, useFullscreen, useJudge,
@@ -92,8 +95,13 @@ export default function CalendarRun() {
     const n = params.get('mode') === 'contest' ? 5 : Number(params.get('level'));
     return CAL_LEVELS.some((l) => l.n === n) ? n : null;
   });
-  const [count, setCount] = useState(20);
-  const [stepsOn, setStepsOn] = useState(false);
+  /* 코스로 열면 주소의 문항 수(?n)·단계 입력(?steps=1)으로. 주소가 바뀌면 화면을 새로 연다(App 의 key) */
+  const [count, setCount] = useState(() => {
+    const n = Math.round(Number(params.get('n')));
+    return n > 0 ? Math.min(200, Math.max(5, n)) : 20;
+  });
+  const [stepsOn, setStepsOn] = useState(() => params.get('steps') === '1');
+  const course = courseStep(params);
   const [phase, setPhase] = useState<Phase>('setup');
   const [cfg, setCfg] = useState<RunCfg | null>(null);
   const [queue, setQueue] = useState<CalItem[]>([]);
@@ -140,6 +148,8 @@ export default function CalendarRun() {
   /* 판정 연출은 연출 층과 머리띠에서만. 문제 카드는 조각이 넘지 않을 선을 재는 데만 넘긴다(측정 구간) */
   const judge = useJudge();
   const { show: showJudge, shake, reset: resetJudge } = judge;
+  /* 스승님 복기 — 성적표가 나온 판에서만 */
+  const coach = useCoachReview('calc', phase === 'done' && outcome ? sessionId : '');
 
   /** 새 판. 문제는 세션 시드로 만든다 — 같은 시드면 같은 문제(기획서 §5.7) */
   const start = async () => {
@@ -410,6 +420,7 @@ export default function CalendarRun() {
     };
     return (
       <div className="flex flex-col gap-4">
+        <CourseBar step={course} />
         <header>
           <div className="flex items-center justify-between gap-2">
             <Dymo tone="blue" small>계산 종목</Dymo>
@@ -500,7 +511,22 @@ export default function CalendarRun() {
     const slowest = avgs.length > 1 ? Math.max(...avgs.map((a) => a.avgMs)) : -1;
     /* 신기록 무대가 화면 뒤를 덮으므로 함께 볼 상세는 children 으로 넘긴다 */
     return (
-      <ResultSheet outcome={outcome} onAgain={begin} actions={actions}>
+      <ResultSheet
+        outcome={outcome}
+        onAgain={begin}
+        sage={coach.sage}
+        actions={
+          <>
+            <CourseBar
+              step={course}
+              sessionId={sessionId}
+              played={cfg ? { kind: 'calendar', level: cfg.level.n, steps: !!cfg.params.steps } : undefined}
+            />
+            {actions}
+            {coach.action}
+          </>
+        }
+      >
         {avgs.length > 0 && (
           <Panel title="단계별 평균 시간">
             <div className="grid grid-cols-3 gap-2">

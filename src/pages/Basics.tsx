@@ -19,6 +19,9 @@ import { loadSummaries } from '../db/sessions';
 import { drillOutcome, type DrillRun } from '../db/drillOutcome';
 import GoalPanel from '../components/GoalPanel';
 import ImageEditDialog from '../components/ImageEditDialog';
+import CourseBar from '../components/CourseBar';
+import { useCoachReview } from '../components/CoachReview';
+import { courseStep } from '../coach';
 import { isTyping } from '../App';
 import { Empty, Field, Panel, fmtMs, fmtPct } from '../components/ui';
 import { Dymo, Folder, Held, Hud, Key, KeyLink, QuestionCard, ResultSheet, useJudge } from '../components/lp';
@@ -136,6 +139,8 @@ export default function Drill() {
   const cardRef = useRef<HTMLDivElement>(null);
   const judge = useJudge();
   const { show: showJudge, shake: shakeCard, reset: resetJudge } = judge;
+  /* 스승님 복기 — 기록된 문항이 있는 결과에서만 */
+  const coach = useCoachReview('drill', phase === 'done' && results.length > 0 ? sessionId : '');
 
   /**
    * 마지막에 쓰신 설정을 되살린다.
@@ -169,12 +174,33 @@ export default function Drill() {
     setsPicked.current = true;
   }, [settings, sets, images]);
 
-  /* 바뀔 때마다 저장. 되살리기가 끝난 뒤에만 쓴다. */
+  /*
+   * 코스로 열면 주소의 문항 수(?n)·출제 방식(?pick)을 이번 판에만 쓴다 — 저장된 기본 설정은 덮어쓰지 않는다.
+   * 되살리기(위) 다음에 돌아야 이긴다. 주소에서 값이 빠지면(단계 탭 등) 저장된 값으로 돌아간다.
+   * 설정 칸을 직접 바꾸시면 그 값은 주소 몫이 아니므로 다시 저장된다.
+   */
+  const search = params.toString();
+  const course = courseStep(params);
+  const fromUrl = useRef({ count: false, mode: false });
+  useEffect(() => {
+    if (!loaded.current || !settings) return;
+    const n = stage === 3 ? Math.round(Number(params.get('n'))) : 0;
+    const pick = stage === 3 ? params.get('pick') : null;
+    if (n > 0) { setCount(Math.min(300, Math.max(5, n))); fromUrl.current.count = true; }
+    else if (fromUrl.current.count) { setCount(settings.drillCount); fromUrl.current.count = false; }
+    if (pick && Object.hasOwn(MODE_LABEL, pick)) { setMode(pick as PickMode); fromUrl.current.mode = true; }
+    else if (fromUrl.current.mode) { setMode(settings.drillPickMode ?? 'srs'); fromUrl.current.mode = false; }
+    /* 코스의 다음 항목으로 넘어왔는데 지난 판 결과가 남아 있으면 설정부터 */
+    if (course) setPhase((p) => (p === 'done' ? 'setup' : p));
+  }, [search, !!settings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 바뀔 때마다 저장. 되살리기가 끝난 뒤에만 쓴다. 주소에서 온 값은 이번 판 몫이라 저장하지 않는다. */
   useEffect(() => {
     if (!loaded.current || !setsPicked.current) return;
     saveSettings({
-      drillSetIds: selected, drillDecades: decades,
-      drillPickMode: mode, drillStyle: style, drillCount: count,
+      drillSetIds: selected, drillDecades: decades, drillStyle: style,
+      ...(fromUrl.current.mode ? {} : { drillPickMode: mode }),
+      ...(fromUrl.current.count ? {} : { drillCount: count }),
     });
   }, [selected, decades, mode, style, count]);
 
@@ -453,6 +479,7 @@ export default function Drill() {
     const namedCount = pool.length;
     return (
       <div className="flex flex-col gap-5">
+        <CourseBar step={course} />
         {stageTabs}
         <Folder tab="3단계 설정" clip>
           <h2 className="font-sign text-[22px] leading-tight text-ink">이미지 변환 드릴</h2>
@@ -535,7 +562,7 @@ export default function Drill() {
               })}
             </div>
             <Field label="출제 방식">
-              <select className="w-full" value={mode} onChange={(e) => setMode(e.target.value as PickMode)}>
+              <select className="w-full" value={mode} onChange={(e) => { fromUrl.current.mode = false; setMode(e.target.value as PickMode); }}>
                 {(Object.keys(MODE_LABEL) as PickMode[]).map((m) => (
                   <option key={m} value={m}>{MODE_LABEL[m]}</option>
                 ))}
@@ -556,7 +583,7 @@ export default function Drill() {
                   min={5}
                   max={300}
                   value={count}
-                  onChange={(e) => setCount(Number(e.target.value))}
+                  onChange={(e) => { fromUrl.current.count = false; setCount(Number(e.target.value)); }}
                 />
               </Field>
             </div>
@@ -602,14 +629,19 @@ export default function Drill() {
             outcome={outcome}
             /* 이름 고치는 팝업이 떠 있는 동안에는 Enter 로 새 판이 시작되지 않게 */
             onAgain={() => { if (!editId) start(); }}
+            sage={coach.sage}
             actions={
-              <div className="flex flex-wrap justify-center gap-3">
-                <Key tone="cream" size="sm" onClick={() => setPhase('setup')}>다시 설정</Key>
-                {results.length > 0 && (
-                  <Key tone="cream" size="sm" disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Key>
-                )}
-                <KeyLink to="/stats" tone="cream" size="sm">기록 보기</KeyLink>
-              </div>
+              <>
+                {results.length > 0 && <CourseBar step={course} sessionId={sessionId} />}
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Key tone="cream" size="sm" onClick={() => setPhase('setup')}>다시 설정</Key>
+                  {results.length > 0 && (
+                    <Key tone="cream" size="sm" disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Key>
+                  )}
+                  <KeyLink to="/stats" tone="cream" size="sm">기록 보기</KeyLink>
+                </div>
+                {coach.action}
+              </>
             }
           >
             {m3?.passed && <GoalPanel goal={m3} celebrate />}
