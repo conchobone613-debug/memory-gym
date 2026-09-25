@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { MEMORY_EVENTS } from '../data/events';
 import { db } from '../db/db';
 import { localDayKey } from '../db/analytics';
-import { Btn, Empty, LinkBtn, Panel, Stat, fmtPct } from '../components/ui';
+import { Empty, Panel, Stat, fmtPct } from '../components/ui';
+import { Dymo, Folder, Key, KeyLink } from '../components/lp';
 
 const mmss = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -25,7 +26,7 @@ export default function EventDetail() {
     return (
       <Empty>
         그런 종목이 없습니다.{' '}
-        <Link to="/events" className="text-accent">목록으로</Link>
+        <Link to="/events" className="text-red underline underline-offset-2">목록으로</Link>
       </Empty>
     );
   }
@@ -37,108 +38,114 @@ export default function EventDetail() {
   }, 0);
 
   return (
-    <div className="flex flex-col gap-4">
-      <Panel
-        title={ev.name}
-        right={
-          <div className="flex items-center gap-2">
-            <span
-              className={`rounded-md border px-2 py-0.5 text-[11px] ${
-                open ? 'border-good/50 bg-good/10 text-good' : 'border-line text-muted'
-              }`}
-            >
-              {open ? '열림' : '잠김'}
-            </span>
-            <LinkBtn to="/events" size="sm">종목 목록</LinkBtn>
-          </div>
-        }
-      >
-        <p className="text-sm text-muted">{ev.what}</p>
-        <div className="tnum mt-2 text-xs text-muted">
-          대회 기준 — 암기 {ev.memorize} · 회상 {ev.recall}
+    <div className="flex flex-col gap-6">
+      <header>
+        <div className="flex items-center justify-between gap-2">
+          <Dymo tone="red" small>기억력 종목</Dymo>
+          <KeyLink to="/events" tone="cream" size="sm">종목 목록</KeyLink>
         </div>
-      </Panel>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <Panel title="연습">
-          <p className="text-sm text-muted">
-            시간을 재지 않습니다. 짧게 내고, 다 외우셨으면 넘어갑니다. 채점할 때 <b className="text-fg">이미지 이름</b>과
-            궁전을 고르셨으면 <b className="text-fg">장소 이름</b>까지 같이 보여 줍니다.
-          </p>
-          <div className="mt-3">
-            {open && ev.to ? (
-              <LinkBtn to={`${ev.to}&run=easy`} variant="primary">연습 시작</LinkBtn>
-            ) : (
-              <Btn disabled>연습 시작</Btn>
-            )}
-          </div>
-        </Panel>
-
-        <Panel title="모의 대회">
-          <p className="text-sm text-muted">
-            대회 규격 시간으로 잽니다. 암기 시간이 끝나면 자동으로 회상으로 넘어가고, 채점에서 칸마다
-            틀린 원인을 달아 둘 수 있습니다.
-          </p>
-          <div className="mt-3">
-            {open && ev.to ? (
-              <LinkBtn to={`${ev.to}&run=real`} variant="primary">모의 대회 시작</LinkBtn>
-            ) : (
-              <Btn disabled>모의 대회 시작</Btn>
-            )}
-          </div>
-        </Panel>
-      </div>
+        <h1 className="balance mt-4 font-sign text-[40px] leading-[1.05] text-ink">{ev.name}</h1>
+        <p className="mt-2 text-[15px] text-ink">{ev.what}</p>
+        <p className="mt-1.5 font-typek text-xs text-ink-2">
+          대회 기준 — 암기 <b className="tnum text-ink">{ev.memorize}</b> · 회상 <b className="tnum text-ink">{ev.recall}</b>
+        </p>
+      </header>
 
       {!open && (
         <Panel title="아직 잠긴 종목입니다">
-          <p className="text-sm text-muted">
-            <b className="text-fg">열려면</b> — {ev.needs}
+          <p className="text-sm text-ink-2">
+            <b className="text-ink">열려면</b> — {ev.needs}
           </p>
-          <p className="mt-2 text-xs text-muted">
+          <p className="mt-2 font-typek text-[11px] text-ink-2">
             준비되는 대로 이 화면의 연습·모의 대회 버튼이 그대로 켜집니다. 종목 자리는 미리 잡아 두었습니다.
           </p>
         </Panel>
       )}
 
-      <Panel
-        title="내 기록"
-        right={sessions.length > 0 ? <span className="tnum text-xs text-muted">최고 {fmtPct(best)}</span> : undefined}
-      >
+      {/* 빨간 자판은 모의 대회 시작 하나 — 이 화면의 주 동작 */}
+      <Folder tab="시작" clip>
+        <h2 className="text-xl leading-tight text-ink">연습</h2>
+        <p className="mt-1 text-sm text-ink-2">
+          시간을 재지 않습니다. 짧게 내고, 다 외우셨으면 넘어갑니다. 채점할 때 <b className="text-ink">이미지 이름</b>과
+          궁전을 고르셨으면 <b className="text-ink">장소 이름</b>까지 같이 보여 줍니다.
+        </p>
+        <div className="mt-3">
+          {open && ev.to ? (
+            <KeyLink to={`${ev.to}&run=easy`} size="big">연습 시작</KeyLink>
+          ) : (
+            <Key size="big" disabled>연습 시작</Key>
+          )}
+        </div>
+
+        <hr className="my-5 border-dashed border-manila-dark" />
+
+        <h2 className="text-xl leading-tight text-ink">모의 대회</h2>
+        <p className="mt-1 text-sm text-ink-2">
+          대회 규격 시간으로 잽니다. 암기 시간이 끝나면 자동으로 회상으로 넘어가고, 채점에서 칸마다
+          틀린 원인을 달아 둘 수 있습니다.
+        </p>
+        <div className="mt-3">
+          {open && ev.to ? (
+            <KeyLink to={`${ev.to}&run=real`} tone="red" size="big">모의 대회 시작</KeyLink>
+          ) : (
+            <Key tone="red" size="big" disabled>모의 대회 시작</Key>
+          )}
+        </div>
+      </Folder>
+
+      <section className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <Dymo small>내 기록</Dymo>
+          {sessions.length > 0 && (
+            <span className="font-typek text-xs text-ink-2">
+              최고 <b className="tnum text-ink">{fmtPct(best)}</b>
+            </span>
+          )}
+        </div>
         {sessions.length === 0 ? (
-          <Empty>{open ? '아직 이 종목 기록이 없습니다.' : '잠긴 종목이라 기록이 없습니다.'}</Empty>
+          <Panel>
+            <Empty>{open ? '아직 이 종목 기록이 없습니다.' : '잠긴 종목이라 기록이 없습니다.'}</Empty>
+          </Panel>
         ) : (
           <>
-            <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3">
-              <Stat label="시도" value={sessions.length} />
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="시도" value={`${sessions.length}회`} />
               <Stat label="최고 정확도" value={fmtPct(best)} />
-              <Stat
-                label="마지막"
-                value={localDayKey(sessions[0].startedAt)}
-                sub={sessions[0].runMode === 'easy' ? '연습' : '모의 대회'}
-              />
+              <div className="col-span-2">
+                <Stat
+                  label="마지막"
+                  value={localDayKey(sessions[0].startedAt)}
+                  sub={sessions[0].runMode === 'easy' ? '연습' : '모의 대회'}
+                />
+              </div>
             </div>
-            <ul className="max-h-64 overflow-auto text-sm">
-              {sessions.slice(0, 20).map((s) => {
-                const total = s.correct + s.wrong + s.blank;
-                return (
-                  <li key={s.id} className="flex items-center gap-2 border-t border-line/60 py-1.5 first:border-0">
-                    <span className="text-xs text-muted">{localDayKey(s.startedAt)}</span>
-                    <span className="rounded border border-line px-1.5 text-[11px] text-muted">
-                      {s.runMode === 'easy' ? '연습' : '모의 대회'}
-                    </span>
-                    <span className="tnum ml-auto">
-                      {s.correct}/{total} · {total ? fmtPct(s.correct / total) : '—'}
-                    </span>
-                    <span className="tnum w-14 text-right text-xs text-muted">
-                      {mmss(s.memorizeUsedMs + (s.recallUsedMs ?? 0))}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <Panel>
+              <ul className="max-h-64 overflow-auto">
+                {sessions.slice(0, 20).map((s) => {
+                  const total = s.correct + s.wrong + s.blank;
+                  return (
+                    <li
+                      key={s.id}
+                      className="flex items-center gap-2 border-t border-card-edge py-1.5 font-typek text-[12.5px] first:border-0"
+                    >
+                      <span className="tnum text-xs text-ink-2">{localDayKey(s.startedAt)}</span>
+                      <span className="rounded-[3px] border border-card-edge px-1.5 text-[11px] text-ink-2">
+                        {s.runMode === 'easy' ? '연습' : '모의 대회'}
+                      </span>
+                      <span className="tnum ml-auto font-bold text-ink">
+                        {s.correct}/{total} · {total ? fmtPct(s.correct / total) : '—'}
+                      </span>
+                      <span className="tnum w-12 text-right text-xs text-ink-2">
+                        {mmss(s.memorizeUsedMs + (s.recallUsedMs ?? 0))}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
           </>
         )}
-      </Panel>
+      </section>
     </div>
   );
 }

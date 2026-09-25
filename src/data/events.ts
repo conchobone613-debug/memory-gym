@@ -150,7 +150,7 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     name: '추상 이미지',
     memorize: '15분',
     recall: '30분',
-    what: '말로 옮기기 어려운 무늬의 순서. WMSC 는 흑백 무늬, IAM 은 실물 사진을 쓴다.',
+    what: '말로 옮기기 어려운 무늬의 순서. 한 연맹은 흑백 무늬, 다른 연맹은 실물 사진을 쓴다.',
     status: 'locked',
     needs: '무늬 이미지 자료. 말로 못 옮기는 그림이라 이 앱의 이미지 체계와 방식이 다르다.',
   },
@@ -245,6 +245,9 @@ export const CALC_EVENTS: CalcEvent[] = [
 ];
 
 export const DISCIPLINES: Discipline[] = [...MEMORY_EVENTS, ...CALC_EVENTS];
+
+/** 잠긴 종목 카드에 적는 여는 조건의 첫 문장(카드 설명은 두 줄까지). 전문은 종목 화면에 있다. */
+export const needsHead = (s = '') => s.split('. ')[0].replace(/\.$/, '');
 
 export function findDiscipline(id: string): Discipline | undefined {
   return DISCIPLINES.find((d) => d.id === id);

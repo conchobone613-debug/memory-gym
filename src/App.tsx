@@ -83,7 +83,7 @@ function Shell() {
       <SvgDefs />
       <ScrollTop />
 
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-card-edge bg-paper/95 px-3.5 py-2.5 backdrop-blur">
+      <header className="lp-chrome sticky top-0 z-20 flex items-center justify-between border-b border-card-edge bg-paper/95 px-3.5 py-2.5 backdrop-blur">
         <Link to="/" className="flex items-baseline gap-2 no-underline">
           <span className="font-sign text-[22px] leading-none text-ink">{APP_NAME}</span>
           <span className="font-typek text-[10px] tracking-[.12em] text-ink-2">{APP_NAME_KO}</span>
@@ -133,7 +133,7 @@ function Shell() {
       </main>
 
       {/* 아래 탭 — 기둥 폭에 맞춘다 */}
-      <nav className="fixed bottom-0 left-1/2 z-20 grid w-full max-w-[var(--col-w)] -translate-x-1/2 grid-cols-5 border-t border-card-edge bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <nav className="lp-chrome fixed bottom-0 left-1/2 z-20 grid w-full max-w-[var(--col-w)] -translate-x-1/2 grid-cols-5 border-t border-card-edge bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         {TABS.map((t) => {
           const on = tabActive(pathname, t);
           return (

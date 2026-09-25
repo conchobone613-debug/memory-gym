@@ -40,24 +40,6 @@
   --font-hand: var(--font-hand);
 }
 
-/*
- * 옛 테마 이름(먹빛 시절). 화면을 새 부품으로 옮기는 동안 아무것도 어둡게 깨지지 않도록
- * 종이 테마 값으로 이어 둔다. 새 코드에서는 쓰지 않는다 — 옮기기가 끝나면 지운다.
- * 주의: 옛 'ink' 는 바탕색이었다. 새 'ink' 는 글자색이다. 옛 bg-ink 는 bg-paper 로 옮긴다.
- */
-@theme inline {
-  --color-panel: var(--card);
-  --color-panel2: var(--manila);
-  --color-line: var(--card-edge);
-  --color-fg: var(--ink);
-  --color-muted: var(--ink-2);
-  --color-accent: var(--chalk);
-  --color-good: var(--chalk);
-  --color-bad: var(--blue);
-  --color-warn: var(--red);
-  --font-display: var(--font-sign);
-  --font-mono: var(--font-type);
-}
 
 html, body, #root { min-height: 100%; }
 body {
@@ -69,70 +51,54 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
-* { box-sizing: border-box; }
 ::selection { background: var(--brass-light); color: var(--ink); }
 
-h1, h2, h3 { font-family: var(--font-sign); font-weight: 400; letter-spacing: .01em; }
+/*
+ * 태그 기본 모양은 base 층에 둔다 — 층 밖에 두면 Tailwind 조정 클래스(px-*, text-* …)를 늘 이겨서
+ * 화면마다 입력칸을 다듬을 수 없었다. lp- 부품 클래스는 층 밖이라 여전히 이것보다 앞선다.
+ */
+@layer base {
+  h1, h2, h3 { font-family: var(--font-sign); font-weight: 400; letter-spacing: .01em; }
 
-button, a, input, select, textarea { touch-action: manipulation; }
-:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+  button, a, input, select, textarea { touch-action: manipulation; }
+  :focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
-input, textarea, select, button { font: inherit; color: inherit; }
-input, textarea, select {
-  background: var(--input);
-  border: 1px solid var(--card-edge);
-  border-bottom: 2px solid var(--ink-2);
-  border-radius: 2px;
-  padding: .4rem .6rem;
-  outline: none;
-  font-family: var(--font-typek);
-  font-size: 14px;
+  input, textarea, select, button { font: inherit; color: inherit; }
+  input, textarea, select {
+    background: var(--input);
+    border: 1px solid var(--card-edge);
+    border-bottom: 2px solid var(--ink-2);
+    border-radius: 2px;
+    padding: .4rem .6rem;
+    outline: none;
+    font-family: var(--font-typek);
+    /* 휴대폰은 16px 보다 작은 입력칸을 누르면 화면을 확대한다 */
+    font-size: 16px;
+  }
+  input:focus, textarea:focus, select:focus { border-bottom-color: var(--red); }
+  input[type="checkbox"] { accent-color: var(--chalk); }
+
+  kbd {
+    background: var(--key-cream);
+    border: 1px solid var(--card-edge);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: .05rem .35rem;
+    font-size: .8em;
+    font-family: var(--font-type);
+  }
 }
-input:focus, textarea:focus, select:focus { border-bottom-color: var(--red); }
-input[type="checkbox"] { accent-color: var(--chalk); }
 
-kbd {
-  background: var(--key-cream);
-  border: 1px solid var(--card-edge);
-  border-bottom-width: 2px;
-  border-radius: 3px;
-  padding: .05rem .35rem;
-  font-size: .8em;
-  font-family: var(--font-type);
-}
 /* 측정·기록 숫자는 타자기 글꼴에 자릿수를 고정 */
 .tnum { font-family: var(--font-type); font-variant-numeric: tabular-nums; }
 .balance { text-wrap: balance; }
 
-/* ── 옛 판정 연출 ──────────────────────────────
-   새 화면은 이것을 쓰지 않는다 — 판정 연출은 연출 층(design/fx.ts, components/lp/JudgeLayer)에서만.
-   문제 카드에 걸면 다음 문제의 반응시간 측정과 겹친다(디자인 시스템 「측정 구간」). 옮기기가 끝나면 지운다. */
-@keyframes mg-bad {
-  0%, 100% { transform: translateX(0); }
-  20%      { transform: translateX(-7px); }
-  45%      { transform: translateX(6px); }
-  70%      { transform: translateX(-3px); }
-}
-@keyframes mg-pop {
-  0%   { transform: scale(0.7); opacity: 0; }
-  60%  { transform: scale(1.12); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-@keyframes mg-rise {
-  from { transform: translateY(6px); opacity: 0; }
-  to   { transform: translateY(0);   opacity: 1; }
-}
-.mg-bad   { animation: mg-bad 260ms ease-out; }
-.mg-pop   { animation: mg-pop 220ms cubic-bezier(.34,1.56,.64,1); }
-.mg-rise  { animation: mg-rise 260ms ease-out both; }
-
 /*
  * 움직임 줄이기. 앱 설정이 기기 설정보다 앞선다 — <html data-motion="reduce|full">.
  * 설정을 비워 두면(data-motion 없음) 기기의 prefers-reduced-motion 을 따른다.
+ * 부품별 줄이기 규칙은 design/lampadas.css 에 있다.
  */
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.mg-bad, .mg-pop, .mg-rise) { animation: none !important; }
   :root:not([data-motion="full"]) * { transition-duration: 1ms !important; }
 }
-:root[data-motion="reduce"] :is(.mg-bad, .mg-pop, .mg-rise) { animation: none !important; }
 :root[data-motion="reduce"] * { transition-duration: 1ms !important; }

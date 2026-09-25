@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode, type ButtonHTMLAttributes, type CSSProperties } from 'react';
+import { forwardRef, useEffect, useRef, type ReactNode, type ButtonHTMLAttributes, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../../design/sfx';
 import { reduced } from '../../design/settings';
@@ -31,9 +31,12 @@ type KeyProps = ButtonHTMLAttributes<HTMLButtonElement> & {
  * 누르면 4px 쑥 들어가고 타자기 소리가 난다. 빨간 자판은 화면에 하나만(주 동작).
  * 측정 화면의 답 입력에는 쓰지 않는다 — 입력은 키보드·키패드가 받는다.
  */
-export function Key({ tone = 'ink', size = 'md', sub, className, children, onPointerDown, ...rest }: KeyProps) {
+export const Key = forwardRef<HTMLButtonElement, KeyProps>(function Key(
+  { tone = 'ink', size = 'md', sub, className, children, onPointerDown, ...rest }, ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
       {...rest}
       className={keyClass(tone, size, className)}
@@ -43,7 +46,7 @@ export function Key({ tone = 'ink', size = 'md', sub, className, children, onPoi
       {sub && <small>{sub}</small>}
     </button>
   );
-}
+});
 
 /** 링크를 자판처럼. <Link><button/></Link> 은 잘못된 HTML 이라 클릭이 먹지 않는다. */
 export function KeyLink({ to, tone = 'ink', size = 'md', sub, className, children }: {

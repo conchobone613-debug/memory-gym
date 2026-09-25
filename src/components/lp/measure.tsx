@@ -158,21 +158,27 @@ export type Judge = ReturnType<typeof useJudge>;
 export function Hud({ left, streak, judge, right }: { left: ReactNode; streak?: number; judge?: Judge; right?: ReactNode }) {
   const st = judge?.state;
   return (
-    <div className="lp-hud relative">
-      <span>{left}</span>
-      <span className="flex items-center gap-3">
-        {st && st.kind !== 'skip' && <PencilMark key={`m${st.id}`} kind={st.kind} />}
-        {right}
-        {streak != null && <ComboCounter n={streak} ref={judge?.counterRef} />}
-      </span>
-      {st && (
-        <span
-          key={`j${st.id}`}
-          className={`lp-judge lp-judge-show absolute right-0 top-[48px]${st.kind === 'bad' ? ' is-bad' : st.kind === 'skip' ? ' is-skip' : ''}`}
-          role="status"
-        >
-          {st.text}
+    <div>
+      <div className="lp-hud">
+        <span>{left}</span>
+        <span className="flex items-center gap-3">
+          {st && st.kind !== 'skip' && <PencilMark key={`m${st.id}`} kind={st.kind} />}
+          {right}
+          {streak != null && <ComboCounter n={streak} ref={judge?.counterRef} />}
         </span>
+      </div>
+      {/* 판정 글자 줄 — 머리띠가 제 자리를 갖는다. 글자가 문제 카드 윗선을 덮지 않게 높이를 늘 비워 둔다. */}
+      {judge && (
+        <div className="relative h-[30px]" aria-live="polite">
+          {st && (
+            <span
+              key={`j${st.id}`}
+              className={`lp-judge lp-judge-show absolute right-0 top-0${st.kind === 'bad' ? ' is-bad' : st.kind === 'skip' ? ' is-skip' : ''}`}
+            >
+              {st.text}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

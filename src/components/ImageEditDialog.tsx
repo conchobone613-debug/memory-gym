@@ -4,7 +4,7 @@ import { db, getSettings, type MemoImage } from '../db/db';
 import { cardLabel } from '../lib/cards';
 import { suggestFor } from '../lib/suggest';
 import ImageFields from './ImageFields';
-import { Btn } from './ui';
+import { Folder, Key } from './lp';
 
 /**
  * 이미지 한 칸을 그 자리에서 고치는 팝업.
@@ -71,23 +71,20 @@ export default function ImageEditDialog({ imageId, onClose }: { imageId: string;
   const close = async () => { await save(); onClose(); };
   const label = set.domain === 'cardFace' ? cardLabel(draft.key) : draft.key;
 
+  /*
+   * 대화상자 = 책상 위에 놓인 서류철 한 권. 옛 튀어나오는 연출(mg-pop) 대신 화면 넘김과 같은 떠오름(lp-page-in).
+   * 바깥(책상)을 누르면 저장하고 닫는다. 폭은 앱 기둥에 맞춘다.
+   */
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-ink/70 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-desk/75 p-3.5 pt-8 sm:items-center"
       onClick={close}
       role="dialog"
       aria-modal="true"
       aria-label={`${label} 편집`}
     >
-      <div
-        className="mg-pop w-full max-w-2xl rounded-xl border border-accent/40 bg-panel shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-line/70 px-4 py-3">
-          <h2 className="font-display text-base leading-none">{label} 편집</h2>
-          <button className="text-sm text-muted hover:text-fg" onClick={close} aria-label="닫기">✕</button>
-        </header>
-        <div className="p-4">
+      <div className="lp-page-in w-full max-w-[calc(var(--col-w)_-_28px)]" onClick={(e) => e.stopPropagation()}>
+        <Folder tab={`${label} 편집`}>
           <ImageFields
             draft={draft}
             onDraft={setDraft}
@@ -101,10 +98,11 @@ export default function ImageEditDialog({ imageId, onClose }: { imageId: string;
             nameRef={nameRef}
             onNameKey={(e) => { if (e.key === 'Enter') { e.preventDefault(); close(); } }}
           />
-          <div className="mt-4 flex justify-end">
-            <Btn variant="primary" onClick={close}>저장하고 닫기</Btn>
+          <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+            <span className="mr-auto font-typek text-[11px] text-ink-2">Enter 저장 · Esc 닫기</span>
+            <Key onClick={close}>저장하고 닫기</Key>
           </div>
-        </div>
+        </Folder>
       </div>
     </div>
   );

@@ -1,56 +1,45 @@
-import { Link } from 'react-router-dom';
-import { MEMORY_EVENTS } from '../data/events';
+import { MEMORY_EVENTS, needsHead } from '../data/events';
 import { Panel } from '../components/ui';
+import { Dymo, IndexCard } from '../components/lp';
+
+
+/** 카드 오른쪽 수치 칸에는 앞쪽 '숫자+단위'만('5분 안에 최대한 빨리' → '5분'). 숫자가 없으면 비운다. */
+const memorizeShort = (s: string) => /^\d+(분|초)/.exec(s)?.[0];
 
 export default function Events() {
   const ready = MEMORY_EVENTS.filter((e) => e.status === 'ready');
 
   return (
-    <div className="flex flex-col gap-4">
-      <Panel
-        title="대회 표준 10종목"
-        right={<span className="tnum text-xs text-muted">열림 {ready.length} / {MEMORY_EVENTS.length}</span>}
-      >
-        <p className="mb-3 text-xs text-muted">
-          시간은 WMSC·IAM 기준이며 연맹과 해에 따라 다릅니다.
+    <div className="flex flex-col gap-6">
+      <section className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <Dymo tone="red">기억력 종목</Dymo>
+          <span className="font-typek text-xs text-ink-2">
+            열림 <b className="tnum text-ink">{ready.length}/{MEMORY_EVENTS.length}</b>
+          </span>
+        </div>
+        <p className="font-typek text-[11px] text-ink-2">
+          오른쪽은 암기 시간입니다. 국제 기억력 대회 기준이며 연맹과 해에 따라 다릅니다.
         </p>
-
-        <ul className="grid gap-2 md:grid-cols-2">
-          {MEMORY_EVENTS.map((e) => {
-            const open = e.status === 'ready';
-            return (
-              <li key={e.id}>
-                <Link
-                  to={`/events/${e.id}`}
-                  className={`flex h-full flex-col rounded-lg border px-3 py-2.5 transition hover:border-accent/60 ${
-                    open ? 'border-line bg-panel2' : 'border-line/50 bg-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`font-medium ${open ? '' : 'text-muted'}`}>{e.name}</span>
-                    <span
-                      className={`ml-auto rounded-md border px-2 py-0.5 text-[11px] ${
-                        open ? 'border-good/50 bg-good/10 text-good' : 'border-line text-muted'
-                      }`}
-                    >
-                      {open ? '열림' : '잠김'}
-                    </span>
-                  </div>
-                  <div className="tnum mt-0.5 text-xs text-muted">
-                    암기 {e.memorize} · 회상 {e.recall}
-                  </div>
-                  <p className={`mt-1 text-sm ${open ? 'text-muted' : 'text-muted/70'}`}>{e.what}</p>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </Panel>
+        {MEMORY_EVENTS.map((e) => {
+          const locked = e.status !== 'ready';
+          return (
+            <IndexCard
+              key={e.id}
+              to={`/events/${e.id}`}
+              title={e.name}
+              meta={memorizeShort(e.memorize)}
+              body={locked ? `열려면: ${needsHead(e.needs)}` : e.what}
+              locked={locked}
+            />
+          );
+        })}
+      </section>
 
       <Panel title="대회와 다른 점 하나">
-        <p className="text-sm text-muted">
-          대회는 <b className="text-fg">정해진 시간 안에 최대한 많이</b> 외우는 방식입니다. 반면 지금 모의 대회는
-          <b className="text-fg"> 길이를 정해 놓고 시간을 잽니다</b>. 방향이 반대라, 열린 종목도 이 점에서는
+        <p className="text-sm text-ink-2">
+          대회는 <b className="text-ink">정해진 시간 안에 최대한 많이</b> 외우는 방식입니다. 반면 지금 모의 대회는
+          <b className="text-ink"> 길이를 정해 놓고 시간을 잽니다</b>. 방향이 반대라, 열린 종목도 이 점에서는
           대회와 같지 않습니다. 기록을 대회 성적과 바로 견주지는 마십시오.
         </p>
       </Panel>

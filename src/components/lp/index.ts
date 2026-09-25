@@ -12,5 +12,5 @@ export type { KeyTone, KeySize } from './basic';
 export { ComboCounter, useJudge, Hud, QuestionCard, Held } from './measure';
 export type { Judge, JudgeKind, JudgeState } from './measure';
 export { ResultSheet } from './result';
-export { Countdown, useFullscreen } from './contest';
+export { Countdown, useFullscreen, useFocusMode } from './contest';
 export { default as SvgDefs } from './defs';

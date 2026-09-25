@@ -5,6 +5,7 @@ import { faceHint } from '../lib/cards';
 import type { Suggestion } from '../lib/suggest';
 import { askForNames } from '../lib/ai';
 import { Field } from './ui';
+import { Key } from './lp';
 
 /**
  * 이미지 한 칸을 고치는 입력 묶음.
@@ -94,9 +95,13 @@ export default function ImageFields({
     }
   };
 
+  /*
+   * 입력칸은 앱 공통 모양(종이 위 타자기 밑줄 입력, index.css)을 그대로 쓴다.
+   * 한 줄에 하나 — 앱은 휴대폰 폭 기둥이라 두 칸으로 나누면 칸마다 글자가 잘린다.
+   */
   return (
     <>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3">
         <Field
           label="이미지 이름"
           hint={
@@ -141,40 +146,37 @@ export default function ImageFields({
       </div>
 
       {suggestions.length > 0 && (
-        <div className="mt-3">
-          <div className="mb-1.5 text-xs text-muted">이름 후보</div>
-          <div className="flex flex-wrap items-center gap-1.5">
+        <div className="mt-4">
+          <div className="mb-2 font-typek text-[11px] font-bold tracking-wide text-ink-2">이름 후보</div>
+          {/* 후보는 크림색 자판, '다른 후보' 는 남색 자판. 이미 쓰는 이름은 줄을 긋고 흐리게(누를 수는 있다). */}
+          <div className="flex flex-wrap items-center gap-2.5">
             {shown.map((sg) => (
-              <button
+              <Key
                 key={sg.name}
-                type="button"
+                tone="cream"
+                size="sm"
                 onClick={() => onPick(sg.name)}
                 title={sg.taken ? '다른 칸에서 이미 쓰고 있습니다' : undefined}
-                className={`rounded-md border px-2.5 py-1 text-sm transition-colors ${
-                  sg.taken
-                    ? 'border-line/60 text-muted/50 line-through'
-                    : 'border-line bg-panel2 hover:border-accent hover:text-accent'
-                }`}
+                className={sg.taken ? 'opacity-50' : undefined}
               >
-                {sg.name}
-              </button>
+                {sg.taken ? <s>{sg.name}</s> : sg.name}
+              </Key>
             ))}
             {/*
               * 넘길 게 없어도 버튼은 남기고 흐리게만 둔다.
               * 칸마다 버튼이 있다 없다 하면 고장으로 보인다 — 실제로 회장이 그렇게 보셨다.
               * 흐린 버튼은 '더 없다' 를 말해 주지만, 없는 버튼은 아무 말도 못 한다.
               */}
-            <button
-              type="button"
+            <Key
+              size="sm"
               disabled={asking || (!apiKey && pages <= 1)}
               onClick={more}
               title={apiKey || pages > 1 ? undefined : '이 칸은 더 드릴 후보가 없습니다 (설정에 AI 키를 넣으시면 계속 지어 드립니다)'}
-              className="rounded-md border border-line/70 px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line/40 disabled:text-muted/40 disabled:hover:border-line/40 disabled:hover:text-muted/40"
             >
-              {asking ? '짓는 중…' : apiKey ? '다른 후보 ✨' : '다른 후보 ↻'}
-            </button>
+              {asking ? '짓는 중…' : apiKey ? '다른 후보 짓기' : '다른 후보'}
+            </Key>
           </div>
-          {err && <div className="mt-1.5 text-[11px] text-bad">{err}</div>}
+          {err && <div className="mt-2 font-typek text-[11px] text-red">{err}</div>}
         </div>
       )}
     </>

@@ -3,13 +3,17 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getSettings, saveSettings, type MappingAttempt, type MappingStat } from '../db/db';
 import { buildMappingQueue, mappingStatsFor, recordMapping, undoMapping } from '../db/mapping';
 import { goalFor } from '../db/goals';
+import { loadSummaries } from '../db/sessions';
+import { drillOutcome } from '../db/drillOutcome';
 import { makeQuestion, statKey, type Direction, type Question, type Stage } from '../lib/mapping';
+import type { RunOutcome } from '../lib/outcome';
 import { jamoFromKey } from '../lib/keyjamo';
 import { uid } from '../lib/random';
 import { median } from '../lib/srs';
 import { streaks } from '../lib/streak';
 import { isTyping } from '../App';
-import { Btn, Field, Panel, Stat, Streak, fmtMs, fmtPct } from '../components/ui';
+import { Btn, Empty, Field, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
+import { Held, Hud, Key, QuestionCard, ResultSheet, useJudge } from '../components/lp';
 import Keypad from '../components/Keypad';
 import ChosungKey from '../components/ChosungKey';
 import GoalPanel from '../components/GoalPanel';
@@ -36,6 +40,12 @@ const STAGE_TITLE: Record<Stage, string> = {
   2: '2단계 · 두 자리 ↔ 자음 두 개',
 };
 
+const DIRS = [
+  { v: 'toConsonant' as const, t: '숫자 → 자음' },
+  { v: 'toDigit' as const, t: '자음 → 숫자' },
+  { v: 'mix' as const, t: '섞기' },
+];
+
 export default function MappingDrill({ stage, header }: { stage: Stage; header?: ReactNode }) {
   const settings = useLiveQuery(() => getSettings(), []);
   const stats = useLiveQuery(() => mappingStatsFor(stage), [stage], new Map());
@@ -49,16 +59,26 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
   const [results, setResults] = useState<Result[]>([]);
   const [typed, setTyped] = useState('');
   const [last, setLast] = useState<Result | null>(null);
-  const [flash, setFlash] = useState<'good' | 'bad' | null>(null);
   const [streak, setStreak] = useState(0);
-  const [bestStreak, setBestStreak] = useState(0);
   const [sessionId, setSessionId] = useState('');
   const [undoing, setUndoing] = useState(false);
+  /** 성적표 — 한 판을 끝내고 기록을 저장한 뒤에 만든다 */
+  const [outcome, setOutcome] = useState<RunOutcome | null>(null);
 
   const t0 = useRef(0);
   const sessionStart = useRef(0);
   const [elapsed, setElapsed] = useState(0);
-  const [totalMs, setTotalMs] = useState(0);
+  /** 끝내기가 겹치지 않게 — 저장·집계를 기다리는 사이 Enter 가 한 번 더 들어와도 성적표를 두 번 만들지 않는다 */
+  const finishing = useRef(false);
+  const answering = useRef(false);
+
+  /*
+   * 판정 연출은 연출 층과 머리띠(계수기·판정 글자·연필 표시)에서만 돈다.
+   * 문제 카드는 조각이 넘지 않을 선을 재는 데만 넘기고, 카드에는 아무것도 걸지 않는다(측정 구간).
+   */
+  const judge = useJudge();
+  const { show: showJudge, shake, reset: resetJudge } = judge;
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setPhase('setup');
@@ -91,23 +111,49 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     sessionStart.current = Date.now();
     setElapsed(0);
     setStreak(0);
-    setBestStreak(0);
-    setFlash(null);
+    setOutcome(null);
+    finishing.current = false;
+    resetJudge();
     setPhase('asking');
   };
 
   const finish = useCallback(async (final: Result[]) => {
+    if (finishing.current) return;
+    finishing.current = true;
     const now = Date.now();
     if (sessionId) await db.mappingSessions.update(sessionId, { endedAt: now });
-    setTotalMs(now - sessionStart.current);
+    if (final.length > 0) {
+      /* 성적표: 기록을 저장한 뒤의 단계 목표 + 같은 단계의 지난 세션(이번 판 제외, 최근 것이 앞) */
+      const [g, all] = await Promise.all([goalFor(stage), loadSummaries()]);
+      /* 평균 반응시간은 통합 기록(sessions.ts)과 같은 방식 — 모름(0)을 뺀 평균. 지난 판과 같은 잣대로 비교한다 */
+      const rts = final.map((r) => r.rtMs).filter((x) => x > 0);
+      setOutcome(drillOutcome({
+        run: {
+          items: final.length,
+          correct: final.filter((r) => r.isCorrect).length,
+          meanRtMs: rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 0,
+          maxStreak: streaks(final.map((r) => r.isCorrect)).best,
+          totalMs: now - sessionStart.current,
+        },
+        goal: g,
+        past: all.filter((s) => s.disciplineId === `basics-${stage}` && s.id !== sessionId),
+        goalAccuracy: g.rule.accuracy,
+      }));
+    }
     setResults(final);
     setPhase('done');
-  }, [sessionId]);
+  }, [sessionId, stage]);
 
   const answer = useCallback(
     async (given: string, giveUp = false) => {
       const cur = queue[idx];
-      if (!cur) return;
+      /*
+       * 끝내는 중(성적표 저장·집계를 기다리는 사이)에 들어온 입력은 버린다 — 같은 문제가 한 번 더 기록되지 않게.
+       * 저장을 기다리는 사이 들어온 두 번째 입력(키패드 두 번 누름·키 자동 반복)도 같은 문제를 다시 채점해
+       * 두 번 기록됐다(2026-09-25 실측). 이 판정이 화면에 반영될 때까지 다음 입력을 받지 않는다.
+       */
+      if (!cur || finishing.current || answering.current) return;
+      answering.current = true;
       /*
        * '모름' 은 오답으로 센다. 반응시간은 0 으로 둬 표본에서 빠진다 — 포기까지 걸린 시간은
        * 회상 속도가 아니다. giveUp 을 따로 두는 이유: 빈 문자열은 `'ㄱㅋㄲ'.includes('')` 가
@@ -117,22 +163,25 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
       const isCorrect = !giveUp && (cur.groups
         ? cur.groups.every((g, i) => g.includes(given[i] ?? ''))
         : given === cur.answer);
+      const nextStreak = isCorrect ? streak + 1 : 0;
+      /* 판정 연출·소리는 입력 즉시 — 기록 저장을 기다리지 않는다 */
+      showJudge(isCorrect ? 'good' : giveUp ? 'skip' : 'bad', nextStreak, cardRef.current);
       const attempt: MappingAttempt = {
         id: uid(), sessionId, order: idx, stage, unit: cur.unit, direction: cur.direction,
         prompt: cur.prompt, answer: cur.answer, given, isCorrect, rtMs, shownAt: Date.now(),
       };
-      const prevStat = await recordMapping(attempt);
+      let prevStat: Awaited<ReturnType<typeof recordMapping>>;
+      try {
+        prevStat = await recordMapping(attempt);
+      } catch (e) {
+        answering.current = false;
+        throw e;
+      }
       const r: Result = { q: cur, given, isCorrect, rtMs, attemptId: attempt.id, prevStat };
       const next = [...results, r];
       setResults(next);
       setTyped('');
-      setFlash(isCorrect ? 'good' : 'bad');
-      setTimeout(() => setFlash(null), 340);
-      if (isCorrect) {
-        setStreak((v) => { const n = v + 1; setBestStreak((b) => Math.max(b, n)); return n; });
-      } else {
-        setStreak(0);
-      }
+      setStreak(nextStreak);
       if (isCorrect) {
         /* 맞으면 멈추지 않는다. 틀렸을 때만 정답을 보여주고 붙잡는다. */
         if (idx + 1 >= queue.length) await finish(next);
@@ -140,10 +189,15 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
       } else {
         setLast(r);
         setPhase('feedback');
+        /* 붙잡힌 뒤(측정이 끝난 뒤)에만 카드를 한 번 흔든다 */
+        if (!giveUp) shake(cardRef.current);
       }
     },
-    [finish, idx, queue, results, sessionId, stage],
+    [finish, idx, queue, results, sessionId, shake, showJudge, stage, streak],
   );
+
+  /* 판정이 화면에 그려진 뒤(다음 문항·붙잡힘·결과로 바뀐 뒤)에야 다음 입력을 받는다 */
+  useEffect(() => { answering.current = false; }, [idx, phase, results]);
 
   /** 키로 누르든 화면을 누르든 같은 길로 들어온다. 휴대폰에는 물리 키가 없다. */
   const push = useCallback((ch: string) => {
@@ -166,7 +220,8 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
    * 원시 기록과 통계를 같이 되돌리고 그 문제를 다시 낸다.
    */
   const undo = useCallback(async () => {
-    if (undoing) return;
+    /* 끝내는 중에는 받지 않는다 — 지운 시도가 성적표에 남는다. 결과 화면에서 되돌리는 것은 된다 */
+    if (undoing || (finishing.current && phase !== 'done')) return;
     const last = results[results.length - 1];
     if (!last) return;
     setUndoing(true);
@@ -174,14 +229,12 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
       await undoMapping(last.attemptId, statKey(stage, last.q.unit), last.prevStat);
       if (phase === 'done' && sessionId) await db.mappingSessions.update(sessionId, { endedAt: undefined });
       const rest = results.slice(0, -1);
-      const s = streaks(rest.map((r) => r.isCorrect));
       setResults(rest);
-      setStreak(s.cur);
-      setBestStreak(s.best);
+      setStreak(streaks(rest.map((r) => r.isCorrect)).cur);
       setIdx(rest.length);
       setTyped('');
       setLast(null);
-      setFlash(null);
+      finishing.current = false;
       setPhase('asking');
     } finally {
       setUndoing(false);
@@ -209,7 +262,10 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     return () => clearInterval(t);
   }, [phase]);
 
-  /* 단축키 — 자음은 자판의 자음 키, 숫자는 숫자 키를 직접 누른다 */
+  /*
+   * 단축키 — 자음은 자판의 자음 키, 숫자는 숫자 키를 직접 누른다.
+   * 결과 화면의 키(공개 중 아무 키 = 건너뛰기, 끝난 뒤 Enter = 한 판 더)는 ResultSheet 가 맡는다.
+   */
   useEffect(() => {
     if (phase !== 'asking' && phase !== 'feedback') return;
     const onKey = (e: KeyboardEvent) => {
@@ -248,7 +304,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           </div>
         )}
 
-        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-2">
           <Stat label="익힌 칸" value={`${seen}/${total}`} />
           <Stat label="정확도" value={goal?.attempts ? fmtPct(goal.accuracy) : '—'} />
           <Stat label="중앙 반응시간" value={fmtMs(goal?.medianRt ?? 0)} />
@@ -257,32 +313,35 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
 
         {goal && <div className="mb-4"><GoalPanel goal={goal} /></div>}
 
-        <div className="mb-4">
-          <div className="mb-1 text-xs text-muted">방향</div>
-          <div className="grid gap-1.5 sm:grid-cols-3">
-            {([
-              { v: 'toConsonant' as const, t: '숫자 → 자음' },
-              { v: 'toDigit' as const, t: '자음 → 숫자' },
-              { v: 'mix' as const, t: '섞기' },
-            ]).map((o) => (
-              <button
+        <div className="mb-5">
+          <div className="mb-2 font-typek text-[11px] font-bold tracking-wide text-ink-2">방향</div>
+          <div className="flex flex-wrap gap-x-3 gap-y-4" role="group" aria-label="방향">
+            {DIRS.map((o) => (
+              <Key
                 key={o.v}
+                tone={dir === o.v ? 'ink' : 'cream'}
+                size="sm"
+                aria-pressed={dir === o.v}
                 onClick={() => chooseDir(o.v)}
-                className={`rounded-lg border px-3 py-2 text-left transition ${
-                  dir === o.v ? 'border-accent bg-accent/15' : 'border-line bg-panel2 hover:border-accent/50'
-                }`}
               >
-                <div className="text-sm font-medium">{o.t}</div>
-              </button>
+                {o.t}
+              </Key>
             ))}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-5">
           <Field label="문항 수">
-            <input type="number" min={5} max={200} value={count} onChange={(e) => setCount(Number(e.target.value))} />
+            <input
+              className="tnum w-28"
+              type="number"
+              min={5}
+              max={200}
+              value={count}
+              onChange={(e) => setCount(Number(e.target.value))}
+            />
           </Field>
-          <Btn variant="primary" size="lg" onClick={start}>시작</Btn>
+          <Key tone="red" size="big" onClick={start}>시작</Key>
         </div>
 
       </Panel>
@@ -292,124 +351,128 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
 
   /* ───────── 결과 ───────── */
   if (phase === 'done') {
-    const correct = results.filter((r) => r.isCorrect);
-    const rts = correct.map((r) => r.rtMs);
-    const wrongs = results.filter((r) => !r.isCorrect);
-    return (
-      <div className="flex flex-col gap-4">
-      {header}
-      <Panel title={`${STAGE_TITLE[stage]} — 결과`}>
-        {results.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">기록된 문항이 없습니다.</p>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
-              <Stat label="문항" value={results.length} />
-              <Stat label="정확도" value={fmtPct(correct.length / results.length)} sub={`${correct.length}/${results.length}`} />
-              <Stat label="총 걸린 시간" value={mmss(totalMs)} sub={`문항당 ${fmtMs(Math.round(totalMs / results.length))}`} />
-              <Stat label="중앙 반응시간" value={fmtMs(median(rts))} />
-              <Stat label="틀린 칸" value={wrongs.length} />
-              <Stat label="최고 연속" value={bestStreak} />
+    if (results.length === 0 || !outcome) {
+      return (
+        <div className="flex flex-col gap-4">
+          {header}
+          <Panel title={STAGE_TITLE[stage]}>
+            <Empty>기록된 문항이 없습니다.</Empty>
+            <div className="flex flex-wrap gap-x-3 gap-y-4">
+              <Btn variant="primary" onClick={start}>한 번 더</Btn>
+              <Btn onClick={() => setPhase('setup')}>설정으로</Btn>
             </div>
-
-            {goal && <div className="mt-4"><GoalPanel goal={goal} celebrate /></div>}
-            {wrongs.length > 0 && (
-              <div className="mt-4">
-                <div className="mb-1 text-xs text-muted">틀린 문제</div>
-                <ul className="flex flex-wrap gap-1.5">
-                  {wrongs.map((r, i) => (
-                    <li key={i} className="rounded-md border border-bad/50 bg-bad/10 px-2 py-1 text-sm">
-                      <span className="tnum">{r.q.prompt}</span>
-                      <span className="text-muted"> → </span>
-                      <span className="text-good">{r.q.answer}</span>
-                      <span className="text-bad"> (답: {r.given || '모름'})</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        )}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Btn variant="primary" onClick={start}>한 번 더</Btn>
-          <Btn onClick={() => setPhase('setup')}>설정으로</Btn>
-          {results.length > 0 && (
-            <Btn disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Btn>
-          )}
+          </Panel>
         </div>
-      </Panel>
-      </div>
+      );
+    }
+    const correct = results.filter((r) => r.isCorrect);
+    const wrongs = results.filter((r) => !r.isCorrect);
+    /*
+     * 성적표(글자판·목표 막대·금별·도장·아까움·신기록 무대)는 ResultSheet 가 그린다.
+     * 신기록 무대가 화면 뒤를 덮으므로 함께 볼 상세는 children 으로 넘긴다 — 단계 탭도 그래서 성적표 밖이 아니라 맨 끝에 둔다.
+     * 목표 막대도 성적표에 있으므로 GoalPanel 은 도달했을 때의 한마디(다음 단계)만.
+     */
+    return (
+      <ResultSheet
+        outcome={outcome}
+        onAgain={start}
+        actions={
+          <div className="flex flex-wrap justify-center gap-x-3 gap-y-4 pt-1">
+            <Btn onClick={() => setPhase('setup')}>설정으로</Btn>
+            <Btn disabled={undoing} onClick={undo}>← 마지막 문제 다시 풀기</Btn>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-3 gap-2">
+          <Stat label="문항" value={results.length} sub={`맞힘 ${correct.length}`} />
+          <Stat label="중앙 반응시간" value={fmtMs(median(correct.map((r) => r.rtMs)))} />
+          <Stat label="틀린 칸" value={wrongs.length} />
+        </div>
+
+        {goal?.passed && <GoalPanel goal={goal} celebrate />}
+
+        {wrongs.length > 0 && (
+          <Panel title="틀린 문제">
+            <ul className="flex flex-col">
+              {wrongs.map((r, i) => (
+                <li key={i} className="flex items-baseline gap-2 border-b border-card-edge py-1.5 font-typek text-[13px] last:border-b-0">
+                  <span className="tnum min-w-10 text-[17px] font-bold text-ink">{r.q.prompt}</span>
+                  <span className="text-ink-2">→</span>
+                  <span className="text-ink">{r.q.answer}</span>
+                  <span className="ml-auto text-blue">{r.given ? `입력 ${r.given}` : '모름'}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
+
+        {header}
+      </ResultSheet>
     );
   }
 
   /* ───────── 실행 ───────── */
   if (!q) return null;
-  const showing = phase === 'feedback' && last ? last.q : q;
+  const held = phase === 'feedback' && last ? last : null;
+  const showing = held ? held.q : q;
+  /* 입력 칸 — 모양은 고정, 글자만 바뀐다. 붙잡힌 동안에는 방금 입력한 답을 그대로 둔다 */
+  const slots = q.groups ? q.groups.length : q.answer.length;
+  const filled = held ? held.given : typed;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between text-xs text-muted">
-        <span className="tnum">{idx + 1} / {queue.length}</span>
-        <span className="tnum ml-3">{mmss(elapsed)}</span>
-        <span className="ml-3"><Streak n={streak} /></span>
-        <div className="mx-4 h-1 flex-1 overflow-hidden rounded-full bg-line">
-          <div className="h-full bg-accent transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
-        </div>
+    <div className="flex flex-col gap-3">
+      {judge.layer}
+
+      <div className="flex items-center gap-3">
         {results.length > 0 && (
-          <button
-            className="mr-3 text-muted transition-colors hover:text-accent disabled:opacity-40"
-            disabled={undoing}
-            onClick={undo}
-          >
-            ← 앞 문제
-          </button>
+          <Btn size="sm" disabled={undoing} onClick={undo}>← 앞 문제</Btn>
         )}
-        <button className="text-muted hover:text-fg" onClick={() => finish(results)}>중단 (Esc)</button>
+        <span className="tnum ml-auto text-[13px] text-ink-2">{mmss(elapsed)}</span>
+        <Btn size="sm" onClick={() => finish(results)}>중단 (Esc)</Btn>
       </div>
 
-      <div
-        className={`flex min-h-[20rem] flex-col items-center justify-center gap-6 rounded-xl border px-4 py-6 transition-colors ${
-          flash === 'good' ? 'mg-good border-good/70 bg-good/10' :
-          flash === 'bad' ? 'mg-bad border-bad/70 bg-bad/10' :
-          'border-line bg-panel'
-        }`}
+      <Hud left={<>자음 {stage}단계 · <b>{idx + 1}</b>/{queue.length}</>} streak={streak} judge={judge} />
+
+      {/* 판정 글자 줄은 Hud 가 제 자리를 갖는다 — 카드 윗선을 덮지 않는다 */}
+      <QuestionCard
+        ref={cardRef}
+        prompt={showing.prompt}
+        help={`${showing.direction === 'toConsonant' ? '이 숫자의 자음은?' : '이 자음의 숫자는?'} · Tab 모름`}
       >
-        <span className="text-xs text-muted">
-          {showing.direction === 'toConsonant' ? '이 숫자의 자음은?' : '이 자음의 숫자는?'}
-        </span>
-        <div className="text-center text-[4.5rem] leading-none font-semibold tracking-wider">{showing.prompt}</div>
+        <div className="flex gap-3">
+          {Array.from({ length: slots }).map((_, i) => (
+            <span
+              key={i}
+              className="grid size-14 place-items-center border-b-2 border-ink-2 bg-input font-type text-[28px] font-bold leading-none text-ink"
+            >
+              {filled[i] ?? ''}
+            </span>
+          ))}
+        </div>
+      </QuestionCard>
 
-        {phase === 'asking' && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="tnum flex gap-2">
-              {Array.from({ length: q.groups ? q.groups.length : q.answer.length }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`flex size-14 items-center justify-center rounded-lg border text-2xl ${
-                    typed[i] ? 'border-accent bg-accent/15' : 'border-line bg-panel2'
-                  }`}
-                >
-                  {typed[i] ?? ''}
-                </span>
-              ))}
+      {phase === 'asking' && (
+        <>
+          <Keypad kind={q.groups ? 'jamo' : 'digit'} onPress={push} onBackspace={back} />
+          <div className="flex justify-center pt-1">
+            <Key tone="cream" sub="Tab" onClick={pass}>모름</Key>
+          </div>
+        </>
+      )}
+
+      {held && (
+        <>
+          <Held>
+            <div>정답 <b>{held.q.answer}</b></div>
+            <div className="mt-0.5">
+              {held.given
+                ? <>입력한 답 <span className="font-type font-bold text-blue">{held.given}</span></>
+                : '모름으로 넘겼습니다'}
             </div>
-            <Keypad
-              kind={q.groups ? 'jamo' : 'digit'}
-              onPress={push}
-              onBackspace={back}
-            />
-            <Btn size="sm" onClick={pass}>모름</Btn>
-          </div>
-        )}
-
-        {phase === 'feedback' && last && (
-          <div className="flex flex-col items-center gap-3">
-            <div className="text-sm text-bad">{last.given ? `답하신 것 — ${last.given}` : '모름'}</div>
-            <div className="text-4xl font-semibold text-good">{last.q.answer}</div>
-            <Btn variant="primary" onClick={continueAfterWrong}>계속 (Enter)</Btn>
-          </div>
-        )}
-      </div>
+          </Held>
+          <Key size="big" sub="Enter" onClick={continueAfterWrong}>계속</Key>
+        </>
+      )}
     </div>
   );
 }

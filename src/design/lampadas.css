@@ -224,3 +224,9 @@
 .lp-stat-sub { margin-top: 2px; font: 11px var(--font-typek); color: var(--ink-2); }
 .lp-key.is-lg { font-size: 17px; padding: 13px 24px 14px; }
 .lp-key.is-danger { --kt: var(--red); }
+
+/* 모의 대회의 방해 요소 없는 화면: 머리말·아래 탭을 내린다(useFocusMode) */
+:root[data-focus="on"] .lp-chrome { display: none; }
+
+/* 잠긴 목록 카드: 설명 끝이 '잠김' 도장과 겹치지 않게 */
+.lp-index.is-locked .lp-index-body { padding-right: 52px; }

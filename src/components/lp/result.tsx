@@ -48,7 +48,7 @@ export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', acti
   const skipRef = useRef<() => void>(() => {});
 
   const onAgainRef = useRef(onAgain);
-  onAgainRef.current = onAgain;
+  useLayoutEffect(() => { onAgainRef.current = onAgain; });
 
   /* 글자판은 fx.flip 이 칸을 직접 그린다 — React 는 그 안을 건드리지 않는다. */
   useLayoutEffect(() => {
@@ -171,8 +171,10 @@ export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', acti
       skipRef.current();
       return;
     }
-    const t = e.target as HTMLElement | null;
-    if (e.key === 'Enter' && onAgainRef.current && !(t && t.closest('input, textarea, select, button, a'))) {
+    const t = e.target instanceof Element ? e.target : null;
+    /* 결과 위에 대화상자(이름 고치기 등)가 떠 있으면 Enter 는 그쪽 몫이다 */
+    const modalOpen = !!document.querySelector('[aria-modal="true"]');
+    if (e.key === 'Enter' && onAgainRef.current && !modalOpen && !(t && t.closest('input, textarea, select, button, a'))) {
       e.preventDefault();
       sfx.key(true);
       onAgainRef.current();

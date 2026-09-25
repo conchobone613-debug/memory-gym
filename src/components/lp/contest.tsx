@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { sfx } from '../../design/sfx';
 
 /*
@@ -10,7 +10,7 @@ import { sfx } from '../../design/sfx';
 export function Countdown({ onDone, stepMs = 700 }: { onDone: () => void; stepMs?: number }) {
   const [i, setI] = useState(0);
   const doneRef = useRef(onDone);
-  doneRef.current = onDone;
+  useLayoutEffect(() => { doneRef.current = onDone; });
   const LABELS = ['3', '2', '1', '시작'];
 
   useEffect(() => {
@@ -28,6 +28,19 @@ export function Countdown({ onDone, stepMs = 700 }: { onDone: () => void; stepMs
       <b key={i} className={go ? 'is-go' : undefined}>{LABELS[i]}</b>
     </div>
   );
+}
+
+/**
+ * 모의 대회의 '방해 요소 없는 화면' — active 동안 앱 머리말과 아래 탭을 내린다(<html data-focus>).
+ * 전체 화면을 브라우저가 막아도(휴대폰 사파리 등) 이것은 된다.
+ */
+export function useFocusMode(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const root = document.documentElement;
+    root.dataset.focus = 'on';
+    return () => { delete root.dataset.focus; };
+  }, [active]);
 }
 
 /**

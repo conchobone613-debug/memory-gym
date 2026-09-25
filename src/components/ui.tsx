@@ -122,17 +122,3 @@ export function Kbd({ children }: { children: ReactNode }) {
 /** 숫자는 단위를 붙여 짧게: 1.57초, 96% */
 export const fmtMs = (x: number) => (x ? `${(x / 1000).toFixed(2)}초` : '—');
 export const fmtPct = (x: number) => `${Math.round(x * 100)}%`;
-
-/**
- * 연속 정답(측정 화면이 아닌 곳의 작은 표시). 측정 화면은 components/lp 의 계수기(ComboCounter)를 쓴다.
- * 이모지는 쓰지 않는다(디자인 시스템 「글」).
- */
-export function Streak({ n }: { n: number }) {
-  if (n < 2) return null;
-  return (
-    <span className="inline-flex items-center gap-1 rounded-[3px] bg-ink px-2 py-0.5 font-typek text-xs text-paper">
-      <span className="tnum font-bold">{n}</span>
-      연속
-    </span>
-  );
-}
