@@ -180,8 +180,8 @@ export const CALC_EVENTS: CalcEvent[] = [
     id: 'calendar',
     name: '달력',
     what: '1600–2099년 무작위 날짜의 요일. 1분 안에 최대한 많이.',
-    status: 'locked',
-    needs: '날짜 문제 생성기와 요일 채점기, 연도 코드·월 코드 드릴. 모든 날짜를 대조하는 정답 시험을 붙여 연다.',
+    status: 'ready',
+    to: '/calc/calendar/run',
     rules: [
       timeLimit(60),
       penalty,
