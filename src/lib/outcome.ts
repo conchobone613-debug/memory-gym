@@ -18,6 +18,8 @@ export const NEAR_MISS = {
   spokenDigits: 2,
   /** 이진수 종목 — 줄 점수 신기록에 이만큼(반 줄) 모자라면 아깝다 */
   binaryPoints: 15,
+  /** 계산 모의 대회 — 같은 점수에서 최고 기록보다 이만큼(ms) 이내로 늦으면 아깝다 */
+  contestMs: 3000,
 };
 
 export interface OutcomeStat {

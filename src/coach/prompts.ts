@@ -1,6 +1,9 @@
 import { CAL_LEVELS } from '../calc/calendarLadder';
+import { calcLevels, isContestLevel } from '../calc/ladders';
 import { LADDERS } from '../db/goals';
-import { BASICS_MS, CALENDAR_MS, calendarOpen, estimate, MAX_ITEMS, MIN_ITEMS, openMemoryEvents } from './catalog';
+import {
+  BASICS_MS, CALC_MIN_ITEMS, CALENDAR_MS, calendarOpen, estimate, MAX_ITEMS, MIN_ITEMS, openCalcEvents, openMemoryEvents,
+} from './catalog';
 import type { CoachSummary } from './summary';
 import type { ReviewInput } from './review';
 
@@ -20,16 +23,16 @@ export const COURSE_SYSTEM = [
   '',
   '네 기둥',
   '1. 개인화 — 요약표의 실제 기록에 맞춥니다.',
-  '2. 커리큘럼 — 사다리의 지금 칸에서 합니다. basics.current(0 = 세 단계 모두 통과)와 calendar.current 가 지금 칸입니다. 지금 칸이나 그 아래에서 하고, 올라가도 한 칸 위까지만 갑니다.',
+  '2. 커리큘럼 — 사다리의 지금 칸에서 합니다. basics.current(0 = 세 단계 모두 통과)와 calendar.current, calcEvents[].current 가 지금 칸입니다. 지금 칸이나 그 아래에서 하고, 올라가도 한 칸 위까지만 갑니다.',
   '3. 목표 쪼개기 — 지금 칸의 통과 조건(칸 반복 cellsDone/cells, 정확도 accuracyPct/needAccuracyPct, 반응 medianSec/needSec) 가운데 못 채운 것을 겨냥합니다.',
   '4. 점진적 부하 — 통과하면 조금 더 무겁게. 최근 두 판 정확도(last2AccuracyPct)가 둘 다 기준보다 10%p 이상 낮으면 한 칸 아래를 권합니다.',
   '',
   '코스 규칙',
-  '- 기억력(basics·event)에 시간의 약 3분의 2, 달력(calendar)에 나머지를 씁니다.',
+  '- 시간은 기억력(basics·event)에 약 3분의 2, 계산(calendar·calc)에 나머지를 씁니다.',
   "- 예상 시간 합이 '가진 시간'을 넘지 않게 문항 수를 잡습니다. 한 문항에 드는 시간은 paceSec(초)이고, "
     + `없으면 기초 ${Object.values(BASICS_MS).map((ms) => ms / 1000).join('·')}초, `
-    + `달력 ${Object.entries(CALENDAR_MS).map(([lv, ms]) => `${lv}칸 ${ms / 1000}초`).join('·')}로 봅니다. `
-    + `문항 수는 ${MIN_ITEMS}~${MAX_ITEMS}입니다.`,
+    + `달력 ${Object.entries(CALENDAR_MS).map(([lv, ms]) => `${lv}칸 ${ms / 1000}초`).join('·')}, 계산 종목은 카탈로그에 적힌 칸별 시간으로 봅니다. `
+    + `문항 수는 ${MIN_ITEMS}~${MAX_ITEMS}입니다(계산 종목 칸은 ${CALC_MIN_ITEMS}~${MAX_ITEMS}).`,
   '- 카탈로그에 있는 항목만 냅니다. 오래 쉰 종목(runs 0 이거나 daysAgo 가 큰 것)을 챙깁니다.',
   '- cells 가 0 인 기초 단계는 낼 수 없습니다.',
   '',
@@ -37,6 +40,7 @@ export const COURSE_SYSTEM = [
   '- basics: stage 1~3, items, pick(3단계만 — srs 골고루 · weak 약한 칸 · unseen 안 본 칸 · all 전부. 1·2단계는 none). level 0, eventId none, run none, steps false.',
   '- calendar: level 1~5(5 = 1분 모의 대회, items 0), items, steps(3·4칸에서 연도 코드·월 코드·요일을 차례로 칠 때 true). stage 0, eventId none, run none, pick none.',
   '- event: eventId, run(easy 연습 — 시간을 재지 않고 분량 1/4 · real 모의 대회 — 규격 시간). stage 0, level 0, items 0, steps false, pick none.',
+  '- calc: eventId(계산 종목), level 1~마지막(마지막 = 모의 대회, items 0), items. stage 0, run none, pick none, steps false.',
   '',
   '말',
   '- say: 스승님의 말. 하게체로 두 문장 이내. 숫자는 요약표에 적힌 값을 그대로만 씁니다 — 빼거나 더하거나 어림해 새 숫자를 만들지 않습니다.',
@@ -66,12 +70,19 @@ export function courseUser(s: CoachSummary, minutes: number): string {
     const real = estimate({ kind: 'event', eventId: e.id, run: 'real' }, s);
     return `  - ${e.id} (${e.name}) — 연습 약 ${easy}분 · 모의 대회 약 ${real}분`;
   });
+  const calc = openCalcEvents().flatMap((e) => [
+    `  - ${e.id} (${e.name}):`,
+    ...calcLevels(e.id).map((l) => (isContestLevel(l)
+      ? `    - ${l.n}칸 ${l.name} — 약 ${estimate({ kind: 'calc', eventId: e.id, level: l.n, items: 0 }, s)}분`
+      : `    - ${l.n}칸 ${l.name} — ${l.what}, 기록이 없으면 한 문항 ${l.perItemMs / 1000}초`)),
+  ]);
   return [
     `가진 시간: ${minutes}분`,
     '',
     '카탈로그 — 여기 있는 것만 코스에 넣을 수 있습니다.',
     `- basics(기초): ${basics}`,
     ...cal,
+    ...(calc.length ? ['- calc(계산 종목 사다리):', ...calc] : []),
     '- event(기억력 종목):',
     ...events,
     '',
@@ -91,10 +102,10 @@ export function courseSchema(): Record<string, unknown> {
     additionalProperties: false,
     required: ['kind', 'stage', 'level', 'eventId', 'run', 'pick', 'items', 'steps', 'why'],
     properties: {
-      kind: choice(['basics', 'calendar', 'event']),
+      kind: choice(['basics', 'calendar', 'event', 'calc']),
       stage: int,
       level: int,
-      eventId: choice([...openMemoryEvents().map((e) => e.id), 'none']),
+      eventId: choice([...openMemoryEvents().map((e) => e.id), ...openCalcEvents().map((e) => e.id), 'none']),
       run: choice(['easy', 'real', 'none']),
       pick: choice(['srs', 'weak', 'unseen', 'all', 'none']),
       items: int,

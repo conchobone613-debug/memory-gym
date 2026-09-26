@@ -51,6 +51,11 @@ describe('labelParts', () => {
     expect(labelParts({ kind: 'calendar', level: 5, items: 0 })).toEqual(['달력 5칸 · 1분 모의 대회', '']);
     expect(labelParts({ kind: 'event', eventId: 'speed-numbers', run: 'easy' })).toEqual(['스피드 숫자 · 연습', '']);
   });
+
+  it('계산 종목 칸 이름에 · 가 있어도 분량은 문항 수부터', () => {
+    expect(labelParts({ kind: 'calc', eventId: 'sqrt', level: 2, items: 20 })).toEqual(['제곱근 2칸 · 6자리 · 유효 6', '20문항']);
+    expect(labelParts({ kind: 'calc', eventId: 'sqrt', level: 4, items: 0 })).toEqual(['제곱근 · 모의 대회', '']);
+  });
 });
 
 describe('코스 주소 왕복', () => {
@@ -61,12 +66,18 @@ describe('코스 주소 왕복', () => {
       { kind: 'calendar', level: 3, items: 15, steps: true },
       { kind: 'calendar', level: 5, items: 0 },
       { kind: 'event', eventId: 'speed-cards', run: 'real' },
+      { kind: 'calc', eventId: 'sqrt', level: 3, items: 15 },
+      { kind: 'calc', eventId: 'sqrt', level: 4, items: 0 },
     ];
     items.forEach((it, i) => {
       const href = courseHref(it, 'row-1', i);
       const q = new URLSearchParams(href.split('?')[1]);
       expect(courseStep(q)).toEqual({ logId: 'row-1', index: i });
-      if (it.kind === 'basics') {
+      if (it.kind === 'calc') {
+        expect(href.startsWith('/calc/sqrt/run?')).toBe(true);
+        if (it.level === 4) expect([q.get('mode'), q.get('level')]).toEqual(['contest', null]);
+        else expect([q.get('level'), Number(q.get('n'))]).toEqual([String(it.level), it.items]);
+      } else if (it.kind === 'basics') {
         expect(href.startsWith('/basics?')).toBe(true);
         expect(q.get('stage')).toBe(String(it.stage));
         expect(Number(q.get('n'))).toBe(it.items);

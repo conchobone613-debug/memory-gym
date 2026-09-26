@@ -5,7 +5,9 @@ import { goalFor } from '../db/goals';
 import { CAL_LEVELS, contestSessions, practiceIds } from '../calc/calendarLadder';
 import { stepAverages } from '../calc/calendarDrill';
 import { WEEKDAY_LONG } from '../calc/calendar';
-import { MEMORY_EVENTS } from '../data/events';
+import { calcLevels, calcPracticeIds } from '../calc/ladders';
+import { calcContestSessions } from '../calc/calcOutcome';
+import { CALC_EVENTS, MEMORY_EVENTS } from '../data/events';
 
 /*
  * 한 판 복기의 입력 — 그 판의 요약만(원시 기록 전체를 보내지 않는다).
@@ -49,12 +51,19 @@ const slowOf = (rows: Row[]) => rows.filter((r) => r.rtMs > 0).sort((a, b) => b.
 const wrongOf = (rows: Row[]) => rows.filter((r) => !r.ok).slice(0, TOP)
   .map((r) => ({ prompt: r.prompt, expected: r.answer, given: orBlank(r.given) }));
 
-/** 이 달력 판과 견줄 수 있는 판들의 id */
+/** 이 계산 판과 견줄 수 있는 판들의 id */
 async function calcPeers(disciplineId: string, sessionId: string): Promise<Set<string>> {
   const sessions = await db.calcSessions.where('disciplineId').equals(disciplineId).toArray();
   const me = sessions.find((s) => s.id === sessionId);
   if (!me) return new Set();
   const log = { sessions, items: [] };
+  /* 달력 밖 계산 종목 — 연습은 같은 칸, 모의 대회는 같은 규정 */
+  const ev = CALC_EVENTS.find((e) => e.id === disciplineId);
+  if (ev && disciplineId !== 'calendar') {
+    return me.mode === 'practice'
+      ? calcPracticeIds(log, Number(me.params.level))
+      : new Set(calcContestSessions(log, ev, me.rules).map((s) => s.id));
+  }
   if (me.mode === 'practice') return practiceIds(log, Number(me.params.level), !!Number(me.params.steps || 0));
   return new Set(contestSessions(log, {
     limitSec: Number(me.params.limitSec), penalty: Number(me.rules.penaltyPerWrong) || 0,
@@ -123,7 +132,8 @@ export async function buildSessionReviewInput(kind: SessionKind, sessionId: stri
     out.wrong = wrongOf(rows);
     const steps = stepAverages(items.map((i) => ({ steps: i.steps?.filter((st) => st.ok !== false) })));
     if (steps.length) out.steps = steps.map((x) => ({ name: x.name, avgSec: sec(x.avgMs) }));
-    const pass = session?.mode === 'practice' ? CAL_LEVELS.find((l) => l.n === Number(session.params.level))?.pass : undefined;
+    const levels = me.disciplineId === 'calendar' ? CAL_LEVELS : calcLevels(me.disciplineId);
+    const pass = session?.mode === 'practice' ? levels.find((l) => l.n === Number(session.params.level))?.pass : undefined;
     if (pass) out.target = { accuracyPct: pct(pass.accuracy), sec: pass.medianMs / 1000 };
   }
   return out;

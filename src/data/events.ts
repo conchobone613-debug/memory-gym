@@ -209,8 +209,8 @@ export const CALC_EVENTS: CalcEvent[] = [
     id: 'sqrt',
     name: '제곱근',
     what: '6자리 수의 제곱근을 유효숫자 8자리까지.',
-    status: 'locked',
-    needs: '큰 정수로 정답을 만드는 계산기와 유효숫자 채점기. 버림·반올림 경계 시험을 붙여 연다.',
+    status: 'ready',
+    to: '/calc/sqrt/run',
     rules: [
       items(10), timeLimit(0), penalty,
       { key: 'digits', label: '자릿수', kind: 'number', default: 6, min: 2, max: 12, unit: '자리' },

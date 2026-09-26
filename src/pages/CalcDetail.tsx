@@ -4,6 +4,7 @@ import { CALC_EVENTS } from '../data/events';
 import { calcSummaries, loadCalcLog } from '../db/calcLog';
 import { localDayKey } from '../db/analytics';
 import { CAL_LEVELS } from '../calc/calendarLadder';
+import { calcLevels } from '../calc/ladders';
 import { getRules } from '../lib/rules';
 import { Empty, Panel, fmtPct } from '../components/ui';
 import { Dymo, Folder, Key, KeyLink } from '../components/lp';
@@ -27,12 +28,13 @@ export default function CalcDetail() {
   const open = ev.status === 'ready';
   const rows = log ? calcSummaries(log).slice(0, 20) : [];
   const byId = new Map(log?.sessions.map((s) => [s.id, s]));
-  /** 연습은 칸 이름(달력 사다리), 모의 대회는 점수 — 끝까지 치르지 않은 판은 '중단' */
+  /** 연습은 칸 이름(달력은 달력 사다리, 나머지는 계산 사다리), 모의 대회는 점수 — 끝까지 치르지 않은 판은 '중단' */
   const detail = (sid: string) => {
     const s = byId.get(sid);
     if (!s) return '';
     if (s.mode === 'contest') return s.endedAt ? `${s.score}점` : '중단';
-    return ev.id === 'calendar' ? CAL_LEVELS.find((l) => l.n === Number(s.params.level))?.name ?? '' : '';
+    const levels: { n: number; name: string }[] = ev.id === 'calendar' ? CAL_LEVELS : calcLevels(ev.id);
+    return levels.find((l) => l.n === Number(s.params.level))?.name ?? '';
   };
   const show = (key: string) => {
     const f = ev.rules.find((r) => r.key === key)!;

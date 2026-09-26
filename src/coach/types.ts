@@ -11,7 +11,9 @@ export type CourseItem =
   /** 달력 사다리 칸. 5 = 1분 모의 대회(items 0, 무시). steps = 단계 입력(3·4칸만) */
   | { kind: 'calendar'; level: 1 | 2 | 3 | 4 | 5; items: number; steps?: boolean }
   /** 열린 기억력 종목. 분량은 종목 프리셋 그대로 — easy 연습(1/4, 시간 안 잼) · real 모의 대회 */
-  | { kind: 'event'; eventId: string; run: 'easy' | 'real' };
+  | { kind: 'event'; eventId: string; run: 'easy' | 'real' }
+  /** 달력을 뺀 열린 계산 종목의 사다리 칸(calc/ladders). 마지막 칸 = 모의 대회(items 0, 무시) */
+  | { kind: 'calc'; eventId: string; level: number; items: number };
 
 /** 코스에 올린 항목 — estMinutes 는 코드가 계산(estimate), why 는 평문 한 줄(…습니다) */
 export type PlannedItem = CourseItem & { estMinutes: number; why: string };

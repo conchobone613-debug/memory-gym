@@ -1,8 +1,11 @@
 import { findDiscipline } from '../data/events';
 import { CAL_LEVELS } from '../calc/calendarLadder';
 import { LADDERS } from '../db/goals';
-import { calendarOpen, estimate, estimateMs, hasItems, MAX_COURSE_ITEMS, MAX_ITEMS, MIN_ITEMS, openMemoryEvents, PREP_MS } from './catalog';
-import type { CoachSummary, EventRecord } from './summary';
+import { calcLevels } from '../calc/ladders';
+import {
+  CALC_MIN_ITEMS, calendarOpen, estimate, estimateMs, hasItems, isCalcContest, MAX_COURSE_ITEMS, MAX_ITEMS, MIN_ITEMS, minItems, openMemoryEvents, PREP_MS,
+} from './catalog';
+import type { CalcEventRecord, CoachSummary, EventRecord } from './summary';
 import type { Course, CourseItem, PlannedItem } from './types';
 
 /*
@@ -16,6 +19,7 @@ import type { Course, CourseItem, PlannedItem } from './types';
 export type Draft = CourseItem & { why: string };
 type BasicsItem = Extract<CourseItem, { kind: 'basics' }>;
 type CalItem = Extract<CourseItem, { kind: 'calendar' }>;
+type CalcItem = Extract<CourseItem, { kind: 'calc' }>;
 
 /** 무너짐: 최근 두 판 정확도가 둘 다 기준보다 이만큼(%p) 이상 낮다 */
 export const COLLAPSE_GAP_PCT = 10;
@@ -24,13 +28,13 @@ export const collapsed = (last2: number[], needPct: number) =>
 
 const setItems = (i: CourseItem, n: number) => { if (hasItems(i)) i.items = n; };
 
-/** budgetMs 안에 드는 문항 수(10~60) */
+/** budgetMs 안에 드는 문항 수(10~60, 계산 종목은 5~60) */
 function itemsFor(item: CourseItem, budgetMs: number, s: CoachSummary): number {
   const one = { ...item };
   setItems(one, 1);
   const per = estimateMs(one, s) - PREP_MS;
   const n = per > 0 ? Math.floor((budgetMs - PREP_MS) / per) : MAX_ITEMS;
-  return Math.min(MAX_ITEMS, Math.max(MIN_ITEMS, n));
+  return Math.min(MAX_ITEMS, Math.max(minItems(item), n));
 }
 
 /**
@@ -42,17 +46,17 @@ export function fit(list: Draft[], s: CoachSummary, minutes: number): Draft[] {
   const cap = minutes * 60_000;
   const sum = () => out.reduce((a, d) => a + estimateMs(d, s), 0);
   while (sum() > cap) {
-    const drills = out.filter((d) => hasItems(d) && d.items > MIN_ITEMS);
+    const drills = out.filter((d) => hasItems(d) && d.items > minItems(d));
     if (!drills.length) break;
     const big = drills.reduce((a, b) => (estimateMs(b, s) > estimateMs(a, s) ? b : a));
-    if (hasItems(big)) big.items = Math.max(MIN_ITEMS, big.items - 5);
+    if (hasItems(big)) big.items = Math.max(minItems(big), big.items - 5);
   }
   while (sum() > cap && out.length > 1) out.pop();
   return out;
 }
 
 const itemKey = (i: CourseItem) =>
-  i.kind === 'basics' ? `b${i.stage}` : i.kind === 'calendar' ? `c${i.level}` : `e${i.eventId}`;
+  i.kind === 'basics' ? `b${i.stage}` : i.kind === 'calendar' ? `c${i.level}` : i.kind === 'calc' ? `k${i.eventId}${i.level}` : `e${i.eventId}`;
 
 /** 분량이 가진 시간의 이만큼에 못 미치면 채운다 */
 export const FILL_RATIO = 0.8;
@@ -99,6 +103,9 @@ export function defaultWhy(item: CourseItem): string {
     return item.level === 5 ? '1분 모의 대회로 점수를 쌓습니다.' : `달력 ${item.level}칸(${CAL_LEVELS[item.level - 1].name})을 연습합니다.`;
   }
   const name = findDiscipline(item.eventId)?.name ?? item.eventId;
+  if (item.kind === 'calc') {
+    return isCalcContest(item) ? `${name} 모의 대회로 점수를 쌓습니다.` : `${name} ${item.level}칸(${calcLevels(item.eventId)[item.level - 1].name})에서 연습합니다.`;
+  }
   return `${name} 종목을 ${item.run === 'easy' ? '연습합니다' : '모의 대회로 치릅니다'}.`;
 }
 
@@ -189,9 +196,54 @@ function planCalendar(s: CoachSummary): { item: CalItem; why: string } | null {
   return { item, why: `${tag}에서 다지는 중입니다.` };
 }
 
-/** 한 번도 안 한 종목(등록부 순) → 오래 쉰 종목 순 */
-const eventOrder = (s: CoachSummary) =>
-  [...s.events].sort((a, b) => Number(b.runs === 0) - Number(a.runs === 0) || (b.daysAgo ?? 0) - (a.daysAgo ?? 0));
+/** 계산 종목(달력 제외) — 지금 칸(또는 한 칸 아래)과 겨냥할 조건. 지금 칸이 모의 대회면 모의 대회 */
+function planCalc(e: CalcEventRecord): { item: CalcItem; why: string } {
+  const last = calcLevels(e.id).at(-1)!.n;
+  if (e.current >= last) {
+    return {
+      item: { kind: 'calc', eventId: e.id, level: last, items: 0 },
+      why: e.levels.every((l) => l.passed) ? `${e.name} 연습 칸을 모두 통과해 모의 대회로 점수를 쌓습니다.` : `지금 칸으로 정한 ${e.name} 모의 대회입니다.`,
+    };
+  }
+  const cur = e.current;
+  const r = e.levels[cur - 1];
+  if (cur > 1 && collapsed(r.last2AccuracyPct, r.needAccuracyPct)) {
+    return {
+      item: { kind: 'calc', eventId: e.id, level: cur - 1, items: CALC_MIN_ITEMS },
+      why: '최근 두 판 정확도가 기준에 크게 못 미쳐 한 칸 아래에서 다집니다.',
+    };
+  }
+  const item: CalcItem = { kind: 'calc', eventId: e.id, level: cur, items: CALC_MIN_ITEMS };
+  const tag = `${e.name} ${cur}칸(${r.name})`;
+  if (r.accuracyPct == null) return { item, why: `${tag}에 아직 기록이 없어 처음부터 합니다.` };
+  if (r.recentItems < r.needItems) return { item, why: `${tag}에 최근 문항이 ${r.recentItems}개라 ${r.needItems}개까지 쌓아야 합니다.` };
+  if (r.accuracyPct < r.needAccuracyPct) return { item, why: `${tag} 정확도 ${r.accuracyPct}%를 ${r.needAccuracyPct}%까지 올려야 합니다.` };
+  if (r.medianSec != null && r.medianSec > r.needSec) {
+    return { item, why: `${tag} 중앙 반응 ${r.medianSec}초를 ${r.needSec}초 안으로 줄여야 합니다.` };
+  }
+  return { item, why: `${tag}에서 다지는 중입니다.` };
+}
+
+/** 한 번도 안 한 것(등록부 순) → 오래 쉰 것 순 */
+const byRest = (a: { runs: number; daysAgo: number | null }, b: { runs: number; daysAgo: number | null }) =>
+  Number(b.runs === 0) - Number(a.runs === 0) || (b.daysAgo ?? 0) - (a.daysAgo ?? 0);
+
+const eventOrder = (s: CoachSummary) => [...s.events].sort(byRest);
+
+/**
+ * 계산 몫을 받을 종목 — 달력과 열린 계산 종목 가운데 기억력 종목과 같은 순서(byRest)로 하나.
+ * 최소 분량으로도 room(기억력 항목을 최소로 줄이고 남는 시간)에 안 드는 종목은 건너뛴다 — 골라 봐야 fit 이 빼서
+ * 계산 몫이 통째로 비고, 그 종목이 계속 '오래 쉰 종목'으로 남아 다음 종목까지 밀린다. 어느 것도 안 들면 첫 종목(fit 이 뺀다).
+ */
+function planCalcShare(s: CoachSummary, room: number): { item: CalItem | CalcItem; why: string } | null {
+  const picks = [
+    ...(calendarOpen() ? [{ runs: s.calendar.runs, daysAgo: s.calendar.daysAgo, plan: () => planCalendar(s) }] : []),
+    ...s.calcEvents.map((e) => ({ runs: e.runs, daysAgo: e.daysAgo, plan: () => planCalc(e) })),
+  ];
+  const plans = picks.sort(byRest).map((p) => p.plan()).filter((p) => p !== null);
+  const least = (i: CourseItem) => estimateMs(hasItems(i) ? { ...i, items: minItems(i) } : i, s);
+  return plans.find((p) => least(p.item) <= room) ?? plans[0] ?? null;
+}
 
 /** 연습을 90% 넘게 하면 모의 대회로, 모의 대회가 80% 밑이면 다시 연습으로 */
 const runFor = (e: EventRecord): 'easy' | 'real' =>
@@ -227,10 +279,10 @@ export function ruleCourse(s: CoachSummary, minutes: number): Course {
   const drafts: Draft[] = [];
   if (b.item) drafts.push({ ...b.item, items: itemsFor(b.item, memBudget - eventsMs, s), why: b.why });
   drafts.push(...events);
-  const c = planCalendar(s);
+  const c = planCalcShare(s, total - (b.item ? estimateMs(b.item, s) : 0) - eventsMs);
   if (c) {
     const item = { ...c.item };
-    if (item.level < 5) item.items = itemsFor(item, total - memBudget, s);
+    if (hasItems(item)) item.items = itemsFor(item, total - memBudget, s);
     drafts.push({ ...item, why: c.why });
   }
   return { say: b.say, items: finalize(fit(drafts, s, minutes), s) };

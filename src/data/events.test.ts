@@ -24,6 +24,11 @@ describe('종목 등록부', () => {
     }
   });
 
+  it('열린 계산 종목 주소는 /calc/<id>/run — 종목 화면이 ?mode=contest 를 붙인다', () => {
+    for (const e of CALC_EVENTS.filter((x) => x.status === 'ready')) expect(e.to, e.id).toBe(`/calc/${e.id}/run`);
+    expect(findDiscipline('sqrt')?.status).toBe('ready');
+  });
+
   it('영역 표시가 목록과 맞다', () => {
     expect(MEMORY_EVENTS.every((e) => e.domain === 'memory')).toBe(true);
     expect(CALC_EVENTS.every((e) => e.domain === 'calc')).toBe(true);

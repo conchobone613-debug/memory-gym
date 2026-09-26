@@ -4,11 +4,14 @@ import { dayStreak, loadSummaries, type SessionSummary } from '../db/sessions';
 import { localDayKey, movers, type MoverRow } from '../db/analytics';
 import { goalFor, LADDERS, type GoalStatus } from '../db/goals';
 import { calcSummaries, loadCalcLog, type CalcLog } from '../db/calcLog';
-import { CAL_LEVELS, CALENDAR_LADDER, currentLevel, ladderStatus } from '../calc/calendarLadder';
+import { CAL_LEVELS, CALENDAR_LADDER, currentLevel, ladderStatus, type LevelPass } from '../calc/calendarLadder';
 import { stepAverages } from '../calc/calendarDrill';
-import { getRules } from '../lib/rules';
+import { calcLadderStatus, currentCalcLevel } from '../calc/ladders';
+import { calcContestSessions } from '../calc/calcOutcome';
+import { defaultRules, getRules } from '../lib/rules';
 import { median } from '../lib/srs';
-import { openMemoryEvents } from './catalog';
+import type { RuleValues } from '../db/db';
+import { openCalcEvents, openMemoryEvents } from './catalog';
 
 /*
  * 훈련 요약표 — 스승님께 보내는 작고 사실만 담은 표(기획서 §6.2). 원시 기록은 보내지 않는다.
@@ -66,6 +69,19 @@ export interface EventRecord {
   realMin: number | null;
 }
 
+export interface CalcEventRecord {
+  id: string;
+  name: string;
+  /** 지금 칸(마지막 칸 = 모의 대회). 한 칸 내리기로 정한 칸이 있으면 그 칸 */
+  current: number;
+  /** 연습 칸들(모의 대회 칸 제외) */
+  levels: CalendarRung[];
+  /** 지금 규정으로 끝까지 치른 모의 대회. limitSec(0 = 시간 제한 없음)·items 는 지금 규정 — 예상 시간의 바탕 */
+  contest: { runs: number; best: number | null; limitSec: number; items: number };
+  runs: number;
+  daysAgo: number | null;
+}
+
 export interface RecentRow {
   id: string;
   name: string;
@@ -88,8 +104,13 @@ export interface CoachSummary {
     current: number;
     levels: CalendarRung[];
     contest: { level: 5; name: string; runs: number; bestScore: number | null; limitSec: number };
+    /** 문항이 있는 판 수(연습·모의 대회)와 마지막으로 한 지 며칠 — 계산 몫을 어느 종목에 줄지 가린다 */
+    runs: number;
+    daysAgo: number | null;
   };
   events: EventRecord[];
+  /** 달력을 뺀 열린 계산 종목 */
+  calcEvents: CalcEventRecord[];
   recent7: RecentRow[];
   recent30: RecentRow[];
   weak: {
@@ -111,6 +132,10 @@ export interface SummaryInput {
   /** 모의 대회 제한시간(초) */
   contestSec: number;
   slowImages: MoverRow[];
+  /** 달력을 뺀 계산 종목의 기록 · 사다리 표에 적힌 지금 칸 id · 규정(종목 id 로). 없으면 빈 기록·기본 규정 */
+  calcLogs?: Record<string, CalcLog>;
+  calcStored?: Record<string, string | undefined>;
+  calcRules?: Record<string, RuleValues>;
 }
 
 const DAY = 86_400_000;
@@ -125,6 +150,27 @@ function paceOf(list: SessionSummary[], now: number): number | null {
 }
 
 const last2 = (list: SessionSummary[]) => list.slice(0, 2).map((s) => pct(s.accuracy));
+
+/** 마지막으로 한 지 며칠(오늘 = 0). 한 적 없으면 null */
+const daysAgoOf = (t: number | undefined, now: number) => (t == null ? null : Math.round((midnight(now) - midnight(t)) / DAY));
+
+interface RungStatus { level: { n: number; name: string; pass?: LevelPass }; attempts: number; accuracy: number; medianRt: number; passed: boolean }
+
+/** 사다리 칸 상태 → 요약표의 칸 줄(달력·계산 종목 같은 모양). 통과 기준이 있는 칸만 */
+function rungsOf(statuses: RungStatus[], log: CalcLog, sums: SessionSummary[], now: number): CalendarRung[] {
+  const levelOf = new Map(log.sessions.map((s) => [s.id, Number(s.params.level)]));
+  return statuses.filter((st) => st.level.pass).map((st) => {
+    const p = st.level.pass!;
+    const mine = sums.filter((x) => x.mode === 'practice' && levelOf.get(x.id) === st.level.n);
+    return {
+      level: st.level.n, name: st.level.name, passed: st.passed,
+      recentItems: st.attempts, needItems: p.items,
+      accuracyPct: st.attempts ? pct(st.accuracy) : null, needAccuracyPct: pct(p.accuracy),
+      medianSec: st.medianRt ? sec(st.medianRt) : null, needSec: p.medianMs / 1000,
+      paceSec: paceOf(mine, now), last2AccuracyPct: last2(mine),
+    };
+  });
+}
 
 function recentRows(summaries: SessionSummary[], now: number, days: number): RecentRow[] {
   const groups = new Map<string, SessionSummary[]>();
@@ -162,20 +208,26 @@ export function buildSummary(inp: SummaryInput): CoachSummary {
 
   const statuses = ladderStatus(calLog);
   const calSums = calcSummaries(calLog);
-  const levelOf = new Map(calLog.sessions.map((s) => [s.id, Number(s.params.level)]));
-  const levels: CalendarRung[] = statuses.filter((st) => st.level.pass).map((st) => {
-    const p = st.level.pass!;
-    const mine = calSums.filter((x) => x.mode === 'practice' && levelOf.get(x.id) === st.level.n);
-    return {
-      level: st.level.n, name: st.level.name, passed: st.passed,
-      recentItems: st.attempts, needItems: p.items,
-      accuracyPct: st.attempts ? pct(st.accuracy) : null, needAccuracyPct: pct(p.accuracy),
-      medianSec: st.medianRt ? sec(st.medianRt) : null, needSec: p.medianMs / 1000,
-      paceSec: paceOf(mine, now), last2AccuracyPct: last2(mine),
-    };
-  });
+  const levels = rungsOf(statuses, calLog, calSums, now);
   const contests = calLog.sessions.filter((s) => s.mode === 'contest' && !!s.endedAt);
   const contestLevel = CAL_LEVELS.find((l) => l.drill === 'contest')!;
+
+  const calcEvents: CalcEventRecord[] = openCalcEvents().map((ev) => {
+    const log = inp.calcLogs?.[ev.id] ?? { sessions: [], items: [] };
+    const rules = inp.calcRules?.[ev.id] ?? defaultRules(ev.rules);
+    const st = calcLadderStatus(ev.id, log);
+    const sums = calcSummaries(log);
+    const done = calcContestSessions(log, ev, rules);
+    return {
+      id: ev.id, name: ev.name, current: currentCalcLevel(ev.id, st, inp.calcStored?.[ev.id]).n,
+      levels: rungsOf(st, log, sums, now),
+      contest: {
+        runs: done.length, best: done.length ? Math.max(...done.map((s) => s.score)) : null,
+        limitSec: Number(rules.timeLimitSec) || 0, items: Number(rules.items) || 0,
+      },
+      runs: sums.length, daysAgo: daysAgoOf(sums[0]?.startedAt, now),
+    };
+  });
 
   const events: EventRecord[] = openMemoryEvents().map((ev) => {
     const mine = summaries.filter((s) => s.kind === 'recall' && s.disciplineId === ev.id);
@@ -187,7 +239,7 @@ export function buildSummary(inp: SummaryInput): CoachSummary {
     return {
       id: ev.id, name: ev.name, runs: mine.length,
       lastDay: last ? localDayKey(last.startedAt) : null,
-      daysAgo: last ? Math.round((midnight(now) - midnight(last.startedAt)) / DAY) : null,
+      daysAgo: daysAgoOf(last?.startedAt, now),
       lastRun: last ? (last.mode === 'practice' ? 'easy' : 'real') : null,
       lastAccuracyPct: last ? pct(last.accuracy) : null,
       easyMin: runMin('practice'), realMin: runMin('contest'),
@@ -209,8 +261,11 @@ export function buildSummary(inp: SummaryInput): CoachSummary {
         level: 5, name: contestLevel.name, runs: contests.length,
         bestScore: contests.length ? Math.max(...contests.map((s) => s.score)) : null, limitSec: inp.contestSec,
       },
+      runs: calSums.length,
+      daysAgo: daysAgoOf(calSums[0]?.startedAt, now),
     },
     events,
+    calcEvents,
     recent7: recentRows(summaries, now, 7),
     recent30: recentRows(summaries, now, 30),
     weak: {
@@ -223,7 +278,8 @@ export function buildSummary(inp: SummaryInput): CoachSummary {
 /** 저장소에서 읽어 요약표를 만든다 */
 export async function loadCoachSummary(now = Date.now()): Promise<CoachSummary> {
   const cal = CALC_EVENTS.find((e) => e.id === 'calendar')!;
-  const [settings, summaries, goals, calLog, stored, rules, mv] = await Promise.all([
+  const calc = openCalcEvents();
+  const [settings, summaries, goals, calLog, stored, rules, mv, calcRows] = await Promise.all([
     getSettings(),
     loadSummaries(now - 365 * DAY),
     Promise.all([goalFor(1), goalFor(2), goalFor(3)]),
@@ -231,9 +287,13 @@ export async function loadCoachSummary(now = Date.now()): Promise<CoachSummary> 
     db.ladderState.get(CALENDAR_LADDER),
     getRules(cal),
     movers(5),
+    Promise.all(calc.map((ev) => Promise.all([loadCalcLog(ev.id), db.ladderState.get(ev.id), getRules(ev)]))),
   ]);
   return buildSummary({
     now, dailyMinutes: settings.dailyMinutes, summaries, goals, calLog, calStored: stored?.currentLevel,
     contestSec: Number(rules.timeLimitSec) || 60, slowImages: mv.slowest,
+    calcLogs: Object.fromEntries(calc.map((ev, i) => [ev.id, calcRows[i][0]])),
+    calcStored: Object.fromEntries(calc.map((ev, i) => [ev.id, calcRows[i][1]?.currentLevel])),
+    calcRules: Object.fromEntries(calc.map((ev, i) => [ev.id, calcRows[i][2]])),
   });
 }

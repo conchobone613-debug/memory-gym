@@ -18,6 +18,7 @@ import Memory from './pages/Memory';
 import Calc from './pages/Calc';
 import CalcDetail from './pages/CalcDetail';
 import CalendarRun from './pages/CalendarRun';
+import CalcRun from './pages/CalcRun';
 import Practice from './pages/Practice';
 import Stats from './pages/Stats';
 import Settings from './pages/Settings';
@@ -129,6 +130,7 @@ function Shell() {
           <Route path="/calc/:id" element={<CalcDetail />} />
           {/* 칸·모드는 주소로 받으므로, 주소만 바뀌어도(뒤로 가기 등) 새 화면으로 연다 */}
           <Route path="/calc/calendar/run" element={<CalendarRun key={search} />} />
+          <Route path="/calc/:id/run" element={<CalcRun key={search} />} />
 
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />

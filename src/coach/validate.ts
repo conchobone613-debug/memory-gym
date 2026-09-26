@@ -1,5 +1,8 @@
-import { findDiscipline } from '../data/events';
-import { calendarOpen, estimateMs, MAX_COURSE_ITEMS, MAX_ITEMS, MIN_ITEMS, openMemoryEvents } from './catalog';
+import { CALC_EVENTS, findDiscipline } from '../data/events';
+import { calcLevels } from '../calc/ladders';
+import {
+  CALC_MIN_ITEMS, calendarOpen, estimateMs, isCalcContest, MAX_COURSE_ITEMS, MAX_ITEMS, MIN_ITEMS, openCalcEvents, openMemoryEvents,
+} from './catalog';
 import { courseUser, reviewUser } from './prompts';
 import { defaultWhy, fill, finalize, fit, ruleCourse, type Draft } from './rule';
 import type { CoachSummary } from './summary';
@@ -66,9 +69,9 @@ export function keepSentences(text: string, allowed: Allowed, drop: (sentence: s
     .filter((x) => x && numbersOk(x, allowed) && !NOT_SAGE_END.test(x) && !drop(x)).join(' ');
 }
 
-const clampItems = (v: unknown) => {
+const clampItems = (v: unknown, min = MIN_ITEMS) => {
   const n = int(v);
-  return n > 0 ? Math.min(MAX_ITEMS, Math.max(MIN_ITEMS, n)) : DEFAULT_ITEMS;
+  return n > 0 ? Math.min(MAX_ITEMS, Math.max(min, n)) : DEFAULT_ITEMS;
 };
 
 /** 항목 하나를 카탈로그에 맞춘다. 쓸 수 없으면 null */
@@ -95,25 +98,46 @@ function cleanItem(r: Record<string, unknown>, s: CoachSummary): CourseItem | nu
     if (!ev) return null;
     return { kind: 'event', eventId: ev.id, run: r.run === 'real' ? 'real' : 'easy' };
   }
+  if (r.kind === 'calc') {
+    const ev = openCalcEvents().find((e) => e.id === r.eventId);
+    const lv = int(r.level);
+    const last = ev ? calcLevels(ev.id).length : 0;
+    if (!ev || !(lv >= 1 && lv <= last)) return null;
+    const level = Math.min(lv, (s.calcEvents.find((e) => e.id === ev.id)?.current ?? 1) + 1);
+    const item: CourseItem = { kind: 'calc', eventId: ev.id, level, items: 0 };
+    if (!isCalcContest(item)) item.items = clampItems(r.items, CALC_MIN_ITEMS);
+    return item;
+  }
   return null;
 }
 
 const sameItem = (a: CourseItem, b: CourseItem) =>
   a.kind === b.kind && (a.kind === 'basics' ? a.stage === (b as typeof a).stage
     : a.kind === 'calendar' ? a.level === (b as typeof a).level
-      : a.eventId === (b as typeof a).eventId && a.run === (b as typeof a).run);
+      : a.kind === 'calc' ? a.eventId === (b as typeof a).eventId && a.level === (b as typeof a).level
+        : a.eventId === (b as typeof a).eventId && a.run === (b as typeof a).run);
 
-/** 항목을 가리키는 말 — '2단계', '3칸', 종목 이름. 스승님이 청했는데 코스에 그대로 남지 않은 것을 말하는 문장은 뺀다 */
+/** 항목을 가리키는 말 — '2단계', '3칸'(달력), 종목 이름('제곱근 2칸'). 스승님이 청했는데 코스에 그대로 남지 않은 것을 말하는 문장은 뺀다 */
 function mentionsOf(r: Record<string, unknown>): string[] {
   const n = int(r.kind === 'basics' ? r.stage : r.level);
   if (r.kind === 'basics' && n > 0) return [`${n}단계`];
-  if (r.kind === 'calendar' && n > 0) return [`${n}칸`];
+  /* 계산 종목으로 잘못 온 달력도 달력 칸 이름('N칸')으로 — 코스에 남은 달력 칸과 견준다 */
+  if ((r.kind === 'calendar' || (r.kind === 'calc' && r.eventId === 'calendar')) && n > 0) return [`${n}칸`];
+  if (r.kind === 'calc') {
+    const name = typeof r.eventId === 'string' ? findDiscipline(r.eventId)?.name : undefined;
+    return name && n > 0 ? [`${name} ${n}칸`] : [];
+  }
   const name = r.kind === 'event' && typeof r.eventId === 'string' ? findDiscipline(r.eventId)?.name : undefined;
   return name ? [name] : [];
 }
+const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/* 이름 없는 'N칸'(달력)이 '제곱근 N칸' 처럼 계산 종목 이름이 붙은 말에 걸리지 않게 그 말을 먼저 지우고 찾는다 */
+const NAMED_CALC = CALC_EVENTS.filter((e) => e.id !== 'calendar').map((e) => new RegExp(`${esc(e.name)}\\s*\\d+\\s*칸`, 'g'));
 const says = (text: string, m: string) => {
   const d = /^(\d+)(.*)$/.exec(m);
-  return d ? new RegExp(`(?<![\d.])${d[1]}\s*${d[2]}`).test(text) : text.includes(m);
+  if (!d) return text.includes(m);
+  const bare = NAMED_CALC.reduce((t, re) => t.replace(re, ''), text);
+  return new RegExp(`(?<![\\d.])${d[1]}\\s*${d[2]}`).test(bare);
 };
 
 /**

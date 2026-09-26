@@ -27,10 +27,15 @@ export function nextCourseIndex(done: readonly (string | null | undefined)[], fr
   return -1;
 }
 
-/** 항목 이름을 둘로 — 카드 제목(종목·칸)과 그 아래 분량('30문항 · 약한 칸'). 제목 줄은 한 줄이라 길면 잘린다 */
+/**
+ * 항목 이름을 둘로 — 카드 제목(종목·칸)과 그 아래 분량('30문항 · 약한 칸'). 제목 줄은 한 줄이라 길면 잘린다.
+ * 'N문항' 부터가 분량이다(계산 종목 칸 이름 '6자리 · 유효 6' 처럼 제목에도 ' · ' 가 있다).
+ */
 export function labelParts(item: CourseItem): [string, string] {
   const parts = itemLabel(item).split(' · ');
-  return [parts.slice(0, 2).join(' · '), parts.slice(2).join(' · ')];
+  const at = parts.findIndex((p) => /^\d+문항$/.test(p));
+  const cut = at < 0 ? parts.length : at;
+  return [parts.slice(0, cut).join(' · '), parts.slice(cut).join(' · ')];
 }
 
 /*

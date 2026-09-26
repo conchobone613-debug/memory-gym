@@ -1,7 +1,9 @@
-import { CALC_EVENTS, findDiscipline, MEMORY_EVENTS, type MemoryEvent } from '../data/events';
+import { CALC_EVENTS, findDiscipline, MEMORY_EVENTS, type CalcEvent, type MemoryEvent } from '../data/events';
 import { PRESETS } from '../data/presets';
 import { LADDERS } from '../db/goals';
 import { CAL_LEVELS } from '../calc/calendarLadder';
+import { calcLevels, isContestLevel } from '../calc/ladders';
+import { defaultRules } from '../lib/rules';
 import type { CourseItem } from './types';
 import type { CoachSummary } from './summary';
 
@@ -22,8 +24,21 @@ export const PREP_MS = 30_000;
 export const BASICS_MS: Record<1 | 2 | 3, number> = { 1: 1500, 2: 3000, 3: 4000 };
 export const CALENDAR_MS: Record<1 | 2 | 3 | 4, number> = { 1: 4000, 2: 2000, 3: 12_000, 4: 12_000 };
 
+/** 계산 종목 칸의 최소 문항 수 — 한 문항이 30~90초라 기초·달력의 MIN_ITEMS 로는 코스에 들지 못한다 */
+export const CALC_MIN_ITEMS = 5;
+export const minItems = (i: CourseItem) => (i.kind === 'calc' ? CALC_MIN_ITEMS : MIN_ITEMS);
+
 export const openMemoryEvents = (): MemoryEvent[] => MEMORY_EVENTS.filter((e) => e.status === 'ready');
 export const calendarOpen = () => CALC_EVENTS.some((e) => e.id === 'calendar' && e.status === 'ready');
+/** 코스에 오를 수 있는 계산 종목(달력 제외) — 열렸고 사다리가 있는 것 */
+export const openCalcEvents = (): CalcEvent[] =>
+  CALC_EVENTS.filter((e) => e.status === 'ready' && e.id !== 'calendar' && calcLevels(e.id).length > 0);
+
+/** 계산 종목 항목이 모의 대회 칸인가(없는 칸도 문항 수가 없는 쪽으로) */
+export const isCalcContest = (i: Extract<CourseItem, { kind: 'calc' }>) => {
+  const lv = calcLevels(i.eventId)[i.level - 1];
+  return !lv || isContestLevel(lv);
+};
 
 /** 종목 화면 주소(?preset=)가 가리키는 프리셋 */
 export function presetOf(eventId: string) {
@@ -32,9 +47,18 @@ export function presetOf(eventId: string) {
   return PRESETS.find((p) => p.id === id);
 }
 
-/** 문항 수가 있는 항목(기초·달력 1~4칸) */
+/** 문항 수가 있는 항목(기초·달력 1~4칸·계산 종목 연습 칸) */
 export const hasItems = (i: CourseItem): i is Extract<CourseItem, { items: number }> =>
-  i.kind === 'basics' || (i.kind === 'calendar' && i.level < 5);
+  i.kind === 'basics' || (i.kind === 'calendar' && i.level < 5) || (i.kind === 'calc' && !isCalcContest(i));
+
+/** 계산 종목 모의 대회 규정(요약표에 없으면 등록부 기본값) */
+function calcContestRule(s: CoachSummary, eventId: string): { limitSec: number; items: number } {
+  const rec = s.calcEvents?.find((e) => e.id === eventId);
+  if (rec) return { limitSec: rec.contest.limitSec, items: rec.contest.items };
+  const ev = CALC_EVENTS.find((e) => e.id === eventId);
+  const r = ev ? defaultRules(ev.rules) : {};
+  return { limitSec: Number(r.timeLimitSec) || 0, items: Number(r.items) || 0 };
+}
 
 /**
  * 예상 시간(ms) = 같은 칸의 최근 '한 문항에 실제로 든 시간' 중앙값 × 문항 수 + 준비 여유.
@@ -50,6 +74,17 @@ export function estimateMs(item: CourseItem, s: CoachSummary): number {
     const pace = s.calendar.levels[item.level - 1]?.paceSec;
     return PREP_MS + item.items * (pace ? pace * 1000 : CALENDAR_MS[item.level]);
   }
+  if (item.kind === 'calc') {
+    const levels = calcLevels(item.eventId);
+    if (isCalcContest(item)) {
+      /* 제한시간이 있으면 그 시간, 없으면(끝까지 풀고 시간만 잼) 규정 문항 × 마지막 연습 칸의 한 문항 시간 */
+      const c = calcContestRule(s, item.eventId);
+      const per = levels.filter((l) => !isContestLevel(l)).at(-1)?.perItemMs ?? 0;
+      return PREP_MS + (c.limitSec > 0 ? c.limitSec * 1000 : c.items * per);
+    }
+    const pace = s.calcEvents?.find((e) => e.id === item.eventId)?.levels[item.level - 1]?.paceSec;
+    return PREP_MS + item.items * (pace ? pace * 1000 : levels[item.level - 1].perItemMs);
+  }
   const rec = s.events.find((e) => e.id === item.eventId);
   const past = item.run === 'easy' ? rec?.easyMin : rec?.realMin;
   if (past) return PREP_MS + past * 60_000;
@@ -64,7 +99,7 @@ export const estimate = (item: CourseItem, s: CoachSummary) => Math.max(1, Math.
 /**
  * 항목 → 화면 주소. 코스로 여는 판이면 '&course=<행 id>&ci=<순번>' 을 붙인다 — 그 판이 끝나면 markStep 으로 표시한다.
  * 기초 '/basics?stage=S&n=N(&pick=P)' · 달력 '/calc/calendar/run?level=L&n=N(&steps=1)' 또는 '?mode=contest' ·
- * 종목 = 등록부의 to + '&run=R'.
+ * 계산 종목 '/calc/<id>/run?level=L&n=N' 또는 '?mode=contest' · 종목 = 등록부의 to + '&run=R'.
  */
 export function courseHref(item: CourseItem, logId?: string, index = 0): string {
   let base: string;
@@ -74,6 +109,8 @@ export function courseHref(item: CourseItem, logId?: string, index = 0): string 
     base = item.level === 5
       ? '/calc/calendar/run?mode=contest'
       : `/calc/calendar/run?level=${item.level}&n=${item.items}${item.steps ? '&steps=1' : ''}`;
+  } else if (item.kind === 'calc') {
+    base = `/calc/${item.eventId}/run?${isCalcContest(item) ? 'mode=contest' : `level=${item.level}&n=${item.items}`}`;
   } else {
     const to = findDiscipline(item.eventId)?.to ?? '/memory';
     base = `${to}${to.includes('?') ? '&' : '?'}run=${item.run}`;
@@ -85,7 +122,9 @@ export function courseHref(item: CourseItem, logId?: string, index = 0): string 
 export type PlayedRun =
   | { kind: 'basics'; stage: number }
   | { kind: 'calendar'; level: number; steps: boolean }
-  | { kind: 'event'; presetId: string | null; run: 'easy' | 'real' };
+  | { kind: 'event'; presetId: string | null; run: 'easy' | 'real' }
+  /** 계산 종목(달력 제외). 모의 대회는 마지막 칸 번호 */
+  | { kind: 'calc'; eventId: string; level: number };
 
 /** 이 판이 코스 항목대로였는가 — 다른 단계·칸·단계 입력·프리셋·모드로 한 판은 그 항목을 마친 것으로 치지 않는다 */
 export function playedMatches(item: CourseItem, p: PlayedRun): boolean {
@@ -93,6 +132,7 @@ export function playedMatches(item: CourseItem, p: PlayedRun): boolean {
   if (item.kind === 'calendar') {
     return p.kind === 'calendar' && p.level === item.level && (item.level === 5 || p.steps === !!item.steps);
   }
+  if (item.kind === 'calc') return p.kind === 'calc' && p.eventId === item.eventId && p.level === item.level;
   return p.kind === 'event' && p.run === item.run && p.presetId === (presetOf(item.eventId)?.id ?? null);
 }
 
@@ -105,8 +145,16 @@ export function courseStep(params: URLSearchParams): { logId: string; index: num
 
 const PICK_NAME = { srs: '골고루', weak: '약한 칸', unseen: '안 본 칸', all: '전부' } as const;
 
-/** 항목 이름(평문) — '기초 2단계 · 두 자리 · 30문항', '달력 5칸 · 1분 모의 대회', '스피드 숫자 · 연습' */
+/**
+ * 항목 이름(평문) — '기초 2단계 · 두 자리 · 30문항', '달력 5칸 · 1분 모의 대회', '스피드 숫자 · 연습',
+ * '제곱근 2칸 · 6자리 · 유효 6 · 20문항', '제곱근 · 모의 대회'
+ */
 export function itemLabel(item: CourseItem): string {
+  if (item.kind === 'calc') {
+    const name = findDiscipline(item.eventId)?.name ?? item.eventId;
+    if (isCalcContest(item)) return `${name} · 모의 대회`;
+    return `${name} ${item.level}칸 · ${calcLevels(item.eventId)[item.level - 1].name} · ${item.items}문항`;
+  }
   if (item.kind === 'basics') {
     const name = LADDERS[0].levels[item.stage - 1]?.name ?? '';
     const pick = item.stage === 3 && item.pick ? ` · ${PICK_NAME[item.pick]}` : '';
