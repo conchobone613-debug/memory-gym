@@ -36,6 +36,12 @@ export default function EventDetail() {
     const total = s.correct + s.wrong + s.blank;
     return Math.max(a, total ? s.correct / total : 0);
   }, 0);
+  /* 대회식 점수가 있는 종목(듣기·이진수) — 최고 점수는 모의 대회 판에서만(runMode 가 없는 옛 기록은 규격대로 한 판) */
+  const scored = ev.score;
+  const contestScores = scored
+    ? sessions.filter((s) => (s.runMode ?? 'real') === 'real' && s.score !== undefined).map((s) => s.score!)
+    : [];
+  const bestScore = contestScores.length ? `${Math.max(...contestScores)}${scored!.unit}` : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,8 +72,12 @@ export default function EventDetail() {
       <Folder tab="시작" clip>
         <h2 className="text-xl leading-tight text-ink">연습</h2>
         <p className="mt-1 text-sm text-ink-2">
-          시간을 재지 않습니다. 짧게 내고, 다 외우셨으면 넘어갑니다. 채점할 때 <b className="text-ink">이미지 이름</b>과
-          궁전을 고르셨으면 <b className="text-ink">장소 이름</b>까지 같이 보여 줍니다.
+          {ev.howPractice ?? (
+            <>
+              시간을 재지 않습니다. 짧게 내고, 다 외우셨으면 넘어갑니다. 채점할 때 <b className="text-ink">이미지 이름</b>과
+              궁전을 고르셨으면 <b className="text-ink">장소 이름</b>까지 같이 보여 줍니다.
+            </>
+          )}
         </p>
         <div className="mt-3">
           {open && ev.to ? (
@@ -81,8 +91,12 @@ export default function EventDetail() {
 
         <h2 className="text-xl leading-tight text-ink">모의 대회</h2>
         <p className="mt-1 text-sm text-ink-2">
-          대회 규격 시간으로 잽니다. 암기 시간이 끝나면 자동으로 회상으로 넘어가고, 채점에서 칸마다
-          틀린 원인을 달아 둘 수 있습니다.
+          {ev.howContest ?? (
+            <>
+              대회 규격 시간으로 잽니다. 암기 시간이 끝나면 자동으로 회상으로 넘어가고, 채점에서 칸마다
+              틀린 원인을 달아 둘 수 있습니다.
+            </>
+          )}
         </p>
         <div className="mt-3">
           {open && ev.to ? (
@@ -98,7 +112,7 @@ export default function EventDetail() {
           <Dymo small>내 기록</Dymo>
           {sessions.length > 0 && (
             <span className="font-typek text-xs text-ink-2">
-              최고 <b className="tnum text-ink">{fmtPct(best)}</b>
+              최고 <b className="tnum text-ink">{bestScore ?? fmtPct(best)}</b>
             </span>
           )}
         </div>
@@ -111,7 +125,8 @@ export default function EventDetail() {
             <div className="grid grid-cols-2 gap-2">
               <Stat label="시도" value={`${sessions.length}회`} />
               <Stat label="최고 정확도" value={fmtPct(best)} />
-              <div className="col-span-2">
+              {scored && <Stat label="모의 대회 최고" value={bestScore ?? '—'} sub={scored.label} />}
+              <div className={scored ? undefined : 'col-span-2'}>
                 <Stat
                   label="마지막"
                   value={localDayKey(sessions[0].startedAt)}
@@ -132,8 +147,11 @@ export default function EventDetail() {
                       <span className="rounded-[3px] border border-card-edge px-1.5 text-[11px] text-ink-2">
                         {s.runMode === 'easy' ? '연습' : '모의 대회'}
                       </span>
+                      {/* 점수 종목은 칸 수 대신 판마다 점수 — 휴대폰 한 줄에 들어가게 */}
                       <span className="tnum ml-auto font-bold text-ink">
-                        {s.correct}/{total} · {total ? fmtPct(s.correct / total) : '—'}
+                        {!scored && `${s.correct}/${total} · `}
+                        {total ? fmtPct(s.correct / total) : '—'}
+                        {scored && s.score !== undefined && ` · ${s.score}${scored.unit}`}
                       </span>
                       <span className="tnum w-12 text-right text-xs text-ink-2">
                         {mmss(s.memorizeUsedMs + (s.recallUsedMs ?? 0))}

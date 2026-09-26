@@ -56,6 +56,29 @@ describe('통합 기록 — 네 가지 모양을 한 틀로', () => {
     expect(out.find((s) => s.id === 'a')).toMatchObject({ disciplineId: 'speed-cards', mode: 'contest' });
     expect(out.find((s) => s.id === 'b')).toMatchObject({ disciplineId: 'speed-numbers', mode: 'practice' });
   });
+
+  it('eventId 가 없는 이진수 판은 이진수 종목으로 읽는다', () => {
+    const out = summarize({
+      ...empty,
+      recallSessions: [{
+        id: 'x', mode: 'binary', presetName: 'p', stimulus: Array(12).fill('1'), memorizeMs: 0, memorizeUsedMs: 6000, recallMs: 0,
+        startedAt: T, correct: 1, wrong: 1, blank: 0, params: { code: 'b3', rowLen: 30 },
+      }],
+    });
+    expect(out[0]).toMatchObject({ disciplineId: 'binary', title: '이진수', perItemMs: 500 });
+  });
+
+  it('낭독 간격이 있는 판(듣기)은 문항당 시간을 재지 않는다 — 속도를 기계가 정했다', () => {
+    const out = summarize({
+      ...empty,
+      recallSessions: [{
+        id: 's', mode: 'digits', presetName: 'p', eventId: 'spoken-numbers', runMode: 'real', stimulus: Array(10).fill('3'),
+        memorizeMs: 10_000, memorizeUsedMs: 10_800, recallMs: 0, recallUsedMs: 30_000, startedAt: T, correct: 4, wrong: 1, blank: 0,
+        score: 7, params: { intervalMs: 1000, lang: 'ko' },
+      }],
+    });
+    expect(out[0]).toMatchObject({ disciplineId: 'spoken-numbers', title: '듣고 외우는 숫자', perItemMs: 0, durationMs: 40_800, items: 5 });
+  });
 });
 
 describe('연속일', () => {

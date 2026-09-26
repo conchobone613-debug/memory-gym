@@ -1,5 +1,5 @@
 import { db, getSettings, type ImageStat, type MappingStat } from './db';
-import { resolveCellImage } from '../lib/resolveImage';
+import { resolveCellImage, settingsForSession } from '../lib/resolveImage';
 import { mean, median } from '../lib/srs';
 
 const MAX_SAMPLES = 30;
@@ -44,7 +44,7 @@ export async function rebuildImageStats(): Promise<number> {
     const session = sessionById.get(cell.sessionId);
     if (!session) continue;
     const chunk = session.mode === 'digits' ? cell.expected.length : 1;
-    const img = resolveCellImage(cell.expected, session.mode, chunk, settings, sets, images);
+    const img = resolveCellImage(cell.expected, session.mode, chunk, settingsForSession(settings, session), sets, images);
     if (!img?.name.trim()) continue;
     const cur = byImage.get(img.id) ?? {
       imageId: img.id, setId: img.setId, attempts: 0, correct: 0, wrong: 0,

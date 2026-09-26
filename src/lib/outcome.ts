@@ -14,6 +14,10 @@ export const NEAR_MISS = {
   items: 1,
   /** 최고 연속에 이만큼 모자라면 아깝다 */
   combo: 2,
+  /** 듣기 종목 — 처음 틀린 곳까지 자리 수 신기록에 이만큼 모자라면 아깝다 */
+  spokenDigits: 2,
+  /** 이진수 종목 — 줄 점수 신기록에 이만큼(반 줄) 모자라면 아깝다 */
+  binaryPoints: 15,
 };
 
 export interface OutcomeStat {

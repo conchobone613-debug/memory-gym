@@ -53,7 +53,7 @@ export const COURSE_SYSTEM = [
   '- say: "정확도가 90% 남짓 되는구먼." — 요약표 값(91)을 어림해 바꿨습니다.',
   '- say: "오늘도 열심히 해 봅시다." — 하게체가 아닙니다.',
   '- why: "약한 칸을 복습하게." — why 는 평문(…습니다)입니다.',
-  '- event 에 spoken-numbers — 카탈로그에 없는(잠긴) 종목입니다.',
+  '- event 에 words — 카탈로그에 없는(잠긴) 종목입니다.',
   '- basics.current 가 1 인데 stage 3 — 두 칸을 건너뛰었습니다.',
 ].join('\n');
 

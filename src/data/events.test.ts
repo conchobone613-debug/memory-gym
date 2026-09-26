@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CALC_EVENTS, DISCIPLINES, MEMORY_EVENTS, findDiscipline } from './events';
+import { PRESETS } from './presets';
 
 describe('종목 등록부', () => {
   it('id 가 영역을 넘어서도 겹치지 않는다', () => {
@@ -11,6 +12,15 @@ describe('종목 등록부', () => {
     for (const d of DISCIPLINES) {
       if (d.status === 'ready') expect(d.to, d.id).toBeTruthy();
       else expect(d.needs, d.id).toBeTruthy();
+    }
+  });
+
+  it('프리셋마다 종목이 등록부에 있고, 열린 기억력 종목 주소의 프리셋은 그 종목 것이다', () => {
+    for (const p of PRESETS) expect(MEMORY_EVENTS.some((e) => e.id === p.eventId), p.id).toBe(true);
+    for (const e of MEMORY_EVENTS.filter((x) => x.status === 'ready')) {
+      const q = new URLSearchParams(e.to!.split('?')[1]);
+      expect(q.get('event'), e.id).toBe(e.id);
+      expect(PRESETS.find((p) => p.id === q.get('preset'))?.eventId, e.id).toBe(e.id);
     }
   });
 

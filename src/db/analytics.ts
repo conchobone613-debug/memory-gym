@@ -1,5 +1,7 @@
-import { compareKeys, db, type MemoImage } from './db';
+import { compareKeys, db, getSettings, type MemoImage } from './db';
 import { median } from '../lib/srs';
+import { bitsToKey, DEFAULT_BINARY_CODE } from '../lib/binary';
+import { settingsForSession } from '../lib/resolveImage';
 
 export function localDayKey(t: number): string {
   const d = new Date(t);
@@ -63,7 +65,17 @@ export async function confusionPairs(limit = 10): Promise<ConfusionPair[]> {
     if (cur) cur.count++;
     else counts.set(k, { expected, answered, count: 1, source });
   };
-  for (const c of cells) bump(c.expected, c.answered, '실전');
+  /* 이진수 칸은 그 판 방식으로 이미지 키로 바꿔 센다 — 비트 문자열을 혼동 쌍에 섞지 않는다 */
+  const settings = await getSettings();
+  const binary = new Map((await db.recallSessions.where('mode').equals('binary').toArray())
+    .map((s) => [s.id, settingsForSession(settings, s).binaryCode ?? DEFAULT_BINARY_CODE]));
+  for (const c of cells) {
+    const code = binary.get(c.sessionId);
+    if (!code) { bump(c.expected, c.answered, '실전'); continue; }
+    const exp = bitsToKey(c.expected, code);
+    const ans = bitsToKey(c.answered, code);
+    if (exp && ans) bump(exp, ans, '실전');
+  }
 
   /* 초성만 맞은 것도 센다 — 다른 칸 이름을 쳤는데 코드 앞자리가 겹치면 그쪽으로 분류되기 때문 */
   const typed = await db.drillAttempts

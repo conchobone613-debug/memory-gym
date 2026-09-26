@@ -38,6 +38,11 @@ export interface MemoryEvent extends DisciplineBase {
   memorize: string;
   /** 회상 시간 표기 */
   recall: string;
+  /** 대회식 점수가 있는 종목 — 성적표·내 기록·스승님이 이 이름과 단위로 적는다(판마다 RecallSession.score) */
+  score?: { label: string; unit: string };
+  /** 종목 화면의 연습·모의 대회 설명. 없으면 화면 기본 문구 */
+  howPractice?: string;
+  howContest?: string;
 }
 
 /** 규정 칸 하나. 값은 설정 화면에서 바꾸고 세션마다 사본으로 남는다. */
@@ -88,21 +93,27 @@ export const MEMORY_EVENTS: MemoryEvent[] = [
     domain: 'memory',
     id: 'spoken-numbers',
     name: '듣고 외우는 숫자',
-    memorize: '초당 한 개씩 낭독',
-    recall: '제한 있음',
+    memorize: '초당 1개 낭독',
+    recall: '5분',
     what: '눈으로 보지 못하고 귀로만 받는다. 되감기가 없어 가장 가혹한 종목으로 꼽힌다.',
-    status: 'locked',
-    needs: '숫자를 초당 하나씩 읽어 주는 기능. 브라우저 음성 합성으로 만들 수 있어 사진이 필요한 종목보다 쉽다.',
+    status: 'ready',
+    to: '/practice?preset=sp100&event=spoken-numbers',
+    score: { label: '처음 틀린 곳까지', unit: '자리' },
+    howPractice: '낭독을 늦출 수 있고(1.5초·2초) 분량을 4분의 1로 줄입니다. 채점할 때 이미지 이름을 같이 보여 줍니다.',
+    howContest: '초당 한 개씩 한 번만 읽습니다. 다 읽으면 곧바로 회상으로 넘어갑니다. 점수는 처음 틀린 곳까지 맞힌 자리 수입니다.',
   },
   {
     domain: 'memory',
     id: 'binary',
     name: '이진수',
-    memorize: '30분',
-    recall: '60분',
-    what: '0과 1만 늘어선 줄을 외운다.',
-    status: 'locked',
-    needs: '이진수를 몇 자리씩 묶어 십진수로 바꾸는 규칙. 바꾸고 나면 회장님 숫자 이미지를 그대로 쓴다.',
+    memorize: '5분',
+    recall: '15분',
+    what: '0과 1만 늘어선 30자리 줄을 외운다. 국가 대회는 5분, 국제 대회는 30분 판이다.',
+    status: 'ready',
+    to: '/practice?preset=b5&event=binary',
+    score: { label: '줄 점수', unit: '점' },
+    howPractice: '시간을 재지 않고 분량을 4분의 1로 줄입니다. 외우는 동안 칸마다 바꾼 숫자를 보여 줍니다.',
+    howContest: '대회 규격 시간으로 잽니다. 30자리 줄마다 모두 맞으면 30점, 하나 틀리면 15점, 둘 이상이면 0점입니다.',
   },
   {
     domain: 'memory',

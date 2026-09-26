@@ -5,6 +5,7 @@ import { goalFor } from '../db/goals';
 import { CAL_LEVELS, contestSessions, practiceIds } from '../calc/calendarLadder';
 import { stepAverages } from '../calc/calendarDrill';
 import { WEEKDAY_LONG } from '../calc/calendar';
+import { MEMORY_EVENTS } from '../data/events';
 
 /*
  * 한 판 복기의 입력 — 그 판의 요약만(원시 기록 전체를 보내지 않는다).
@@ -32,6 +33,8 @@ export interface ReviewInput {
   errorTags?: { tag: string; count: number }[];
   /** 같은 종목·같은 모드의 지난 판 */
   previous?: { day: string; accuracyPct: number; secPerItem: number | null };
+  /** 대회식 점수가 있는 종목(듣기·이진수)의 그 판 점수 — 예: 처음 틀린 곳까지 34자리 */
+  contestScore?: { label: string; value: number; unit: string };
 }
 
 const TOP = 5;
@@ -103,6 +106,9 @@ export async function buildSessionReviewInput(kind: SessionKind, sessionId: stri
     const tags = new Map<ErrorTag, number>();
     for (const c of cells) for (const t of c.errorTags) tags.set(t, (tags.get(t) ?? 0) + 1);
     if (tags.size) out.errorTags = [...tags].sort((a, b) => b[1] - a[1]).map(([t, count]) => ({ tag: ERROR_TAG_LABEL[t], count }));
+    const session = await db.recallSessions.get(sessionId);
+    const meta = MEMORY_EVENTS.find((e) => e.id === me.disciplineId)?.score;
+    if (session?.score !== undefined && meta) out.contestScore = { label: meta.label, value: session.score, unit: meta.unit };
   } else {
     const [session, items] = await Promise.all([
       db.calcSessions.get(sessionId),

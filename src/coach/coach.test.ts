@@ -64,7 +64,7 @@ describe('훈련 요약표', () => {
     expect(s.calendar.current).toBe(1);
     expect(s.calendar.levels).toHaveLength(4);
     expect(s.calendar.contest).toEqual({ level: 5, name: '1분 모의 대회', runs: 0, bestScore: null, limitSec: 60 });
-    expect(s.events.map((e) => e.id)).toEqual(['speed-numbers', 'hour-numbers', 'speed-cards']); // 열린 종목만
+    expect(s.events.map((e) => e.id)).toEqual(['speed-numbers', 'hour-numbers', 'speed-cards', 'spoken-numbers', 'binary']); // 열린 종목만
     expect(s.events.every((e) => e.runs === 0 && e.daysAgo === null)).toBe(true);
     expect(s.recent7).toEqual([]);
     expect(s.weak).toEqual({ images: [], calendarSteps: [] });
@@ -176,6 +176,9 @@ describe('규칙 코치', () => {
       summaries: [
         sess({ kind: 'recall', disciplineId: 'speed-numbers', title: '스피드 숫자', startedAt: T - DAY, accuracy: 0.95, durationMs: 240_000 }),
         sess({ kind: 'recall', disciplineId: 'speed-cards', title: '스피드 카드', startedAt: T - 6 * DAY, accuracy: 0.95, durationMs: 150_000 }),
+        /* 한 번도 안 한 종목이 앞서므로 듣기·이진수는 오늘 해 둔다 — 여기서는 오래 쉰 순서만 본다 */
+        sess({ kind: 'recall', disciplineId: 'spoken-numbers', title: '듣고 외우는 숫자', startedAt: T, accuracy: 0.5 }),
+        sess({ kind: 'recall', disciplineId: 'binary', title: '이진수', startedAt: T, accuracy: 0.5 }),
       ],
     }));
     /* 1시간 숫자는 한 번도 안 했지만 연습만 45분이라 30분 코스에 들지 않는다 */
@@ -215,7 +218,7 @@ describe('스승님 코스 검사', () => {
     const c = validateCourse({
       say: '해 보세.',
       items: [
-        ai({ kind: 'event', eventId: 'spoken-numbers', run: 'easy' }),
+        ai({ kind: 'event', eventId: 'words', run: 'easy' }),
         ai({ kind: 'event', eventId: 'foo', run: 'easy' }),
         ai({ kind: 'sqrt', level: 1, items: 10 }),
         ai({ kind: 'event', eventId: 'speed-cards', run: 'real' }),
@@ -223,7 +226,7 @@ describe('스승님 코스 검사', () => {
     }, s, 30);
     /* 스승님이 고른 것 가운데 쓸 수 있는 것만 앞에 남고, 뒤는 분량을 채운 규칙 항목이다 */
     expect(c?.items[0]).toMatchObject({ kind: 'event', eventId: 'speed-cards' });
-    expect(c?.items.some((i) => i.kind === 'event' && ['spoken-numbers', 'foo'].includes(i.eventId))).toBe(false);
+    expect(c?.items.some((i) => i.kind === 'event' && ['words', 'foo'].includes(i.eventId))).toBe(false);
     expect(c?.items[0]).toMatchObject({ run: 'real' });
   });
 
@@ -474,7 +477,7 @@ describe('답 형식(JSON 스키마)', () => {
     };
     walk(schema);
     const item = (schema.properties as { items: { items: { properties: { eventId: { enum: string[] } } } } }).items.items;
-    expect(item.properties.eventId.enum).toEqual(['speed-numbers', 'hour-numbers', 'speed-cards', 'none']);
+    expect(item.properties.eventId.enum).toEqual(['speed-numbers', 'hour-numbers', 'speed-cards', 'spoken-numbers', 'binary', 'none']);
   });
 
   it('스승님 글의 기본 시간·문항 범위는 코드 값을 옮겨 적는다 · 맞는 예와 틀린 예가 있다', () => {

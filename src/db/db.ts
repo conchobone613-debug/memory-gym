@@ -5,6 +5,8 @@ import {
   type RankDigits, type SuitDigits,
 } from '../lib/cards';
 import { uid } from '../lib/random';
+import type { BinaryCode } from '../lib/binary';
+import type { SpokenLang } from '../lib/spoken';
 import type { Course, Review } from '../coach/types';
 
 /* ───────────────── 타입 ───────────────── */
@@ -69,7 +71,8 @@ export interface DrillAttempt {
   shownAt: number;
 }
 
-export type PracticeMode = 'digits' | 'cards';
+/** 듣고 외우는 숫자는 'digits' + eventId 'spoken-numbers' 로 저장한다(칸 모양이 숫자와 같다). */
+export type PracticeMode = 'digits' | 'cards' | 'binary';
 
 export interface RecallSession {
   id: string;
@@ -92,6 +95,13 @@ export interface RecallSession {
   correct: number;
   wrong: number;
   blank: number;
+  /*
+   * 아래 둘은 색인이 아닌 칸이라 버전을 올리지 않았다(P3). 기존 종목은 비워 둔다.
+   */
+  /** 대회식 점수 — 듣기는 처음 틀린 곳까지 맞힌 자리 수, 이진수는 줄 점수 */
+  score?: number;
+  /** 그 판 조건 사본 — 듣기 { intervalMs, lang }, 이진수 { code, rowLen }. 설정을 바꿔도 옛 판의 뜻이 남는다. */
+  params?: RuleValues;
 }
 
 export type ErrorTag = 'image' | 'locus' | 'link' | 'order' | 'blank';
@@ -187,6 +197,10 @@ export interface AppSettings {
   dailyMinutes: number;
   /** 스승님이 하루 한 번 스스로 코스를 짜 줄지. 없으면 켬(키가 있을 때만 부른다) */
   coachAuto?: boolean;
+  /** 이진수 6자리를 숫자 이미지로 바꾸는 방식. 없으면 DEFAULT_BINARY_CODE(lib/binary) */
+  binaryCode?: BinaryCode;
+  /** 듣기 종목 낭독 언어. 없으면 DEFAULT_SPOKEN_LANG(lib/spoken) */
+  spokenLang?: SpokenLang;
   seededAt?: number;
 }
 

@@ -101,8 +101,10 @@ export function summarize(raw: RawLogs): SessionSummary[] {
 
   for (const s of raw.recallSessions) {
     /* 종목 화면이 생기기 전 기록에는 eventId 가 없다. 그때는 숫자·카드로만 갈랐다. */
-    const disciplineId = s.eventId ?? (s.mode === 'cards' ? 'speed-cards' : 'speed-numbers');
+    const disciplineId = s.eventId ?? (s.mode === 'cards' ? 'speed-cards' : s.mode === 'binary' ? 'binary' : 'speed-numbers');
     const items = s.correct + s.wrong + s.blank;
+    /* 낭독 간격이 있는 판(듣기)은 속도를 기계가 정해 문항당 시간이 제자의 속도가 아니다 */
+    const paced = s.params?.intervalMs !== undefined;
     push({
       id: s.id, kind: 'recall', domain: 'memory', disciplineId,
       title: findDiscipline(disciplineId)?.name ?? s.presetName,
@@ -110,7 +112,7 @@ export function summarize(raw: RawLogs): SessionSummary[] {
       mode: s.runMode === 'easy' ? 'practice' : 'contest',
       startedAt: s.startedAt, durationMs: s.memorizeUsedMs + (s.recallUsedMs ?? 0),
       items, correct: s.correct,
-      perItemMs: s.stimulus.length ? Math.round(s.memorizeUsedMs / s.stimulus.length) : 0,
+      perItemMs: !paced && s.stimulus.length ? Math.round(s.memorizeUsedMs / s.stimulus.length) : 0,
     });
   }
 

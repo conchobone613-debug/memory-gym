@@ -1,5 +1,6 @@
-import type { AppSettings, ImageSet, MemoImage, PracticeMode } from '../db/db';
+import type { AppSettings, ImageSet, MemoImage, PracticeMode, RecallSession } from '../db/db';
 import { resolveCard } from './cards';
+import { bitsToKey, DEFAULT_BINARY_CODE, toBinaryCode } from './binary';
 
 /**
  * 실전 칸의 정답 키가 어느 이미지였는지 찾는다.
@@ -22,7 +23,19 @@ export function resolveCellImage(
     const set = setByDomain.get(chunk === 3 ? 'digit3' : 'digit2');
     return set ? bySetKey.get(`${set.id}:${expectedKey}`) : undefined;
   }
+  if (mode === 'binary') {
+    /* 이진수 6자리 = 두 자리 숫자 이미지 하나 */
+    const key = bitsToKey(expectedKey, settings.binaryCode ?? DEFAULT_BINARY_CODE);
+    const set = setByDomain.get('digit2');
+    return key && set ? bySetKey.get(`${set.id}:${key}`) : undefined;
+  }
   const r = resolveCard(expectedKey, settings.suitDigits, settings.rankDigits);
   const set = r && setByDomain.get(r.domain);
   return r && set ? bySetKey.get(`${set.id}:${r.key}`) : undefined;
+}
+
+/** 지난 판을 읽을 때의 설정 — 이진수 판은 그때 쓴 변환 방식(params.code)을 덮는다. 방식을 나중에 바꿔도 옛 판은 그때 방식이다. */
+export function settingsForSession(settings: AppSettings, session: Pick<RecallSession, 'mode' | 'params'>): AppSettings {
+  if (session.mode !== 'binary' || session.params?.code === undefined) return settings;
+  return { ...settings, binaryCode: toBinaryCode(session.params.code, settings.binaryCode ?? DEFAULT_BINARY_CODE) };
 }
