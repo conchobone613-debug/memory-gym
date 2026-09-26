@@ -139,6 +139,39 @@ async function collectLogsSince(since: number, allCells = false) {
   return { rows: out, count };
 }
 
+type LogRows = Partial<Record<LogTable, unknown[]>>;
+
+/** 묶음 하나의 JSON 크기 상한. Firestore 문서 한도가 1MiB 라 여유를 둔다. */
+export const BATCH_BYTES = 700_000;
+
+const utf8 = new TextEncoder();
+
+/**
+ * 올릴 기록을 JSON 크기(UTF-8 바이트) 기준으로 여러 묶음으로 나눈다. 행 순서는 그대로다.
+ * 한 행이 상한을 넘는 일은 없다고 본다 — 넘으면 그 행 혼자 한 묶음이 된다.
+ */
+export function splitRows(rows: LogRows, limit = BATCH_BYTES): LogRows[] {
+  const out: LogRows[] = [];
+  let cur: LogRows = {};
+  let size = 2; // {}
+  for (const name of LOG_TABLES) {
+    const head = name.length + 6; // "이름":[] 와 쉼표
+    for (const row of rows[name] ?? []) {
+      const add = utf8.encode(JSON.stringify(row)).length + 1;
+      if (size > 2 && size + (cur[name] ? 0 : head) + add > limit) {
+        out.push(cur);
+        cur = {};
+        size = 2;
+      }
+      if (!cur[name]) { cur[name] = []; size += head; }
+      cur[name].push(row);
+      size += add;
+    }
+  }
+  if (size > 2) out.push(cur);
+  return out;
+}
+
 /** id 가 UUID 라 bulkPut 은 몇 번 해도 같은 결과가 된다. */
 async function applyLogs(rows: Partial<Record<LogTable, unknown[]>>): Promise<number> {
   let n = 0;
@@ -191,10 +224,13 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   /*
    * 3. 새로 생긴 기록 올리기.
    * 2026-09-26 전에는 회상 칸이 한 번도 올라가지 않았다. 그때 동기화한 기기는 칸을 한 번 전부 올린다.
+   * 첫 동기화·되채우기는 Firestore 문서 한도(1MiB)를 넘을 수 있어 묶음을 나눠 올린다.
+   * 중간에 실패하면 lastSyncAt 이 그대로라 다음번에 전부 다시 올린다 — 받는 쪽 bulkPut 은 겹쳐도 같다.
    */
   const mine = await collectLogsSince(since, !settings.recallCellsSynced);
-  if (mine.count > 0) {
-    await remote.putBatch(`${now}-${Math.random().toString(36).slice(2, 8)}`, now, mine.rows);
+  const tag = Math.random().toString(36).slice(2, 8);
+  for (const [i, rows] of splitRows(mine.rows).entries()) {
+    await remote.putBatch(`${now}-${tag}-${i}`, now, rows);
   }
 
   /* 4. 통계는 받은 게 아니라 여기서 다시 만든다 */

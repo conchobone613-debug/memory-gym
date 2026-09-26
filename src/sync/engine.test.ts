@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db, getSettings, saveSettings } from '../db/db';
-import { syncOnce, type Remote } from './engine';
+import { BATCH_BYTES, splitRows, syncOnce, type Remote } from './engine';
 
 /*
  * 회상 칸은 시각이 없어 '마지막 동기화 뒤' 비교로는 한 번도 올라가지 않았다(2026-09-26 수리).
@@ -10,25 +10,33 @@ import { syncOnce, type Remote } from './engine';
 
 type Rows = Record<string, { id: string }[]>;
 
-/** Firestore 대신 메모리에 담는 창구. 올린 묶음을 그대로 남겨 들여다본다. */
-function memoryRemote() {
+/** JSON 을 UTF-8 로 적은 크기 — Firestore 가 문서 크기를 세는 단위 */
+const bytes = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
+
+/** Firestore 대신 메모리에 담는 창구. 올린 묶음을 그대로 남겨 들여다본다. 1MiB 넘는 묶음은 Firestore 처럼 거절한다. */
+function memoryRemote(failAt = -1) {
   const batches: { id: string; createdAt: number; rows: Rows }[] = [];
+  let puts = 0;
   const remote: Remote = {
     async getAssets() { return null; },
     async putAssets() {},
     async listBatches(after) { return batches.filter((b) => b.createdAt > after) as never; },
-    async putBatch(id, createdAt, rows) { batches.push({ id, createdAt, rows: rows as Rows }); },
+    async putBatch(id, createdAt, rows) {
+      if (puts++ === failAt) throw new Error('연결 끊김');
+      if (bytes(rows) > 1024 * 1024) throw new Error('문서가 1MiB 를 넘음');
+      batches.push({ id, createdAt, rows: rows as Rows });
+    },
   };
   return { remote, batches };
 }
 
-async function addRecall(id: string, startedAt: number, cells: number) {
+async function addRecall(id: string, startedAt: number, cells: number, answered = '13') {
   await db.recallSessions.add({
     id, mode: 'digits', presetName: 'p', stimulus: [], memorizeMs: 1, memorizeUsedMs: 1, recallMs: 1,
     startedAt, correct: 0, wrong: cells, blank: 0,
   });
   await db.recallCells.bulkAdd(Array.from({ length: cells }, (_, i) => ({
-    id: `${id}-c${i}`, sessionId: id, index: i, expected: '12', answered: '13', isCorrect: false, errorTags: [],
+    id: `${id}-c${i}`, sessionId: id, index: i, expected: '12', answered, isCorrect: false, errorTags: [],
   })));
 }
 
@@ -97,4 +105,70 @@ describe('동기화 — 회상 칸', () => {
     expect(res.pulled).toBe(3);
     expect(ids(await db.recallCells.toArray())).toEqual(['r1-c0', 'r1-c1']);
   });
+});
+
+describe('동기화 — 큰 기록은 묶음을 나눠 올린다', () => {
+  it('나누기: 묶음마다 한도 아래이고, 이어 붙이면 원래 행이 순서대로 다 있다', () => {
+    const rows = {
+      recallSessions: Array.from({ length: 30 }, (_, i) => ({ id: `s${i}`, presetName: '한글 이름' })),
+      recallCells: Array.from({ length: 200 }, (_, i) => ({ id: `c${i}`, answered: '가나다라마바사' })),
+    };
+    const parts = splitRows(rows, 2_000);
+
+    expect(parts.length).toBeGreaterThan(1);
+    for (const p of parts) expect(bytes(p)).toBeLessThanOrEqual(2_000);
+    expect(parts.flatMap((p) => p.recallSessions ?? [])).toEqual(rows.recallSessions);
+    expect(parts.flatMap((p) => p.recallCells ?? [])).toEqual(rows.recallCells);
+  });
+
+  it('나누기: 빈 기록은 묶음이 없고, 작은 기록은 한 묶음 그대로다', () => {
+    expect(splitRows({})).toEqual([]);
+    const small = { drillAttempts: [{ id: 'a' }] };
+    expect(splitRows(small)).toEqual([small]);
+  });
+
+  it('칸 1만 개도 한도 아래 묶음들로 빠짐없이 올라가고, 새 기기가 전부 받는다', async () => {
+    await addRecall('big', Date.now() - 60_000, 10_000);
+    /* 한 묶음이면 Firestore 문서 한도(1MiB)를 넘는 양이어야 이 시험이 뜻이 있다 */
+    expect(bytes(await db.recallCells.toArray())).toBeGreaterThan(1024 * 1024);
+    const { remote, batches } = memoryRemote();
+
+    const res = await syncOnce(remote);
+
+    expect(batches.length).toBeGreaterThan(1);
+    expect(new Set(batches.map((b) => b.id)).size).toBe(batches.length);
+    for (const b of batches) expect(bytes(b.rows)).toBeLessThanOrEqual(BATCH_BYTES);
+    const cells = batches.flatMap((b) => b.rows.recallCells ?? []);
+    expect(cells).toHaveLength(10_000);
+    expect(new Set(cells.map((c) => c.id)).size).toBe(10_000);
+    expect(ids(batches.flatMap((b) => b.rows.recallSessions ?? []))).toEqual(['big']);
+    expect(res.pushed).toBe(10_001);
+
+    /* 같은 방에 새로 들어온 기기 */
+    await Promise.all([db.recallSessions.clear(), db.recallCells.clear(), db.settings.clear()]);
+    const got = await syncOnce(remote);
+
+    expect(got.pulled).toBe(10_001);
+    expect(await db.recallCells.count()).toBe(10_000);
+    expect(ids(await db.recallSessions.toArray())).toEqual(['big']);
+  }, 60_000);
+
+  it('묶음 일부만 올라가고 끊기면 표시가 남지 않아, 다음번에 전부 다시 올린다', async () => {
+    /* fake-indexeddb 는 이미 있는 행을 덮어쓰는 데 행마다 약 10ms 라, 칸 수를 줄이고 칸을 크게 한다 */
+    await addRecall('big', Date.now() - 60_000, 100, 'x'.repeat(10_000));
+    const { remote, batches } = memoryRemote(1); // 두 번째 묶음에서 끊긴다
+
+    await expect(syncOnce(remote)).rejects.toThrow('연결 끊김');
+    expect(batches).toHaveLength(1);
+    const s = await getSettings();
+    expect(s.lastSyncAt ?? 0).toBe(0);
+    expect(s.recallCellsSynced).toBeFalsy();
+
+    await syncOnce(remote);
+    await Promise.all([db.recallSessions.clear(), db.recallCells.clear(), db.settings.clear()]);
+    await syncOnce(remote);
+
+    expect(await db.recallCells.count()).toBe(100);
+    expect(ids(await db.recallSessions.toArray())).toEqual(['big']);
+  }, 60_000);
 });
