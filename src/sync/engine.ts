@@ -35,10 +35,10 @@ async function collectAssets() {
     db.imageSets.toArray(), db.images.toArray(), db.palaces.toArray(), db.loci.toArray(), getSettings(),
   ]);
   /*
-   * lastBackupAt·lastSyncAt 은 기기마다 다른 값이라 보내지 않는다.
+   * lastBackupAt·lastSyncAt·recallCellsSynced 는 기기마다 다른 값이라 보내지 않는다.
    * aiKey 는 **비밀이라** 보내지 않는다 — 기기마다 각자 넣는다.
    */
-  const { lastBackupAt: _b, lastSyncAt: _s, aiKey: _k, ...shared } = settings;
+  const { lastBackupAt: _b, lastSyncAt: _s, recallCellsSynced: _r, aiKey: _k, ...shared } = settings;
   return { imageSets, images, palaces, loci, settings: shared };
 }
 
@@ -111,16 +111,31 @@ async function applyAssets(b: AssetBundle) {
 
 /* ── 기록 ───────────────────────────────────────── */
 
-async function collectLogsSince(since: number) {
+/**
+ * `allCells` 는 회상 칸을 시각과 상관없이 전부 올린다 — 칸을 한 번도 올리지 않은 기기의 되채우기.
+ */
+async function collectLogsSince(since: number, allCells = false) {
   const out: Partial<Record<LogTable, unknown[]>> = {};
   let count = 0;
+  const put = (name: LogTable, rows: unknown[]) => {
+    if (rows.length) { out[name] = rows; count += rows.length; }
+  };
   for (const name of LOG_TABLES) {
-    const rows = (await db.table(name).toArray()).filter((r: Record<string, unknown>) => {
+    if (name === 'recallCells') continue;
+    put(name, (await db.table(name).toArray()).filter((r: Record<string, unknown>) => {
       const t = (r.shownAt ?? r.startedAt ?? 0) as number;
       return t > since;
-    });
-    if (rows.length) { out[name] = rows; count += rows.length; }
+    }));
   }
+  /*
+   * 회상 칸에는 시각이 없다. 그래서 칸은 **판을 따라** 간다 — 이번에 올리는 판의 칸만.
+   * 판과 칸은 한 트랜잭션에 같이 저장되므로 어긋나지 않는다(Practice.tsx).
+   * 칸 표에 시각을 더하지 말 것 — 옛 칸에는 여전히 없어 같은 구멍이 남는다.
+   */
+  const sessionIds = ((out.recallSessions ?? []) as { id: string }[]).map((s) => s.id);
+  put('recallCells', allCells
+    ? await db.recallCells.toArray()
+    : await db.recallCells.where('sessionId').anyOf(sessionIds).toArray());
   return { rows: out, count };
 }
 
@@ -173,8 +188,11 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
     assets = 'local';
   }
 
-  /* 3. 새로 생긴 기록 올리기 */
-  const mine = await collectLogsSince(since);
+  /*
+   * 3. 새로 생긴 기록 올리기.
+   * 2026-09-26 전에는 회상 칸이 한 번도 올라가지 않았다. 그때 동기화한 기기는 칸을 한 번 전부 올린다.
+   */
+  const mine = await collectLogsSince(since, !settings.recallCellsSynced);
   if (mine.count > 0) {
     await remote.putBatch(`${now}-${Math.random().toString(36).slice(2, 8)}`, now, mine.rows);
   }
@@ -182,6 +200,6 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   /* 4. 통계는 받은 게 아니라 여기서 다시 만든다 */
   if (pulled > 0) await rebuildAll();
 
-  await saveSettings({ lastSyncAt: now });
+  await saveSettings({ lastSyncAt: now, recallCellsSynced: true });
   return { pushed: mine.count, pulled, assets, at: now };
 }
