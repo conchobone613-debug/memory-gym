@@ -223,8 +223,8 @@ export const CALC_EVENTS: CalcEvent[] = [
     id: 'surprise',
     name: '서프라이즈',
     what: '대회의 깜짝 라운드 대비. 제곱·곱셈·괄호 계산·나눗셈·덧셈을 섞는다.',
-    status: 'locked',
-    needs: '유형 등록부와 첫 다섯 유형. 덧셈·곱셈 생성기를 부품으로 쓰므로 그 뒤에 연다.',
+    status: 'ready',
+    to: '/calc/surprise/run',
     rules: [items(10), timeLimit(0), penalty, ROUNDING],
   },
   {

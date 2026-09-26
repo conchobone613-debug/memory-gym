@@ -5,7 +5,7 @@ import { goalFor } from '../db/goals';
 import { CAL_LEVELS, contestSessions, practiceIds } from '../calc/calendarLadder';
 import { stepAverages } from '../calc/calendarDrill';
 import { WEEKDAY_LONG } from '../calc/calendar';
-import { calcLevels, calcPracticeIds, sessionFlashMs } from '../calc/ladders';
+import { calcLevels, calcPracticeIds, ladderSession, sessionFlashMs, sessionType } from '../calc/ladders';
 import { calcContestSessions } from '../calc/calcOutcome';
 import { CALC_EVENTS, MEMORY_EVENTS } from '../data/events';
 
@@ -57,11 +57,11 @@ async function calcPeers(disciplineId: string, sessionId: string): Promise<Set<s
   const me = sessions.find((s) => s.id === sessionId);
   if (!me) return new Set();
   const log = { sessions, items: [] };
-  /* 달력 밖 계산 종목 — 연습은 같은 칸(플래시 판은 같은 간격의 플래시 판끼리), 모의 대회는 같은 규정 */
+  /* 달력 밖 계산 종목 — 연습은 같은 칸(플래시 판은 같은 간격의 플래시 판끼리, 유형 판은 같은 유형끼리), 모의 대회는 같은 규정 */
   const ev = CALC_EVENTS.find((e) => e.id === disciplineId);
   if (ev && disciplineId !== 'calendar') {
     return me.mode === 'practice'
-      ? calcPracticeIds(log, Number(me.params.level), sessionFlashMs(me.params))
+      ? calcPracticeIds(log, Number(me.params.level), sessionFlashMs(me.params), sessionType(me.params))
       : new Set(calcContestSessions(log, ev, me.rules).map((s) => s.id));
   }
   if (me.mode === 'practice') return practiceIds(log, Number(me.params.level), !!Number(me.params.steps || 0));
@@ -133,8 +133,8 @@ export async function buildSessionReviewInput(kind: SessionKind, sessionId: stri
     const steps = stepAverages(items.map((i) => ({ steps: i.steps?.filter((st) => st.ok !== false) })));
     if (steps.length) out.steps = steps.map((x) => ({ name: x.name, avgSec: sec(x.avgMs) }));
     const levels = me.disciplineId === 'calendar' ? CAL_LEVELS : calcLevels(me.disciplineId);
-    /* 플래시 판은 반응시간을 수가 다 지나간 뒤부터 재 칸의 통과 기준과 잣대가 다르다 */
-    const pass = session?.mode === 'practice' && !sessionFlashMs(session.params)
+    /* 플래시 판(반응시간을 수가 다 지나간 뒤부터 잰다)·유형 한정 판은 칸의 통과 기준과 잣대가 다르다 */
+    const pass = session?.mode === 'practice' && ladderSession(session.params)
       ? levels.find((l) => l.n === Number(session.params.level))?.pass : undefined;
     if (pass) out.target = { accuracyPct: pct(pass.accuracy), sec: pass.medianMs / 1000 };
   }

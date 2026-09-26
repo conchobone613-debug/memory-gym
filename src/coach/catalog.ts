@@ -2,7 +2,7 @@ import { CALC_EVENTS, findDiscipline, MEMORY_EVENTS, type CalcEvent, type Memory
 import { PRESETS } from '../data/presets';
 import { LADDERS } from '../db/goals';
 import { CAL_LEVELS } from '../calc/calendarLadder';
-import { calcLevels, isContestLevel } from '../calc/ladders';
+import { calcLevels, isContestLevel, sessionType } from '../calc/ladders';
 import { defaultRules } from '../lib/rules';
 import type { CourseItem } from './types';
 import type { CoachSummary } from './summary';
@@ -123,19 +123,24 @@ export type PlayedRun =
   | { kind: 'basics'; stage: number }
   | { kind: 'calendar'; level: number; steps: boolean }
   | { kind: 'event'; presetId: string | null; run: 'easy' | 'real' }
-  /** 계산 종목(달력 제외). 모의 대회는 마지막 칸 번호. flash = 플래시 암산 판(사다리에 들지 않는다) */
-  | { kind: 'calc'; eventId: string; level: number; flash?: boolean };
+  /**
+   * 계산 종목(달력 제외). 모의 대회는 마지막 칸 번호. flash = 플래시 암산 판, type = 유형 하나만 고른 판(서프라이즈 —
+   * 섞기 'mix' 나 없음은 섞기 판). 둘 다 사다리에 들지 않는다
+   */
+  | { kind: 'calc'; eventId: string; level: number; flash?: boolean; type?: string };
 
 /**
  * 이 판이 코스 항목대로였는가 — 다른 단계·칸·단계 입력·프리셋·모드로 한 판은 그 항목을 마친 것으로 치지 않는다.
- * 계산 종목 항목은 사다리 연습이므로 플래시 판도 치지 않는다.
+ * 계산 종목 항목은 사다리 연습이므로 플래시 판·유형 한정 판도 치지 않는다.
  */
 export function playedMatches(item: CourseItem, p: PlayedRun): boolean {
   if (item.kind === 'basics') return p.kind === 'basics' && p.stage === item.stage;
   if (item.kind === 'calendar') {
     return p.kind === 'calendar' && p.level === item.level && (item.level === 5 || p.steps === !!item.steps);
   }
-  if (item.kind === 'calc') return p.kind === 'calc' && p.eventId === item.eventId && p.level === item.level && !p.flash;
+  if (item.kind === 'calc') {
+    return p.kind === 'calc' && p.eventId === item.eventId && p.level === item.level && !p.flash && !sessionType(p);
+  }
   return p.kind === 'event' && p.run === item.run && p.presetId === (presetOf(item.eventId)?.id ?? null);
 }
 

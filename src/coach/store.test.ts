@@ -194,6 +194,29 @@ describe('한 판 복기', () => {
     expect(p?.target).toEqual({ accuracyPct: 90, sec: 10 });
   });
 
+  it('서프라이즈 유형 판은 같은 유형 판끼리만 견주고, 칸의 통과 기준을 붙이지 않는다', async () => {
+    const sur = (id: string, at: number, correct: number, type = 'mix') => ({
+      id, disciplineId: 'surprise', mode: 'practice' as const, rules: {}, params: { level: 1, items: 2, type }, seed: 'x',
+      startedAt: at, endedAt: at + 2000, correct, wrong: 2 - correct, score: correct,
+    });
+    const item = (sessionId: string, i: number, at: number, ok: boolean) => ({
+      id: `${sessionId}-${i}`, sessionId, index: i, kind: 'sq', prompt: '47²', expected: '2209', answered: ok ? '2209' : '2208',
+      isCorrect: ok, rtMs: 1000, shownAt: at + i * 1000,
+    });
+    const rows = [
+      sur('sq-old', t - 3 * 86_400_000, 1, 'sq'), sur('div-old', t - 2 * 86_400_000, 0, 'div'),
+      sur('mix-old', t - 86_400_000, 2), sur('sq-new', t, 2, 'sq'), sur('mix-new', t + 1000, 2),
+    ];
+    await db.calcSessions.bulkAdd(rows);
+    await db.calcItems.bulkAdd(rows.flatMap((s) => [item(s.id, 0, s.startedAt, s.correct > 0), item(s.id, 1, s.startedAt, s.correct > 1)]));
+    const q = await buildSessionReviewInput('calc', 'sq-new');
+    expect(q?.previous).toMatchObject({ accuracyPct: 50 }); // 제곱 판(sq-old), 나눗셈 판·섞기 판은 건너뛴다
+    expect(q?.target).toBeUndefined();
+    const m = await buildSessionReviewInput('calc', 'mix-new');
+    expect(m?.previous).toMatchObject({ accuracyPct: 100 }); // 섞기 판(mix-old), 바로 앞 제곱 판은 건너뛴다
+    expect(m?.target).toEqual({ accuracyPct: 90, sec: 40 });
+  });
+
   it('받은 복기는 남겨 두고 다시 부르지 않는다', async () => {
     await seedMapping();
     await db.settings.put({ ...DEFAULT_SETTINGS, aiKey: 'sk-test' });

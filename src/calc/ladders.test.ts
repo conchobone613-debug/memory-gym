@@ -6,8 +6,8 @@ import { CALC_MAKERS } from './makers';
 import { seeded } from './rng';
 import { sqrtSig } from './bigmath';
 import {
-  CALC_LADDERS, calcLadderStatus, calcLevelItems, calcLevels, calcPracticeIds, currentCalcLevel, evalCalcLevel, isContestLevel, nextSuggestion,
-  sessionFlashMs,
+  CALC_LADDERS, calcLadderStatus, calcLevelItems, calcLevels, calcPracticeIds, currentCalcLevel, evalCalcLevel, isContestLevel, ladderSession,
+  nextSuggestion, sessionFlashMs, sessionType,
 } from './ladders';
 
 const SQ = calcLevels('sqrt');
@@ -185,5 +185,52 @@ describe('플래시 판 거르기', () => {
     /* 플래시 판만 있으면 사다리는 비어 있다 */
     const only = { sessions: [f1.s], items: f1.items };
     expect(calcLadderStatus('addition', only)[0]).toMatchObject({ attempts: 0, passed: false });
+  });
+});
+
+describe('서프라이즈 사다리 · 유형 판 거르기', () => {
+  const T = 1_800_000_000_000;
+  /** 서프라이즈 연습 한 판 — type 이 있으면 그 유형만 고른 판 */
+  function surRun(level: number, startedAt: number, count: number, type?: string) {
+    const r = run(level, startedAt, count, count, 30_000);
+    const s: CalcSession = { ...r.s, disciplineId: 'surprise', params: { ...r.s.params, ...(type ? { type } : {}) } };
+    return { s, items: r.items.map((i) => ({ ...i, kind: type && type !== 'mix' ? type : 'sq' })) };
+  }
+
+  it('두 칸 — 섞어서(20문항 · 90% · 중앙 40초), 모의 대회', () => {
+    const s = calcLevels('surprise');
+    expect(s.map((l) => l.name)).toEqual(['섞어서', '모의 대회']);
+    expect(s.map((l) => l.params)).toEqual([{ type: 'mix' }, undefined]);
+    expect(s[0].pass).toEqual({ items: 20, accuracy: 0.9, medianMs: 40_000 });
+    expect(s.map((l) => l.perItemMs)).toEqual([40_000, 40_000]);
+  });
+
+  it("세션의 유형 한정 — 섞기('mix')·유형 칸 없음은 '', 사다리에는 섞기·보통 판만", () => {
+    expect(sessionType({ level: 1, items: 20 })).toBe('');
+    expect(sessionType({ level: 1, type: 'mix' })).toBe('');
+    expect(sessionType({ level: 1, type: 'sq' })).toBe('sq');
+    expect(sessionType({ kind: 'calc', eventId: 'surprise', level: 1, type: 'div' })).toBe('div');
+    expect(ladderSession({ level: 1, type: 'mix' })).toBe(true);
+    expect(ladderSession({ level: 1, items: 20 })).toBe(true);
+    expect(ladderSession({ level: 1, type: 'div' })).toBe(false);
+    expect(ladderSession({ level: 1, flash: 1, intervalMs: 800 })).toBe(false);
+  });
+
+  it('사다리·신기록 비교는 섞기 판만, 유형 하나만 한 판은 같은 유형끼리', () => {
+    const mix = surRun(1, T, 20, 'mix');
+    const sq1 = surRun(1, T + 1, 10, 'sq');
+    const sq2 = surRun(1, T + 2, 10, 'sq');
+    const div = surRun(1, T + 3, 10, 'div');
+    const log = { sessions: [mix.s, sq1.s, sq2.s, div.s], items: [mix, sq1, sq2, div].flatMap((x) => x.items) };
+    expect([...calcPracticeIds(log, 1)]).toEqual([mix.s.id]);
+    expect([...calcPracticeIds(log, 1, 0, 'sq')]).toEqual([sq1.s.id, sq2.s.id]);
+    expect([...calcPracticeIds(log, 1, 0, 'div')]).toEqual([div.s.id]);
+    expect(new Set(calcLevelItems(log, 1).map((i) => i.sessionId))).toEqual(new Set([mix.s.id]));
+    expect(calcLadderStatus('surprise', log)[0]).toMatchObject({ attempts: 20, passed: true });
+    /* 유형 판만 있으면 사다리는 비어 있다 */
+    expect(calcLadderStatus('surprise', { sessions: [sq1.s], items: sq1.items })[0]).toMatchObject({ attempts: 0, passed: false });
+    /* 유형 칸이 없는 종목(제곱근)은 그대로 */
+    const plain = run(1, T, 5, 5, 1000);
+    expect([...calcPracticeIds({ sessions: [plain.s], items: plain.items }, 1)]).toEqual([plain.s.id]);
   });
 });

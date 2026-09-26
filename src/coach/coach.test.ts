@@ -58,8 +58,8 @@ function sqRun(level: number, startedAt: number, count: number, ok: number, rtMs
 }
 const SQRT_RULES = { items: 10, timeLimitSec: 0, penaltyPerWrong: 0, digits: 6, sigDigits: 8, rounding: 'trunc' };
 const sqLog = (...runs: { s: CalcSession; items: CalcItem[] }[]) => ({ sqrt: { sessions: runs.map((r) => r.s), items: runs.flatMap((r) => r.items) } });
-/** 덧셈·곱셈을 t 에 한 판씩 — 달력·제곱근의 계산 몫 순서를 보는 시험에 '한 번도 안 한 종목' 이 끼어들지 않게 */
-const otherCalc = (t: number) => Object.fromEntries(['addition', 'multiplication'].map((id) => {
+/** 서프라이즈·덧셈·곱셈을 t 에 한 판씩 — 달력·제곱근의 계산 몫 순서를 보는 시험에 '한 번도 안 한 종목' 이 끼어들지 않게 */
+const otherCalc = (t: number) => Object.fromEntries(['surprise', 'addition', 'multiplication'].map((id) => {
   const r = sqRun(1, t, 10, 10, 5_000, { disciplineId: id, rules: {} });
   return [id, { sessions: [r.s], items: r.items }];
 }));
@@ -170,7 +170,7 @@ describe('규칙 코치', () => {
     const b = calRun(2, T - 2 * DAY, 30, 30, 1000);
     const c3 = calRun(3, T - DAY, 20, 14, 7000);
     const d3 = calRun(3, T - 1000, 20, 15, 7000);
-    /* 한 번도 안 한 계산 종목이 계산 몫을 먼저 받으므로 제곱근·덧셈·곱셈은 오늘 해 둔다 — 여기서는 달력의 한 칸 내리기만 본다 */
+    /* 한 번도 안 한 계산 종목이 계산 몫을 먼저 받으므로 제곱근·서프라이즈·덧셈·곱셈은 오늘 해 둔다 — 여기서는 달력의 한 칸 내리기만 본다 */
     const s = buildSummary(input({
       calLog: { sessions: [a.s, b.s, c3.s, d3.s], items: [...a.items, ...b.items, ...c3.items, ...d3.items] },
       calcLogs: { ...sqLog(sqRun(1, T, 10, 10, 20_000)), ...otherCalc(T) },
@@ -498,7 +498,7 @@ describe('답 형식(JSON 스키마)', () => {
     walk(schema);
     const item = (schema.properties as { items: { items: { properties: { eventId: { enum: string[] } } } } }).items.items;
     expect(item.properties.eventId.enum).toEqual([
-      'speed-numbers', 'hour-numbers', 'speed-cards', 'spoken-numbers', 'binary', 'sqrt', 'addition', 'multiplication', 'none',
+      'speed-numbers', 'hour-numbers', 'speed-cards', 'spoken-numbers', 'binary', 'sqrt', 'surprise', 'addition', 'multiplication', 'none',
     ]);
   });
 
@@ -517,7 +517,7 @@ describe('계산 종목(달력 제외) — 스승님 연동', () => {
   it('요약표: 기록이 없으면 첫 칸 · 지금 규정 · 한 번도 안 함', () => {
     const s = buildSummary(input());
     expect(s.calendar).toMatchObject({ runs: 0, daysAgo: null });
-    expect(s.calcEvents.map((e) => e.id)).toEqual(['sqrt', 'addition', 'multiplication']);
+    expect(s.calcEvents.map((e) => e.id)).toEqual(['sqrt', 'surprise', 'addition', 'multiplication']);
     const q = s.calcEvents[0];
     expect(q).toMatchObject({ id: 'sqrt', name: '제곱근', current: 1, runs: 0, daysAgo: null });
     expect(q.contest).toEqual({ runs: 0, best: null, limitSec: 0, items: 10 });
@@ -563,7 +563,7 @@ describe('계산 종목(달력 제외) — 스승님 연동', () => {
     expect((last as { items: number }).items).toBeGreaterThanOrEqual(CALC_MIN_ITEMS);
     expect(totalMs(c.items, fresh)).toBeLessThanOrEqual(15 * 60_000);
 
-    /* 제곱근(과 덧셈·곱셈)을 오늘 했고 달력은 3일 쉬었으면 달력 */
+    /* 제곱근(과 서프라이즈·덧셈·곱셈)을 오늘 했고 달력은 3일 쉬었으면 달력 */
     const old = calRun(1, T - 3 * DAY, 10, 10, 2000);
     const s2 = buildSummary(input({ calLog: { sessions: [old.s], items: old.items }, calcLogs: { ...sqLog(sqRun(1, T, 10, 10, 20_000)), ...otherCalc(T) } }));
     expect(ruleCourse(s2, 15).items.at(-1)).toMatchObject({ kind: 'calendar' });
@@ -646,7 +646,7 @@ describe('계산 종목(달력 제외) — 스승님 연동', () => {
     const c = validateCourse({
       say: '제곱근 4칸 모의 대회를 해 보세.',
       items: [
-        ai({ eventId: 'surprise' }), ai({ eventId: 'calendar' }), ai({ level: 9 }), ai({ level: 0 }),
+        ai({ eventId: 'no-such' }), ai({ eventId: 'calendar' }), ai({ level: 9 }), ai({ level: 0 }),
         ai({ level: 4, items: 40 }), ai({ level: 1, items: 2, why: '첫 칸을 다집니다.' }), ai({ level: 1, items: 30 }),
       ],
     }, s, 60)!;
@@ -712,7 +712,7 @@ describe('덧셈·곱셈 — 등록부·사다리를 따라 스승님이 저절�
 
   it('요약표: 첫 칸 · 연습 칸 이름과 기준 · 등록부 기본 규정', () => {
     const s = buildSummary(input());
-    const [, add, mul] = s.calcEvents;
+    const [, , add, mul] = s.calcEvents;
     expect(add).toMatchObject({ id: 'addition', name: '덧셈', current: 1, runs: 0, daysAgo: null });
     expect(add.levels.map((l) => [l.name, l.needSec])).toEqual([
       ['2자리 × 5개', 10], ['3자리 × 5개', 15], ['4자리 × 10개', 40], ['6자리 × 10개', 60], ['10자리 × 10개', 100],
@@ -732,9 +732,10 @@ describe('덧셈·곱셈 — 등록부·사다리를 따라 스승님이 저절�
     expect(add.levels[0]).toMatchObject({ passed: true, recentItems: 20, accuracyPct: 100, medianSec: 6, paceSec: 6, last2AccuracyPct: [100] });
   });
 
-  it('규칙 코치: 달력·제곱근을 오늘 했으면 한 번도 안 한 덧셈 첫 칸 — 이유의 숫자는 요약표에 있다', () => {
+  it('규칙 코치: 달력·제곱근·서프라이즈를 오늘 했으면 한 번도 안 한 덧셈 첫 칸 — 이유의 숫자는 요약표에 있다', () => {
     const cal = calRun(1, T - 1000, 10, 10, 2000);
-    const s = buildSummary(input({ calLog: { sessions: [cal.s], items: cal.items }, calcLogs: sqLog(sqRun(1, T, 10, 10, 20_000)) }));
+    const sur = otherCalc(T).surprise;
+    const s = buildSummary(input({ calLog: { sessions: [cal.s], items: cal.items }, calcLogs: { ...sqLog(sqRun(1, T, 10, 10, 20_000)), surprise: sur } }));
     const last = ruleCourse(s, 15).items.at(-1)!;
     expect(last).toMatchObject({ kind: 'calc', eventId: 'addition', level: 1, why: '덧셈 1칸(2자리 × 5개)에 아직 기록이 없어 처음부터 합니다.' });
     const ok = allNumbersFrom(s);
@@ -743,7 +744,7 @@ describe('덧셈·곱셈 — 등록부·사다리를 따라 스승님이 저절�
     const add = addRun(1, T, 10, 10, 5_000);
     const t = buildSummary(input({
       calLog: { sessions: [cal.s], items: cal.items },
-      calcLogs: { ...sqLog(sqRun(1, T, 10, 10, 20_000)), addition: { sessions: [add.s], items: add.items } },
+      calcLogs: { ...sqLog(sqRun(1, T, 10, 10, 20_000)), surprise: sur, addition: { sessions: [add.s], items: add.items } },
     }));
     expect(ruleCourse(t, 15).items.at(-1)).toMatchObject({ kind: 'calc', eventId: 'multiplication', level: 1, why: '곱셈 1칸(2×2)에 아직 기록이 없어 처음부터 합니다.' });
   });
@@ -789,5 +790,59 @@ describe('덧셈·곱셈 — 등록부·사다리를 따라 스승님이 저절�
     expect(user).toContain('  - multiplication (곱셈):');
     expect(user).toContain('    - 7칸 8×8 — 8자리 수끼리 곱하기, 기록이 없으면 한 문항 220초');
     expect(user).toContain(`    - 8칸 모의 대회 — 약 ${estimate({ kind: 'calc', eventId: 'multiplication', level: 8, items: 0 }, s)}분`);
+  });
+});
+
+describe('서프라이즈 — 등록부·사다리를 따라 스승님이 저절로 받는다', () => {
+  /** 서프라이즈 연습 한 판 — type 이 있으면 유형 하나만 고른 판 */
+  const surRun = (level: number, startedAt: number, count: number, ok: number, rtMs: number, type = 'mix') =>
+    sqRun(level, startedAt, count, ok, rtMs, { disciplineId: 'surprise', rules: {}, params: { level, items: count, type } });
+
+  it('요약표: 첫 칸 섞어서 · 기준 40초 · 등록부 기본 규정', () => {
+    const sur = buildSummary(input()).calcEvents.find((e) => e.id === 'surprise')!;
+    expect(sur).toMatchObject({ id: 'surprise', name: '서프라이즈', current: 1, runs: 0, daysAgo: null });
+    expect(sur.levels.map((l) => [l.name, l.needSec, l.needItems, l.needAccuracyPct])).toEqual([['섞어서', 40, 20, 90]]);
+    expect(sur.contest).toEqual({ runs: 0, best: null, limitSec: 0, items: 10 });
+  });
+
+  it('요약표: 유형 하나만 한 판은 칸 줄(사다리·한 문항 시간·최근 두 판)에 들지 않고, 한 판으로는 센다', () => {
+    const mix = surRun(1, T - 2 * DAY, 20, 20, 6_000);
+    const sq = surRun(1, T - DAY, 10, 3, 2_000, 'sq');
+    const s = buildSummary(input({ calcLogs: { surprise: { sessions: [mix.s, sq.s], items: [...mix.items, ...sq.items] } } }));
+    const sur = s.calcEvents.find((e) => e.id === 'surprise')!;
+    expect(sur).toMatchObject({ runs: 2, daysAgo: 1, current: 2 });
+    expect(sur.levels[0]).toMatchObject({ passed: true, recentItems: 20, accuracyPct: 100, medianSec: 6, paceSec: 6, last2AccuracyPct: [100] });
+  });
+
+  it('규칙 코치: 달력·제곱근을 오늘 했으면 한 번도 안 한 서프라이즈 첫 칸 — 이유의 숫자는 요약표에 있다', () => {
+    const cal = calRun(1, T - 1000, 10, 10, 2000);
+    const s = buildSummary(input({ calLog: { sessions: [cal.s], items: cal.items }, calcLogs: sqLog(sqRun(1, T, 10, 10, 20_000)) }));
+    const last = ruleCourse(s, 15).items.at(-1)!;
+    expect(last).toMatchObject({ kind: 'calc', eventId: 'surprise', level: 1, why: '서프라이즈 1칸(섞어서)에 아직 기록이 없어 처음부터 합니다.' });
+    const ok = allNumbersFrom(s);
+    for (const x of numbersIn(last.why)) expect(ok.has(x), `why 의 ${x}`).toBe(true);
+  });
+
+  it('예상 시간 · 주소 · 이름 · 유형 하나만 한 판은 코스 항목을 마친 것으로 치지 않는다', () => {
+    const s = buildSummary(input());
+    expect(estimateMs({ kind: 'calc', eventId: 'surprise', level: 1, items: 10 }, s)).toBe(PREP_MS + 10 * 40_000);
+    expect(estimateMs({ kind: 'calc', eventId: 'surprise', level: 2, items: 0 }, s)).toBe(PREP_MS + 10 * 40_000);
+    expect(courseHref({ kind: 'calc', eventId: 'surprise', level: 1, items: 20 })).toBe('/calc/surprise/run?level=1&n=20');
+    expect(courseHref({ kind: 'calc', eventId: 'surprise', level: 2, items: 0 })).toBe('/calc/surprise/run?mode=contest');
+    expect(itemLabel({ kind: 'calc', eventId: 'surprise', level: 1, items: 20 })).toBe('서프라이즈 1칸 · 섞어서 · 20문항');
+    expect(itemLabel({ kind: 'calc', eventId: 'surprise', level: 2, items: 0 })).toBe('서프라이즈 · 모의 대회');
+    const item: CourseItem = { kind: 'calc', eventId: 'surprise', level: 1, items: 20 };
+    expect(playedMatches(item, { kind: 'calc', eventId: 'surprise', level: 1 })).toBe(true);
+    expect(playedMatches(item, { kind: 'calc', eventId: 'surprise', level: 1, type: 'mix' })).toBe(true);
+    expect(playedMatches(item, { kind: 'calc', eventId: 'surprise', level: 1, type: 'sq' })).toBe(false);
+    expect(playedMatches({ kind: 'calc', eventId: 'surprise', level: 2, items: 0 }, { kind: 'calc', eventId: 'surprise', level: 2, type: 'mix' })).toBe(true);
+  });
+
+  it('스승님 글: 서프라이즈 칸 목록', () => {
+    const s = buildSummary(input());
+    const user = courseUser(s, 30);
+    expect(user).toContain('  - surprise (서프라이즈):');
+    expect(user).toContain('    - 1칸 섞어서 — 깜짝 라운드 유형 풀기, 기록이 없으면 한 문항 40초');
+    expect(user).toContain(`    - 2칸 모의 대회 — 약 ${estimate({ kind: 'calc', eventId: 'surprise', level: 2, items: 0 }, s)}분`);
   });
 });

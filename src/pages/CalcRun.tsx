@@ -11,13 +11,13 @@ import type { OutcomeGoal, RunOutcome } from '../lib/outcome';
 import { reduced } from '../design/settings';
 import { isTyping } from '../App';
 import {
-  answerMax, answerSize, appendAnswer, flashFontPx, normalizeAnswer, promptSize, STACK_LH, stackLayout, type Problem,
+  answerMax, answerSize, appendAnswer, flashFontPx, normalizeAnswer, promptBoxPx, promptLayout, ruled, STACK_LH, type Problem,
 } from '../calc/problem';
-import { CALC_MAKERS, type CalcMaker } from '../calc/makers';
+import { CALC_MAKERS, calcTypeLabel, type CalcMaker } from '../calc/makers';
 import { FLASH_MS, flashClock, flashComplete, flashError, flashMs, measureFlash } from '../calc/flash';
 import {
   calcLadderStatus, calcLevelItems, calcLevels, calcPracticeIds, currentCalcLevel, evalCalcLevel, isContestLevel, nextSuggestion,
-  type CalcLevelDef,
+  sessionType, type CalcLevelDef,
 } from '../calc/ladders';
 import { calcContestOutcome, calcContestSessions, calcPracticeOutcome, contestScore } from '../calc/calcOutcome';
 import { newSeed, seeded } from '../calc/rng';
@@ -63,8 +63,12 @@ interface RunCfg {
   penalty: number;
   /** 문제 글자 크기 — 한 판 동안 하나로 고정 */
   size: 'l' | 'm';
-  /** 세로셈·플래시 칸의 글자 크기(px)와 촘촘한 배치. 한 줄 문제(제곱근)는 null */
+  /** 세로셈·플래시 칸의 글자 크기(px)와 촘촘한 배치. 한 줄 문제만 있는 판(제곱근)은 null */
   stack: { px: number; compact: boolean } | null;
+  /** 한 줄 문제 글자 크기(px) — 등급 글자로는 카드에 들지 않을 때만(긴 괄호 식). null = 등급 글자 */
+  linePx: number | null;
+  /** 세로셈과 한 줄 문제가 섞인 판의 문제 칸 높이(px) — 문항마다 카드 크기가 바뀌지 않게. 섞이지 않은 판은 null */
+  boxPx: number | null;
   /** 답 칸 글자 수 상한과 글자 크기 — 이 판의 가장 긴 정답으로 */
   answerMax: number;
   answerSize: 'l' | 'm';
@@ -93,7 +97,17 @@ const PHONE_H = 667;
 const FLASH_REDO_GAP = 1000;
 /** 앱 기둥 폭(px) — 화면 폭, 넓은 화면에서는 lampadas.css 의 --col-w(480px) */
 const colW = () => Math.min(document.documentElement.clientWidth || window.innerWidth, 480);
-
+/** 측정 중 문제 카드 안내 줄 — 한 판 동안 같다 */
+const askHelp = (maker: CalcMaker, p: RuleValues, contest: boolean) => `${maker.ask(p)} · Enter 제출${contest ? '' : ' · Tab 모름'}`;
+/** 안내 줄 한 줄 높이(px) — 배치 높이(STACK_CHROME)는 한 줄만 잡아 둔다 */
+const HELP_LINE = 17;
+/** 안내 줄(11px)이 문제 카드 안쪽 폭(기둥 − 52px)에서 몇 줄로 접히나. 서프라이즈 섞기 안내는 휴대폰에서 두 줄이 된다 */
+function helpRows(text: string, viewW: number): number {
+  const g = document.createElement('canvas').getContext('2d');
+  if (!g) return 1;
+  g.font = `11px ${getComputedStyle(document.documentElement).getPropertyValue('--font-typek').trim() || 'monospace'}`;
+  return Math.max(1, Math.ceil(g.measureText(text).width / (viewW - 52)));
+}
 export default function CalcRun() {
   const { id = '' } = useParams();
   const ev = CALC_EVENTS.find((e) => e.id === id);
@@ -133,6 +147,8 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   const [flashLeft, setFlashLeft] = useState(false);
   /** 프레임이 밀려 수를 놓쳐 다시 비추는 문항(idx). -1 = 없음 */
   const [flashRedo, setFlashRedo] = useState(-1);
+  /** 유형 고르기(서프라이즈 연습 칸) — 선택지의 첫 값(섞기)이 기본 */
+  const [ptype, setPtype] = useState(() => maker.typeOptions?.()[0]?.value ?? '');
   const [phase, setPhase] = useState<Phase>('setup');
   const [cfg, setCfg] = useState<RunCfg | null>(null);
   const [queue, setQueue] = useState<Problem[]>([]);
@@ -191,24 +207,32 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     setTyped(v);
   }, []);
 
+  /** 한 판의 문항 설정 — 연습 칸에서 유형을 골랐으면(유형 고르기가 있는 종목) type 을 덮는다. 세션 params 에 남는다 */
+  const runParams = (r: RuleValues, l: CalcLevelDef): RuleValues =>
+    maker.typeOptions && !isContestLevel(l) ? { ...maker.params(r, l), type: ptype } : maker.params(r, l);
+
   /** 새 판. 문제는 세션 시드로 만든다 — 같은 시드면 같은 문제(기획서 §5.7) */
   const start = async () => {
     if (!rules) return;
     const contest = isContestLevel(level);
-    const p = maker.params(rules, level);
+    const p = runParams(rules, level);
     const items = contest ? Math.max(1, Number(rules.items) || 10) : Math.min(200, Math.max(5, Math.round(count) || 20));
     const limitSec = contest ? Math.max(0, Number(rules.timeLimitSec) || 0) : 0;
     const seed = newSeed();
     const r = seeded(seed);
-    const qs = Array.from({ length: items }, () => maker.make(r, p));
+    /* 판을 통째로 만드는 종목(서프라이즈)은 유형 순서까지 시드로 정해진다 */
+    const qs = maker.makeAll ? maker.makeAll(r, p, items) : Array.from({ length: items }, () => maker.make(r, p));
     const fms = maker.flash && !contest && flashOn ? flashInput(flashSec) : 0;
+    /* 화면 크기는 시작할 때 한 번 재고 판 동안 그대로 둔다. 문항 수 칸을 고치다 누르면 기기 키보드가 높이를
+       줄여 보이므로 기준 휴대폰 높이(667px)보다 작게 재지 않는다. 안내 줄이 접히면 그만큼 문제 칸 높이를 덜 쓴다 */
+    const viewW = colW();
+    const lay = promptLayout(qs, Math.max(PHONE_H, window.innerHeight) - (helpRows(askHelp(maker, p, contest), viewW) - 1) * HELP_LINE, viewW);
     const c: RunCfg = {
       level, contest, params: p, rules: { ...rules }, items, limitSec,
-      penalty: Number(rules.penaltyPerWrong) || 0, size: promptSize(qs),
-      /* 화면 크기는 시작할 때 한 번 재고 판 동안 그대로 둔다. 문항 수 칸을 고치다 누르면 기기 키보드가 높이를
-         줄여 보이므로 기준 휴대폰 높이(667px)보다 작게 재지 않는다 */
-      stack: fms ? { px: flashFontPx(qs, colW()), compact: false }
-        : qs.some((q) => q.lines) ? stackLayout(qs, Math.max(PHONE_H, window.innerHeight), colW()) : null,
+      penalty: Number(rules.penaltyPerWrong) || 0, size: lay.size,
+      stack: fms ? { px: flashFontPx(qs, viewW), compact: false } : lay.stack,
+      linePx: lay.linePx,
+      boxPx: promptBoxPx(qs, lay),
       answerMax: answerMax(qs), answerSize: answerSize(qs), flashMs: fms,
     };
     const id = uid();
@@ -280,8 +304,9 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
         /* 평균 시간은 통합 기록(sessions.ts)과 같은 방식 — 모름(0)을 뺀 평균 */
         const rts = final.map((r) => r.rtMs).filter((x) => x > 0);
         const meanRtMs = rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 0;
-        /* 신기록·아까움은 같은 칸의 지난 판과만 — 플래시 판은 같은 간격의 플래시 판끼리 */
-        const ids = calcPracticeIds(log, cfg.level.n, cfg.flashMs);
+        /* 신기록·아까움은 같은 칸의 지난 판과만 — 플래시 판은 같은 간격의 플래시 판끼리, 유형 판은 같은 유형 판끼리 */
+        const type = sessionType(cfg.params);
+        const ids = calcPracticeIds(log, cfg.level.n, cfg.flashMs, type);
         const o = calcPracticeOutcome({
           run: {
             items: final.length, correct, meanRtMs,
@@ -291,10 +316,11 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
           status: evalCalcLevel(cfg.level, calcLevelItems(log, cfg.level.n)),
           past: calcSummaries(log).filter((s) => ids.has(s.id) && s.id !== sessionId),
         });
-        /* 플래시 판은 반응시간을 수가 다 지나간 뒤부터 재 사다리 기준과 잣대가 달라 사다리에 들지 않는다 —
-           목표 막대·다음 칸 권함은 보통 판에서만 */
-        setOutcome(cfg.flashMs ? { ...o, goals: [] } : o);
-        setSuggest(cfg.flashMs ? null : nextSuggestion(ev.id, calcLadderStatus(ev.id, log), cfg.level.n));
+        /* 플래시 판은 반응시간을 수가 다 지나간 뒤부터 재고, 유형 판은 한 유형만 풀어 사다리 기준과 잣대가 달라
+           사다리에 들지 않는다 — 목표 막대·다음 칸 권함은 보통(섞기) 판에서만 */
+        const off = cfg.flashMs > 0 || !!type;
+        setOutcome(off ? { ...o, goals: [] } : o);
+        setSuggest(off ? null : nextSuggestion(ev.id, calcLadderStatus(ev.id, log), cfg.level.n));
       }
     }
     setResults(final);
@@ -530,7 +556,8 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   /* ───────── 설정 ───────── */
   if (phase === 'setup') {
     const contest = isContestLevel(level);
-    const p = rules ? maker.params(rules, level) : null;
+    const p = rules ? runParams(rules, level) : null;
+    const typeOpts = contest ? undefined : maker.typeOptions?.();
     const limit = Number(rules?.timeLimitSec) || 0;
     const contestBrief = `${Number(rules?.items) || 10}문제 · ${limit ? `제한 ${limitText(limit)}` : '시간 제한 없음'}`;
     /** 칸을 고르면 위의 '이번 판' 이 보이게 올린다 */
@@ -557,6 +584,13 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
                 <h2 className="text-xl leading-tight text-ink">{level.n}. {level.name}</h2>
                 <p className="mt-1 text-sm text-ink-2">{level.what}{p && ` · ${maker.ask(p)}`}</p>
               </div>
+              {typeOpts && (
+                <Field label="유형" hint="한 유형만 푼 판은 사다리·코스에 들지 않고, 같은 유형 판끼리 기록을 견줍니다.">
+                  <select className="w-full" value={ptype} onChange={(e) => setPtype(e.target.value)}>
+                    {typeOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </Field>
+              )}
               {!contest && (
                 <Field label="문항 수">
                   <input className="tnum w-28" type="number" min={5} max={200} value={count} onChange={(e) => setCount(Number(e.target.value))} />
@@ -649,7 +683,9 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
             <CourseBar
               step={course}
               sessionId={sessionId}
-              played={cfg ? { kind: 'calc', eventId: ev.id, level: cfg.level.n, flash: cfg.flashMs > 0 } : undefined}
+              played={cfg ? {
+                kind: 'calc', eventId: ev.id, level: cfg.level.n, flash: cfg.flashMs > 0, type: sessionType(cfg.params) || undefined,
+              } : undefined}
             />
             {suggest && (
               <div className="flex items-center gap-2 rounded-[4px] bg-card px-3 py-2">
@@ -691,16 +727,22 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   const left = startAt + cfg.limitSec * 1000 - now;
   /* 플래시 칸과 '합은?' 칸은 같은 크기(한 판 고정) — 단계가 바뀌어도 문제 카드가 커지거나 줄지 않는다 */
   const box: CSSProperties | undefined = cfg.stack ? { fontSize: cfg.stack.px, height: cfg.stack.px, lineHeight: 1 } : undefined;
-  const prompt = cfg.flashMs
+  const body = cfg.flashMs
     ? flashing
       ? <span key="flash" ref={flashRef} className="block whitespace-pre" style={box} />
       : <span key="ask" className="block" style={box}>합은?</span>
     : cfg.stack && showing.lines
-      ? <Stack lines={showing.lines} rule={showing.kind === 'mul'} style={{ fontSize: cfg.stack.px, lineHeight: STACK_LH }} />
-      : showing.prompt;
+      ? <Stack lines={showing.lines} rule={ruled(showing)} style={{ fontSize: cfg.stack.px, lineHeight: STACK_LH }} />
+      : cfg.linePx
+        ? <span className="block whitespace-nowrap" style={{ fontSize: cfg.linePx, lineHeight: 1 }}>{showing.prompt}</span>
+        : showing.prompt;
+  /* 섞인 판은 문제 칸 높이를 판 동안 하나로 — 한 줄 문제와 열 줄 세로셈이 번갈아도 답 칸·자판이 움직이지 않는다 */
+  const prompt = cfg.boxPx ? <span className="flex items-center justify-center" style={{ height: cfg.boxPx }}>{body}</span> : body;
   const help = flashing
     ? `${flashRedo === idx ? '수를 놓쳐 처음부터 다시 비춥니다' : `${cur.lines?.length ?? 0}개를 하나씩 비춥니다`} · Esc 중단`
-    : `${maker.ask(cfg.params)} · Enter 제출${cfg.contest ? '' : ' · Tab 모름'}`;
+    : askHelp(maker, cfg.params, cfg.contest);
+  /* 유형 하나만 고른 판은 칸 이름(섞어서) 대신 유형 이름을 머리띠에 */
+  const runName = calcTypeLabel(ev.id, cfg.params) ?? cfg.level.name;
 
   return (
     <div className={`flex flex-col ${tight ? 'gap-2' : 'gap-3'}`}>
@@ -719,7 +761,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
             : <Clock sec={elapsed} warn={false} />}
         />
       ) : (
-        <Hud left={<>{ev.name} · {cfg.level.name} · <b>{idx + 1}</b>/{queue.length}</>} streak={streak} judge={judge} />
+        <Hud left={<>{ev.name} · {runName} · <b>{idx + 1}</b>/{queue.length}</>} streak={streak} judge={judge} />
       )}
 
       <QuestionCard ref={cardRef} size={cfg.size} prompt={prompt} help={help} className={tight ? 'is-tight' : undefined} />

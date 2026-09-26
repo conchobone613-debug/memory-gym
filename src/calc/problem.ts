@@ -87,6 +87,51 @@ export function stackLayout(qs: Pick<Problem, 'prompt' | 'lines'>[], viewH: numb
   return normal >= COMPACT_BELOW ? { px: normal, compact: false } : { px: px(STACK_CHROME.compact), compact: true };
 }
 
+export interface PromptLayout {
+  /** 문제 카드 크기 등급(promptSize) */
+  size: 'l' | 'm';
+  /** 세로셈 문항의 글자 크기·촘촘한 배치 — 세로셈 문항만으로 잰 stackLayout. 세로셈이 없으면 null */
+  stack: { px: number; compact: boolean } | null;
+  /** 한 줄 문제 글자 크기(px) — 등급 글자(60·40px)가 카드 안쪽 폭이나 이 배치의 문제 칸 높이를 넘을 때만. 아니면 null */
+  linePx: number | null;
+  /** 이 판에서 가장 높은 문제 칸(px) — 칸을 이 높이로 두면 섞인 판에서도 문항마다 카드 크기가 같다 */
+  boxPx: number;
+}
+
+/**
+ * 한 판의 문제 배치(한 판 동안 고정) — 세로셈과 한 줄 문제가 섞인 판(서프라이즈 섞기)도 판 전체 문항으로 한 번에 정한다.
+ * 세로셈은 세로셈 문항만으로 잰다(긴 한 줄 식이 세로셈 글자를 줄이지 않게). 한 줄 문제는 그 배치(촘촘 여부)에서
+ * 카드 폭과 문제 칸 높이에 들도록 줄인다. 세로셈만 있는 판은 stackLayout 그대로다.
+ */
+export function promptLayout(qs: Pick<Problem, 'prompt' | 'lines'>[], viewH: number, viewW = 375): PromptLayout {
+  const size = promptSize(qs);
+  const stacked = qs.filter((q) => q.lines);
+  const single = qs.filter((q) => !q.lines);
+  const stack = stacked.length ? stackLayout(stacked, viewH, viewW) : null;
+  const room = viewH - STACK_CHROME[stack?.compact ? 'compact' : 'normal'];
+  const chars = Math.max(1, ...single.map((q) => [...q.prompt].length));
+  const fit = Math.max(STACK_MIN_PX, Math.floor(Math.min(PROMPT_PX[size], fitWidth(chars, viewW), room)));
+  const linePx = single.length && fit < PROMPT_PX[size] ? fit : null;
+  const rows = Math.max(0, ...stacked.map((q) => q.lines!.length));
+  const boxPx = Math.max(stack ? rows * stack.px * STACK_LH : 0, single.length ? (linePx ?? PROMPT_PX[size]) : 0);
+  return { size, stack, linePx, boxPx };
+}
+
+/** 곱셈 세로셈(마지막 줄 '× 755') — 밑줄을 긋는다. 밑줄은 2px 선 + 여백으로 4px */
+export const ruled = (q: Pick<Problem, 'lines'>) => !!q.lines?.at(-1)?.startsWith('×');
+const RULE_PX = 4;
+
+/**
+ * 실행기 문제 칸의 고정 높이(px) — 문항마다 칸 높이가 달라지는 판만: 한 줄 문제와 세로셈이 섞였거나, 세로셈의 줄 수·밑줄이
+ * 문항마다 다른 판(서프라이즈 3×3 곱셈 + 덧셈 열 줄). 모든 문항 높이가 같은 판(기존 종목)은 null — 칸을 고정하지 않는다.
+ */
+export function promptBoxPx(qs: Pick<Problem, 'prompt' | 'lines'>[], lay: PromptLayout): number | null {
+  const varies = qs.some((q) => !q.lines)
+    || new Set(qs.map((q) => q.lines?.length ?? 0)).size > 1
+    || new Set(qs.map(ruled)).size > 1;
+  return lay.stack && varies ? Math.ceil(lay.boxPx) + (qs.some(ruled) ? RULE_PX : 0) : null;
+}
+
 /** 플래시 칸 글자 크기(px) — 한 번에 수 하나라 가장 긴 수가 카드 폭(기둥 폭 viewW)에 드는 크기, 60px 까지 */
 export function flashFontPx(qs: Pick<Problem, 'prompt' | 'lines'>[], viewW = 375): number {
   const chars = Math.max(1, ...qs.flatMap((q) => (q.lines ?? [q.prompt]).map((l) => [...l].length)));

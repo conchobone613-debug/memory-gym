@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ANSWER_MAX, answerMax, answerSize, appendAnswer, flashFontPx, normalizeAnswer, promptSize, STACK_CHROME, STACK_LH, stackLayout,
+  ANSWER_MAX, answerMax, answerSize, appendAnswer, flashFontPx, normalizeAnswer, promptBoxPx, promptLayout, promptSize, STACK_CHROME, STACK_LH,
+  stackLayout, type Problem,
 } from './problem';
 import { CALC_MAKERS } from './makers';
 import { calcLevels } from './ladders';
@@ -228,5 +229,108 @@ describe('세로셈 배치(stackLayout · flashFontPx) — 한 판 단위', () =
     expect(width(big, stackLayout(big, 667, 360).px)).toBeLessThanOrEqual(308);
     /* 넓은 화면(기둥 480px)은 더 크게, 60px 까지 */
     expect(flashFontPx(ten, 480)).toBe(60);
+  });
+});
+
+describe('한 줄 문제·섞인 판 배치(promptLayout) — 한 판 단위', () => {
+  const r = seeded('layout');
+  /** 카드 안쪽 폭(px) */
+  const inner = (w: number) => w - 52;
+  const wide = (s: string, px: number) => [...s].length * px * 0.62;
+  const CLASS_PX = { l: 60, m: 40 } as const;
+  const sur = (type: string, n: number, seed = type) => CALC_MAKERS.surprise.makeAll!(seeded(seed), { type, rounding: 'trunc' }, n);
+
+  it('세로셈만 있는 판은 stackLayout 그대로, 제곱근은 등급 글자 그대로 — 기존 종목은 바뀌지 않는다', () => {
+    const add = Array.from({ length: 10 }, () => CALC_MAKERS.addition.make(r, { digits: 10, terms: 10 }));
+    expect(promptLayout(add, 667)).toEqual({ size: promptSize(add), stack: stackLayout(add, 667), linePx: null, boxPx: 10 * 18 * STACK_LH });
+    const mul = Array.from({ length: 10 }, () => CALC_MAKERS.multiplication.make(r, { digitsA: 8, digitsB: 8 }));
+    for (const w of [375, 360, 480]) expect(promptLayout(mul, 667, w).stack).toEqual(stackLayout(mul, 667, w));
+    const six = Array.from({ length: 20 }, () => CALC_MAKERS.sqrt.make(r, { digits: 6, sig: 8, rounding: 'trunc' }));
+    expect(promptLayout(six, 667)).toEqual({ size: 'l', stack: null, linePx: null, boxPx: 60 });
+    expect(promptLayout(six, 667, 360).linePx).toBeNull();
+    const twelve = Array.from({ length: 20 }, () => CALC_MAKERS.sqrt.make(r, { digits: 12, sig: 12, rounding: 'trunc' }));
+    expect(promptLayout(twelve, 667).linePx).toBeNull(); // 13자 × 40px 는 375px 카드에 든다
+  });
+
+  it("긴 괄호 식은 40px 로도 넘쳐 폭에 맞춘 글자 하나로 — '(47 + 38) × (16 + 29)' 21자·세 자리 23자, 375·360px", () => {
+    expect(promptLayout([{ prompt: '(47 + 38) × (16 + 29)' }], 667).linePx).toBe(24);
+    for (const w of [375, 360]) {
+      for (const p of ['(47 + 38) × (16 + 29)', '(999 − 998) × (99 + 99)']) {
+        const l = promptLayout([{ prompt: p }], 667, w);
+        expect(wide(p, 40), p).toBeGreaterThan(inner(w));
+        expect(l.size).toBe('m');
+        expect(wide(p, l.linePx!), `${p} @${w}`).toBeLessThanOrEqual(inner(w));
+        expect(l.linePx!).toBeGreaterThanOrEqual(20);
+      }
+      const expr = sur('expr', 300);
+      const l = promptLayout(expr, 667, w);
+      for (const q of expr) expect(wide(q.prompt, l.linePx!), q.prompt).toBeLessThanOrEqual(inner(w));
+      expect(l.boxPx).toBe(l.linePx);
+    }
+  });
+
+  it('유형 하나만 한 판 — 제곱·나눗셈은 등급 글자 그대로 들고, 3×3·덧셈 열 줄은 세로셈', () => {
+    for (const w of [375, 360]) {
+      expect(promptLayout(sur('sq', 50), 667, w)).toMatchObject({ size: 'l', stack: null, linePx: null });
+      const div = sur('div', 200);
+      const l = promptLayout(div, 667, w);
+      for (const q of div) expect(wide(q.prompt, l.linePx ?? CLASS_PX[l.size])).toBeLessThanOrEqual(inner(w));
+      expect(promptLayout(sur('mul3', 20), 667, w).stack).toEqual({ px: 49, compact: false });
+      expect(promptLayout(sur('add10', 20), 667, w).stack).toEqual({ px: 18, compact: true });
+    }
+  });
+
+  it('섞인 판(세로셈 열 줄 + 한 줄 문제)은 판 전체로 한 번 정하고, 어느 문항도 667px 높이·기둥 폭을 넘지 않는다', () => {
+    for (const w of [375, 360]) {
+      for (const seed of ['a', 'b', 'c', 'd']) {
+        for (const n of [10, 20, 40]) {
+          const qs: Problem[] = sur('mix', n, seed);
+          const l = promptLayout(qs, 667, w);
+          expect(l.stack, seed).not.toBeNull();
+          const chrome = STACK_CHROME[l.stack!.compact ? 'compact' : 'normal'];
+          expect(l.boxPx + chrome).toBeLessThanOrEqual(667);
+          const line = l.linePx ?? CLASS_PX[l.size];
+          for (const q of qs) {
+            if (q.lines) {
+              expect(q.lines.length * l.stack!.px * STACK_LH).toBeLessThanOrEqual(l.boxPx);
+              for (const s of q.lines) expect(wide(s, l.stack!.px)).toBeLessThanOrEqual(inner(w));
+            } else {
+              expect(line).toBeLessThanOrEqual(l.boxPx);
+              expect(wide(q.prompt, line), q.prompt).toBeLessThanOrEqual(inner(w));
+            }
+          }
+          /* 긴 한 줄 식이 세로셈 글자를 줄이지 않는다 — 세로셈은 세로셈 문항만으로 잰다 */
+          expect(l.stack).toEqual(stackLayout(qs.filter((q) => q.lines), 667, w));
+        }
+      }
+    }
+    expect(promptLayout(sur('mix', 20, 'a'), 667)).toMatchObject({ stack: { px: 18, compact: true }, boxPx: 162 });
+  });
+
+  it('문제 칸 고정 높이(promptBoxPx) — 문항마다 칸 높이가 다른 판만 고정, 기존 종목은 고정하지 않는다', () => {
+    const box = (qs: Problem[]) => promptBoxPx(qs, promptLayout(qs, 667));
+    /* 모의 대회 두 문항이 3×3 곱셈 + 덧셈 열 줄(둘 다 세로셈) — 두 줄 곱셈에서 열 줄 덧셈으로 넘어가도 카드가 커지지 않게 */
+    const two = sur('mix', 2, '1');
+    expect(two.map((q) => q.kind).sort()).toEqual(['add10', 'mul3']);
+    expect(box(two)).toBe(Math.ceil(10 * 18 * STACK_LH) + 4);
+    /* 한 줄 문제와 세로셈이 섞인 판은 그대로 고정 */
+    expect(box(sur('mix', 20, 'a'))).toBe(162 + 4);
+    /* 줄 수·밑줄이 모두 같은 판(덧셈·곱셈·한 유형만), 한 줄 문제만 있는 판(제곱근·제곱)은 null */
+    expect(box(Array.from({ length: 10 }, () => CALC_MAKERS.addition.make(r, { digits: 10, terms: 10 })))).toBeNull();
+    expect(box(Array.from({ length: 10 }, () => CALC_MAKERS.multiplication.make(r, { digitsA: 8, digitsB: 8 })))).toBeNull();
+    expect(box(Array.from({ length: 10 }, () => CALC_MAKERS.sqrt.make(r, { digits: 6, sig: 8, rounding: 'trunc' })))).toBeNull();
+    for (const t of ['mul3', 'add10', 'sq', 'expr', 'div']) expect(box(sur(t, 20)), t).toBeNull();
+  });
+
+  it('섞기 안내 줄이 두 줄로 접히면(실행기는 667 − 17 로 잰다) 문제 칸 + 둘레 + 안내 한 줄 더도 667px 안, 글자는 16px 이상', () => {
+    for (const w of [375, 360]) {
+      for (const seed of ['a', 'b', 'c', 'd']) {
+        const l = promptLayout(sur('mix', 20, seed), 667 - 17, w);
+        /* 실행기의 문제 칸 = ceil(boxPx) + 곱셈 밑줄 4 — 밑줄 4 는 둘레(STACK_CHROME)가 이미 잡아 두었다 */
+        expect(STACK_CHROME[l.stack!.compact ? 'compact' : 'normal'] + Math.ceil(l.boxPx) + 17).toBeLessThanOrEqual(667);
+        expect(l.stack!.px).toBeGreaterThanOrEqual(16);
+        expect(l.linePx ?? CLASS_PX[l.size]).toBeGreaterThanOrEqual(16);
+      }
+    }
   });
 });

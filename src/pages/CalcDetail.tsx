@@ -5,6 +5,7 @@ import { calcSummaries, loadCalcLog } from '../db/calcLog';
 import { localDayKey } from '../db/analytics';
 import { CAL_LEVELS } from '../calc/calendarLadder';
 import { calcLevels, sessionFlashMs } from '../calc/ladders';
+import { calcTypeLabel } from '../calc/makers';
 import { getRules } from '../lib/rules';
 import { Empty, Panel, fmtPct } from '../components/ui';
 import { Dymo, Folder, Key, KeyLink } from '../components/lp';
@@ -35,9 +36,10 @@ export default function CalcDetail() {
     if (s.mode === 'contest') return s.endedAt ? `${s.score}점` : '중단';
     const levels: { n: number; name: string }[] = ev.id === 'calendar' ? CAL_LEVELS : calcLevels(ev.id);
     const name = levels.find((l) => l.n === Number(s.params.level))?.name ?? '';
-    /* 플래시 판은 같은 칸의 보통 판과 구분해 적는다 */
+    /* 플래시 판·유형 판은 같은 칸의 보통(섞기) 판과 구분해 적는다 */
     const flash = sessionFlashMs(s.params);
-    return flash ? `${name} · 플래시 ${(flash / 1000).toFixed(1)}초` : name;
+    const type = calcTypeLabel(ev.id, s.params);
+    return flash ? `${name} · 플래시 ${(flash / 1000).toFixed(1)}초` : type ? `${name} · ${type}` : name;
   };
   const show = (key: string) => {
     const f = ev.rules.find((r) => r.key === key)!;

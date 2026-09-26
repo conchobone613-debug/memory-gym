@@ -3,6 +3,7 @@ import type { CalcLog } from '../db/calcLog';
 import type { OutcomeGoal } from '../lib/outcome';
 import { median } from '../lib/srs';
 import type { LevelPass } from './calendarLadder';
+import { MIX } from './surprise';
 
 /*
  * 계산 사다리(달력 제외) — 종목마다 부하가 커지는 칸과 통과 기준. 칸 정의와 기준값은 이 파일 한곳에 둔다.
@@ -52,6 +53,10 @@ export const CALC_LADDERS: Record<string, CalcLevelDef[]> = {
     { n: 7, id: 'multiplication-7', name: '8×8', what: '8자리 수끼리 곱하기', params: { digitsA: 8, digitsB: 8 }, pass: pass(220_000), perItemMs: 220_000 },
     { n: 8, id: 'multiplication-8', name: '모의 대회', what: '규정대로 풀고 점수를 겨룹니다', perItemMs: 220_000 },
   ],
+  surprise: [
+    { n: 1, id: 'surprise-1', name: '섞어서', what: '깜짝 라운드 유형 풀기', params: { type: MIX }, pass: pass(40_000), perItemMs: 40_000 },
+    { n: 2, id: 'surprise-2', name: '모의 대회', what: '규정대로 풀고 점수를 겨룹니다', perItemMs: 40_000 },
+  ],
 };
 
 /** 종목의 칸들(사다리가 없으면 빈 목록) */
@@ -97,13 +102,21 @@ export function evalCalcLevel(level: CalcLevelDef, recent: Pick<CalcItem, 'isCor
 /** 세션의 플래시 표시 간격(ms). 플래시 판이 아니면 0 — 세션 params 의 flash 1 · intervalMs */
 export const sessionFlashMs = (params: RuleValues): number => (Number(params.flash) ? Number(params.intervalMs) || 0 : 0);
 
+/** 세션(또는 한 판)의 유형 한정 — 서프라이즈 연습에서 고른 유형 id. 섞기·유형 칸이 없는 판은 '' */
+export const sessionType = (p: Record<string, unknown>): string => (p.type && p.type !== MIX ? String(p.type) : '');
+
+/** 사다리(칸 기준)에 드는 판인가 — 플래시 판·유형 한정 판은 잣대가 달라 빠진다 */
+export const ladderSession = (params: RuleValues): boolean => !sessionFlashMs(params) && !sessionType(params);
+
 /**
  * 이 칸의 연습 세션 id(연습 판은 params.level 로 칸을 가린다). flashMs = 그 간격의 플래시 판만, 0 = 플래시 아닌 판만.
- * 플래시 판은 반응시간을 수가 다 지나간 뒤부터 재 잣대가 달라 사다리(calcLevelItems)에도 들지 않는다.
+ * type = 그 유형만 고른 판만, '' = 섞기 판만(유형 칸이 없는 종목은 모두 '').
+ * 플래시 판·유형 판은 잣대가 달라 사다리(calcLevelItems)에도 들지 않는다.
  */
-export function calcPracticeIds(log: CalcLog, n: number, flashMs = 0): Set<string> {
+export function calcPracticeIds(log: CalcLog, n: number, flashMs = 0, type = ''): Set<string> {
   return new Set(log.sessions
-    .filter((s) => s.mode === 'practice' && Number(s.params.level) === n && sessionFlashMs(s.params) === flashMs)
+    .filter((s) => s.mode === 'practice' && Number(s.params.level) === n && sessionFlashMs(s.params) === flashMs
+      && sessionType(s.params) === type)
     .map((s) => s.id));
 }
 
