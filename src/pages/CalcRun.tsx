@@ -10,8 +10,11 @@ import { streaks } from '../lib/streak';
 import type { OutcomeGoal, RunOutcome } from '../lib/outcome';
 import { reduced } from '../design/settings';
 import { isTyping } from '../App';
-import { appendAnswer, normalizeAnswer, promptSize, type Problem } from '../calc/problem';
+import {
+  answerMax, answerSize, appendAnswer, flashFontPx, normalizeAnswer, promptSize, STACK_LH, stackLayout, type Problem,
+} from '../calc/problem';
 import { CALC_MAKERS, type CalcMaker } from '../calc/makers';
+import { FLASH_MS, flashClock, flashComplete, flashError, flashMs, measureFlash } from '../calc/flash';
 import {
   calcLadderStatus, calcLevelItems, calcLevels, calcPracticeIds, currentCalcLevel, evalCalcLevel, isContestLevel, nextSuggestion,
   type CalcLevelDef,
@@ -34,9 +37,17 @@ import {
  * 연습: 맞으면 곧바로 다음 문제, 틀리면 정답·풀이를 붙잡아 보여 준다.
  * 모의 대회: 전체 화면 → 3-2-1 → 판정 연출·붙잡힘 없이 규정 문항을 끝까지(제한시간이 있으면 그때까지) → 결과.
  * 답은 입력칸 없이 상태로 가진다 — 휴대폰에서 기기 키보드가 뜨지 않고 숫자 자판만 쓴다.
+ * 플래시 암산(덧셈 연습): 문항마다 'flash' 단계에서 수를 하나씩 비춘 뒤 'asking' 으로 — 반응시간은 그때부터.
  */
 
-type Phase = 'setup' | 'countdown' | 'asking' | 'feedback' | 'done';
+type Phase = 'setup' | 'countdown' | 'flash' | 'asking' | 'feedback' | 'done';
+
+/** 플래시 한 문항의 측정 — 설정 간격과 수마다 실제로 보인 시간·주기(calcItems.flash) */
+interface FlashRec {
+  intervalMs: number;
+  shownMs: number[];
+  periodMs: number[];
+}
 
 /** 한 판 동안 바뀌지 않는 설정 — 시작할 때 굳힌다 */
 interface RunCfg {
@@ -52,6 +63,13 @@ interface RunCfg {
   penalty: number;
   /** 문제 글자 크기 — 한 판 동안 하나로 고정 */
   size: 'l' | 'm';
+  /** 세로셈·플래시 칸의 글자 크기(px)와 촘촘한 배치. 한 줄 문제(제곱근)는 null */
+  stack: { px: number; compact: boolean } | null;
+  /** 답 칸 글자 수 상한과 글자 크기 — 이 판의 가장 긴 정답으로 */
+  answerMax: number;
+  answerSize: 'l' | 'm';
+  /** 플래시 표시 간격(ms). 0 = 플래시 아님 */
+  flashMs: number;
 }
 
 interface Result {
@@ -60,10 +78,21 @@ interface Result {
   given: string;
   isCorrect: boolean;
   rtMs: number;
+  flash?: FlashRec;
 }
 
 const mmss = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
 const limitText = (sec: number) => (sec % 60 ? `${sec}초` : `${sec / 60}분`);
+/** 간격 칸 글자 → ms. 비어 있으면 기본값 */
+const flashInput = (s: string) => flashMs(s.trim() ? Number(s) : NaN);
+/** ms → '1.0' */
+const sec1 = (ms: number) => (ms / 1000).toFixed(1);
+/** 세로셈 배치의 기준 휴대폰 보이는 높이(px) */
+const PHONE_H = 667;
+/** 수를 놓쳐 처음부터 다시 비추기 전 쉼(ms) — 이어지는 수로 보이지 않게 */
+const FLASH_REDO_GAP = 1000;
+/** 앱 기둥 폭(px) — 화면 폭, 넓은 화면에서는 lampadas.css 의 --col-w(480px) */
+const colW = () => Math.min(document.documentElement.clientWidth || window.innerWidth, 480);
 
 export default function CalcRun() {
   const { id = '' } = useParams();
@@ -97,6 +126,13 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     return n > 0 ? Math.min(200, Math.max(5, n)) : 20;
   });
   const course = courseStep(params);
+  /* 플래시 암산 설정(덧셈 연습 칸). 간격 칸은 치는 중의 '0.' 을 받도록 글자로 둔다 */
+  const [flashOn, setFlashOn] = useState(false);
+  const [flashSec, setFlashSec] = useState(sec1(FLASH_MS.default));
+  /** 플래시 중 화면을 떠나 판을 끝냈다 */
+  const [flashLeft, setFlashLeft] = useState(false);
+  /** 프레임이 밀려 수를 놓쳐 다시 비추는 문항(idx). -1 = 없음 */
+  const [flashRedo, setFlashRedo] = useState(-1);
   const [phase, setPhase] = useState<Phase>('setup');
   const [cfg, setCfg] = useState<RunCfg | null>(null);
   const [queue, setQueue] = useState<Problem[]>([]);
@@ -139,6 +175,10 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   const padRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const cardRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<HTMLDivElement>(null);
+  /** 플래시 칸의 글자 — 프레임마다 React 를 다시 그리지 않고 이 요소의 글자만 바꾼다 */
+  const flashRef = useRef<HTMLSpanElement>(null);
+  /** 지금 문항(idx)의 플래시 측정 — 답을 기록할 때 붙인다 */
+  const flashRec = useRef<(FlashRec & { idx: number }) | null>(null);
 
   /* 판정 연출은 연출 층과 머리띠에서만. 문제 카드는 조각이 넘지 않을 선을 재는 데만 넘긴다(측정 구간) */
   const judge = useJudge();
@@ -161,16 +201,23 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     const seed = newSeed();
     const r = seeded(seed);
     const qs = Array.from({ length: items }, () => maker.make(r, p));
+    const fms = maker.flash && !contest && flashOn ? flashInput(flashSec) : 0;
     const c: RunCfg = {
       level, contest, params: p, rules: { ...rules }, items, limitSec,
       penalty: Number(rules.penaltyPerWrong) || 0, size: promptSize(qs),
+      /* 화면 크기는 시작할 때 한 번 재고 판 동안 그대로 둔다. 문항 수 칸을 고치다 누르면 기기 키보드가 높이를
+         줄여 보이므로 기준 휴대폰 높이(667px)보다 작게 재지 않는다 */
+      stack: fms ? { px: flashFontPx(qs, colW()), compact: false }
+        : qs.some((q) => q.lines) ? stackLayout(qs, Math.max(PHONE_H, window.innerHeight), colW()) : null,
+      answerMax: answerMax(qs), answerSize: answerSize(qs), flashMs: fms,
     };
     const id = uid();
     const run = ++runNo.current;
     const startedAt = Date.now();
     await db.calcSessions.add({
       id, disciplineId: ev.id, mode: contest ? 'contest' : 'practice', rules: c.rules,
-      params: contest ? { level: level.n, items, limitSec, ...p } : { level: level.n, items, ...p },
+      params: contest ? { level: level.n, items, limitSec, ...p }
+        : fms ? { level: level.n, items, ...p, flash: 1, intervalMs: fms } : { level: level.n, items, ...p },
       seed, startedAt, correct: 0, wrong: 0, score: 0,
     });
     /* 3-2-1 이 끝나 저장하는 사이 Esc·전체 화면 해제로 취소했으면 취소가 이긴다(그 판은 endedAt 없이 남는다) */
@@ -189,11 +236,14 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     setStreak(0);
     setOutcome(null);
     setSuggest(null);
+    setFlashLeft(false);
+    setFlashRedo(-1);
+    flashRec.current = null;
     const t = performance.now();
     setStartAt(t);
     setNow(t);
     setPicked(level.n);
-    setPhase('asking');
+    setPhase(fms ? 'flash' : 'asking');
   };
 
   /**
@@ -230,8 +280,9 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
         /* 평균 시간은 통합 기록(sessions.ts)과 같은 방식 — 모름(0)을 뺀 평균 */
         const rts = final.map((r) => r.rtMs).filter((x) => x > 0);
         const meanRtMs = rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 0;
-        const ids = calcPracticeIds(log, cfg.level.n);
-        setOutcome(calcPracticeOutcome({
+        /* 신기록·아까움은 같은 칸의 지난 판과만 — 플래시 판은 같은 간격의 플래시 판끼리 */
+        const ids = calcPracticeIds(log, cfg.level.n, cfg.flashMs);
+        const o = calcPracticeOutcome({
           run: {
             items: final.length, correct, meanRtMs,
             maxStreak: streaks(final.map((r) => r.isCorrect)).best, totalMs: performance.now() - startAt,
@@ -239,8 +290,11 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
           /* 목표 막대는 이번 판까지 넣은 이 칸의 최근 기록 */
           status: evalCalcLevel(cfg.level, calcLevelItems(log, cfg.level.n)),
           past: calcSummaries(log).filter((s) => ids.has(s.id) && s.id !== sessionId),
-        }));
-        setSuggest(nextSuggestion(ev.id, calcLadderStatus(ev.id, log), cfg.level.n));
+        });
+        /* 플래시 판은 반응시간을 수가 다 지나간 뒤부터 재 사다리 기준과 잣대가 달라 사다리에 들지 않는다 —
+           목표 막대·다음 칸 권함은 보통 판에서만 */
+        setOutcome(cfg.flashMs ? { ...o, goals: [] } : o);
+        setSuggest(cfg.flashMs ? null : nextSuggestion(ev.id, calcLadderStatus(ev.id, log), cfg.level.n));
       }
     }
     setResults(final);
@@ -262,14 +316,17 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     const ok = !giveUp && given === cur.expected;
     /* 모름은 반응시간 0 — 포기까지 걸린 시간은 셈한 시간이 아니다 */
     const rtMs = giveUp ? 0 : Math.round(at - t0.current);
-    const r: Result = { q: cur, given, isCorrect: ok, rtMs };
+    const fr = flashRec.current;
+    const flash: FlashRec | undefined = cfg.flashMs && fr?.idx === idx
+      ? { intervalMs: cfg.flashMs, shownMs: fr.shownMs, periodMs: fr.periodMs } : undefined;
+    const r: Result = { q: cur, given, isCorrect: ok, rtMs, ...(flash ? { flash } : {}) };
     const nextStreak = ok ? streak + 1 : 0;
     /* 판정 연출·소리는 입력 즉시 — 기록 저장을 기다리지 않는다. 모의 대회는 판정 연출이 없다 */
     if (!cfg.contest) showJudge(ok ? 'good' : giveUp ? 'skip' : 'bad', nextStreak, cardRef.current);
     try {
       await db.calcItems.add({
         id: uid(), sessionId, index: idx, kind: cur.kind, prompt: cur.prompt, expected: cur.expected,
-        answered: given, isCorrect: ok, rtMs, shownAt: shownAt.current,
+        answered: given, isCorrect: ok, rtMs, ...(flash ? { flash } : {}), shownAt: shownAt.current,
       });
     } catch (e) {
       answering.current = false;
@@ -281,7 +338,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     if (cfg.contest || ok) {
       /* 맞으면(모의 대회는 언제나) 멈추지 않는다 */
       if (idx + 1 >= queue.length) await finish(next);
-      else { setIdx(idx + 1); setAnswer(''); }
+      else { setIdx(idx + 1); setAnswer(''); if (cfg.flashMs) setPhase('flash'); }
     } else {
       setLast(r);
       setPhase('feedback');
@@ -292,9 +349,9 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
 
   /** 숫자·소수점 한 글자(appendAnswer 규칙) */
   const typeChar = useCallback((ch: string) => {
-    if (phase !== 'asking' || answering.current) return;
-    setAnswer(appendAnswer(typedRef.current, ch));
-  }, [phase, setAnswer]);
+    if (phase !== 'asking' || answering.current || !cfg) return;
+    setAnswer(appendAnswer(typedRef.current, ch, cfg.answerMax));
+  }, [cfg, phase, setAnswer]);
 
   /** 한 글자 지우기 전용 — 빈 답에서 앞 문제로 넘기지 않는다 */
   const backspace = useCallback(() => {
@@ -303,9 +360,11 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   }, [phase, setAnswer]);
 
   const continueAfterWrong = useCallback(() => {
+    /* 긴 풀이를 읽으려 내린 스크롤이 남으면 다음 문제에서 머리띠·중단이 화면 위로 가려진다 */
+    window.scrollTo(0, 0);
     if (idx + 1 >= queue.length) finish(results);
-    else { setIdx(idx + 1); setAnswer(''); setPhase('asking'); }
-  }, [finish, idx, queue.length, results, setAnswer]);
+    else { setIdx(idx + 1); setAnswer(''); setPhase(cfg?.flashMs ? 'flash' : 'asking'); }
+  }, [cfg, finish, idx, queue.length, results, setAnswer]);
 
   /** 연습 중단 — 여기까지 푼 것으로 결과. 답을 저장하는 중이면 받지 않는다(그 답이 성적표에서 빠지지 않게) */
   const stop = useCallback(() => {
@@ -331,10 +390,67 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   }, [phase, idx]);
 
   useEffect(() => {
-    if (phase !== 'asking' && phase !== 'feedback') return;
+    if (phase !== 'asking' && phase !== 'feedback' && phase !== 'flash') return;
     const t = setInterval(() => setNow(performance.now()), 250);
     return () => clearInterval(t);
   }, [phase]);
+
+  /*
+   * 플래시 — 프레임마다 flashClock 에 프레임 시각을 넘기고, 화면이 바뀌는 프레임에서만 칸의 글자를 바꾼다.
+   * 끝나면 바뀐 프레임 시각으로 잰 간격을 남기고 'asking' 으로. 정리에서 고리를 끊어 StrictMode 에서도 하나만 돈다.
+   */
+  useEffect(() => {
+    const q = queue[idx];
+    const el = flashRef.current;
+    if (phase !== 'flash' || !cfg?.flashMs || !q?.lines || !el) return;
+    const lines = q.lines;
+    let clock = flashClock(lines.length, cfg.flashMs);
+    let alive = true;
+    let raf = 0;
+    /** 다시 비출 때 이 시각까지는 빈 화면으로 쉰다 */
+    let resumeAt = 0;
+    el.textContent = '';
+    const tick = (ts: number) => {
+      /* 중단(Esc)으로 끝내는 중이면 더 비추지 않는다 */
+      if (!alive || finishing.current) return;
+      if (ts < resumeAt) { raf = requestAnimationFrame(tick); return; }
+      const s = clock.frame(ts);
+      if (s) el.textContent = s.kind === 'show' ? lines[s.i] : '';
+      if (s?.kind === 'done') {
+        const m = measureFlash(clock.changes);
+        /* 한 번도 오르지 못한 수가 있으면 보지 못한 수까지 더한 합을 묻게 된다 — 채점하지 않고 처음부터 다시 */
+        if (!flashComplete(m, lines.length)) {
+          clock = flashClock(lines.length, cfg.flashMs);
+          resumeAt = ts + FLASH_REDO_GAP;
+          setFlashRedo(idx);
+          raf = requestAnimationFrame(tick);
+          return;
+        }
+        alive = false;
+        flashRec.current = { idx, intervalMs: cfg.flashMs, ...m };
+        setPhase('asking');
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    /* 숨은 탭에서는 rAF 가 멈춰 간격이 틀어진다 — 그 문항은 버리고 지금까지 푼 것으로 끝낸다 */
+    const onHide = () => {
+      if (!document.hidden || !alive || finishing.current) return;
+      alive = false;
+      cancelAnimationFrame(raf);
+      setFlashLeft(true);
+      finish(results);
+    };
+    document.addEventListener('visibilitychange', onHide);
+    /* 이미 숨은 채로 이 단계에 들어오면 바뀜 알림이 오지 않는다 — 곧바로 같은 처리 */
+    onHide();
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onHide);
+    };
+  }, [cfg, finish, idx, phase, queue, results]);
 
   /* 제한시간이 있는 모의 대회: 시간이 되면 끝. 못 푼 문항은 무응답. 저장 중인 답이 있으면 그것이 반영된 뒤에 */
   useEffect(() => {
@@ -350,22 +466,27 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
 
   /* 측정 동안에는 앱 머리말과 아래 탭을 내린다 — 모의 대회는 방해 요소 없는 화면, 연습은 숫자 자판이 커서
      짧은 휴대폰(보이는 높이 약 670px)에서 '제출'이 아래 탭에 가리기 때문 */
-  useFocusMode(phase === 'countdown' || phase === 'asking' || phase === 'feedback');
+  useFocusMode(phase === 'countdown' || phase === 'flash' || phase === 'asking' || phase === 'feedback');
 
   const cur = queue[idx];
   const contestRun = phase === 'countdown' || !!cfg?.contest;
 
   /*
    * 단축키 — 숫자·'.' 로 치고, Backspace = 한 글자 지우기(앞 문제로 넘기지 않는다), Enter = 제출,
-   * Tab = 모름(연습만), Esc = 중단(연습) · 취소(모의 대회). 붙잡힌 동안 Enter = 계속.
+   * Tab = 모름(연습만), Esc = 중단(연습) · 취소(모의 대회). 붙잡힌 동안 Enter = 계속. 플래시 중에는 Esc 만 받는다.
    * 결과 화면의 키(공개 중 아무 키 = 건너뛰기, 끝난 뒤 Enter = 한 판 더)는 ResultSheet 가 맡는다.
    */
   useEffect(() => {
-    if (phase !== 'countdown' && phase !== 'asking' && phase !== 'feedback') return;
+    if (phase !== 'countdown' && phase !== 'flash' && phase !== 'asking' && phase !== 'feedback') return;
     const onKey = (e: KeyboardEvent) => {
       // 성적표에서 Enter(한 판 더)로 새 판이 열리면 같은 키가 여기까지 온다 — 이미 처리된 키는 받지 않는다
       if (e.defaultPrevented || isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Escape') { e.preventDefault(); if (contestRun) cancel(); else stop(); return; }
+      if (phase === 'flash') {
+        /* 남은 포커스로 버튼이 눌리거나 포커스가 옮겨 가지 않게 */
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') e.preventDefault();
+        return;
+      }
       if (phase === 'feedback') {
         /* 제출한 Enter 를 누르고 있어도 붙잡힌 풀이를 건너뛰지 않게 반복 입력은 받지 않는다 */
         if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); continueAfterWrong(); }
@@ -441,6 +562,25 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
                   <input className="tnum w-28" type="number" min={5} max={200} value={count} onChange={(e) => setCount(Number(e.target.value))} />
                 </Field>
               )}
+              {maker.flash && !contest && (
+                <>
+                  <label className="flex items-start gap-2 font-typek text-[13px] text-ink">
+                    <input type="checkbox" className="mt-0.5 size-4 shrink-0" checked={flashOn} onChange={(e) => setFlashOn(e.target.checked)} />
+                    <span>플래시 암산 — 수를 하나씩 비춥니다</span>
+                  </label>
+                  {flashOn && (
+                    <Field label="표시 간격(초)" hint={`${sec1(FLASH_MS.min)}~${sec1(FLASH_MS.max)}초, 0.1초 단위. 간격의 80% 동안 수를 보입니다.`}>
+                      <input
+                        className="tnum w-28" type="number" inputMode="decimal"
+                        min={FLASH_MS.min / 1000} max={FLASH_MS.max / 1000} step={FLASH_MS.step / 1000}
+                        value={flashSec}
+                        onChange={(e) => setFlashSec(e.target.value)}
+                        onBlur={() => setFlashSec(sec1(flashInput(flashSec)))}
+                      />
+                    </Field>
+                  )}
+                </>
+              )}
               {contest && rules && <ContestRules ev={ev} rules={rules} />}
               <Key tone="red" size="big" disabled={!rules} onClick={begin}>시작</Key>
             </div>
@@ -481,11 +621,15 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
         <KeyLink to={`/calc/${ev.id}`} tone="cream" className="flex-1">종목 화면</KeyLink>
       </div>
     );
+    const leftNote = flashLeft && (
+      <p className="m-0 text-center font-typek text-[12.5px] text-ink-2">화면을 떠나 플래시를 멈췄습니다.</p>
+    );
     if (!outcome) {
       return (
         <Panel title={ev.name}>
           <Empty>기록된 문항이 없습니다.</Empty>
           <div className="flex flex-col gap-4">
+            {leftNote}
             <Key tone="red" size="big" onClick={begin}>한 번 더</Key>
             {actions}
           </div>
@@ -505,7 +649,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
             <CourseBar
               step={course}
               sessionId={sessionId}
-              played={cfg ? { kind: 'calc', eventId: ev.id, level: cfg.level.n } : undefined}
+              played={cfg ? { kind: 'calc', eventId: ev.id, level: cfg.level.n, flash: cfg.flashMs > 0 } : undefined}
             />
             {suggest && (
               <div className="flex items-center gap-2 rounded-[4px] bg-card px-3 py-2">
@@ -524,6 +668,8 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
         {unanswered > 0 && (
           <p className="m-0 text-center font-typek text-[12.5px] text-ink-2">시간이 다 되어 {unanswered}문제는 풀지 못했습니다.</p>
         )}
+        {leftNote}
+        {cfg?.flashMs ? <FlashPanel intervalMs={cfg.flashMs} results={results} /> : null}
         {wrongs.length > 0 && (
           <Panel title="틀린 문제">
             <ul className="flex flex-col">
@@ -539,16 +685,25 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   if (!cur || !cfg) return null;
   const held = phase === 'feedback' ? last : null;
   const showing = held ? held.q : cur;
+  const flashing = phase === 'flash';
+  const tight = !!cfg.stack?.compact;
   const elapsed = Math.max(0, Math.floor((now - startAt) / 1000));
   const left = startAt + cfg.limitSec * 1000 - now;
-  /* 여러 줄 문제(세로셈)는 오른쪽 끝을 맞춘다 */
-  const prompt = showing.lines
-    ? <span className="inline-flex flex-col items-end">{showing.lines.map((l, i) => <span key={i}>{l}</span>)}</span>
-    : showing.prompt;
-  const help = `${maker.ask(cfg.params)} · Enter 제출${cfg.contest ? '' : ' · Tab 모름'}`;
+  /* 플래시 칸과 '합은?' 칸은 같은 크기(한 판 고정) — 단계가 바뀌어도 문제 카드가 커지거나 줄지 않는다 */
+  const box: CSSProperties | undefined = cfg.stack ? { fontSize: cfg.stack.px, height: cfg.stack.px, lineHeight: 1 } : undefined;
+  const prompt = cfg.flashMs
+    ? flashing
+      ? <span key="flash" ref={flashRef} className="block whitespace-pre" style={box} />
+      : <span key="ask" className="block" style={box}>합은?</span>
+    : cfg.stack && showing.lines
+      ? <Stack lines={showing.lines} rule={showing.kind === 'mul'} style={{ fontSize: cfg.stack.px, lineHeight: STACK_LH }} />
+      : showing.prompt;
+  const help = flashing
+    ? `${flashRedo === idx ? '수를 놓쳐 처음부터 다시 비춥니다' : `${cur.lines?.length ?? 0}개를 하나씩 비춥니다`} · Esc 중단`
+    : `${maker.ask(cfg.params)} · Enter 제출${cfg.contest ? '' : ' · Tab 모름'}`;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${tight ? 'gap-2' : 'gap-3'}`}>
       {!cfg.contest && judge.layer}
 
       <div className="flex items-center gap-3">
@@ -567,22 +722,28 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
         <Hud left={<>{ev.name} · {cfg.level.name} · <b>{idx + 1}</b>/{queue.length}</>} streak={streak} judge={judge} />
       )}
 
-      <QuestionCard ref={cardRef} size={cfg.size} prompt={prompt} help={help} />
+      <QuestionCard ref={cardRef} size={cfg.size} prompt={prompt} help={help} className={tight ? 'is-tight' : undefined} />
 
-      <AnswerBox text={held ? held.given : typed} wrong={!!held} caret={phase === 'asking'} />
+      <AnswerBox text={held ? held.given : typed} wrong={!!held} caret={phase === 'asking'} size={cfg.answerSize} tight={tight} />
 
-      {phase === 'asking' && (
-        <NumberPad
-          refs={padRefs}
-          onType={typeChar}
-          onBackspace={backspace}
-          onSubmit={() => submit(false)}
-          onSkip={cfg.contest ? undefined : () => submit(true)}
-        />
+      {(phase === 'asking' || flashing) && (
+        /* 플래시 동안에도 자리를 지켜 답 칸 아래가 움직이지 않게 하고, 누름만 막는다 */
+        <div inert={flashing} className={flashing ? 'opacity-40' : undefined}>
+          <NumberPad
+            refs={padRefs}
+            onType={typeChar}
+            onBackspace={backspace}
+            onSubmit={() => submit(false)}
+            onSkip={cfg.contest ? undefined : () => submit(true)}
+            compact={tight}
+          />
+        </div>
       )}
 
       {held && (
         <>
+          {/* 계속은 자판 자리(답 칸 바로 아래) — 풀이가 길어도(곱셈 8×8 은 열다섯 줄 남짓) 늘 화면 안에 */}
+          <Key size="big" sub="Enter" onClick={continueAfterWrong}>계속</Key>
           <Held>
             <div>정답 <b>{held.q.expected}</b></div>
             <div className="mt-0.5">
@@ -590,9 +751,12 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
                 ? <>입력한 답 <span className="font-type font-bold text-blue">{held.given}</span></>
                 : '모름으로 넘겼습니다'}
             </div>
+            {/* 플래시 판은 카드에 수가 없으므로 비춘 수들을 세로로 */}
+            {cfg.flashMs > 0 && held.q.lines && (
+              <Stack lines={held.q.lines} className="my-1.5 font-type text-[15px] leading-tight font-bold text-ink" />
+            )}
             <Explain lines={held.q.explain} className="mt-1 text-[12px]" />
           </Held>
-          <Key size="big" sub="Enter" onClick={continueAfterWrong}>계속</Key>
         </>
       )}
     </div>
@@ -625,13 +789,30 @@ function ruleText(f: RuleField, v: number | string | undefined): string {
   return `${v ?? '—'}${f.unit ?? ''}`;
 }
 
-/** 답 칸 — 높이 고정, 친 글자와 멈춘 커서만. 붙잡힌 동안에는 방금 낸 답을 파란 글씨로 둔다 */
-function AnswerBox({ text, wrong, caret }: { text: string; wrong: boolean; caret: boolean }) {
+/**
+ * 답 칸 — 높이 고정, 친 글자와 멈춘 커서만. 붙잡힌 동안에는 방금 낸 답을 파란 글씨로 둔다.
+ * 글자 크기(size)·높이(tight)는 한 판 동안 하나 — 16자를 넘는 정답이 있는 판은 20px(calc/problem 의 answerSize).
+ */
+function AnswerBox({ text, wrong, caret, size, tight }: { text: string; wrong: boolean; caret: boolean; size: 'l' | 'm'; tight: boolean }) {
   return (
-    <div className="flex h-14 items-center justify-center overflow-hidden whitespace-nowrap border-b-2 border-ink-2 bg-input px-3 font-type text-[28px] font-bold leading-none">
+    <div
+      className={`flex ${tight ? 'h-12' : 'h-14'} items-center justify-center overflow-hidden whitespace-nowrap border-b-2 border-ink-2 bg-input px-3 font-type ${size === 'm' ? 'text-[20px]' : 'text-[28px]'} font-bold leading-none`}
+    >
       <span className={wrong ? 'text-blue' : 'text-ink'}>{text}</span>
-      {caret && <span aria-hidden className="ml-0.5 inline-block h-8 w-[3px] bg-ink" />}
+      {caret && <span aria-hidden className={`ml-0.5 inline-block ${size === 'm' ? 'h-6' : 'h-8'} w-[3px] bg-ink`} />}
     </div>
+  );
+}
+
+/** 세로셈 — 오른쪽 끝을 맞춘 수들. 곱셈은 두 줄 아래 밑줄(연출이 아니라 고정된 모양) */
+function Stack({ lines, rule, className, style }: { lines: string[]; rule?: boolean; className?: string; style?: CSSProperties }) {
+  return (
+    <span
+      className={`mx-auto flex w-max flex-col items-end tracking-[.02em]${rule ? ' border-b-2 border-ink pb-0.5' : ''}${className ? ` ${className}` : ''}`}
+      style={style}
+    >
+      {lines.map((l, i) => <span key={i} className="whitespace-pre">{l}</span>)}
+    </span>
   );
 }
 
@@ -640,6 +821,31 @@ function Explain({ lines, className }: { lines: string[]; className?: string }) 
     <div className={`flex flex-col gap-0.5 leading-snug break-words ${className ?? ''}`}>
       {lines.map((l, i) => <div key={i}>{l}</div>)}
     </div>
+  );
+}
+
+/** 플래시 판의 간격 — 설정 간격과, 이 판에서 실제로 화면이 바뀐 프레임으로 잰 주기(모든 수)의 평균·최대 오차 */
+function FlashPanel({ intervalMs, results }: { intervalMs: number; results: Result[] }) {
+  const periods = results.flatMap((r) => r.flash?.periodMs ?? []).filter((p) => p > 0);
+  if (!periods.length) return null;
+  const e = flashError(periods, intervalMs);
+  const cells: [string, string][] = [
+    ['설정', `${(intervalMs / 1000).toFixed(2)}초`],
+    ['실제 평균', `${((intervalMs + e.meanMs) / 1000).toFixed(3)}초`],
+    ['최대 오차', `${Math.round(e.maxAbsMs)}ms`],
+  ];
+  return (
+    <Panel title="플래시 간격">
+      <dl className="m-0 grid grid-cols-3 gap-2">
+        {cells.map(([k, v]) => (
+          <div key={k} className="lp-stat">
+            <dt className="lp-stat-label">{k}</dt>
+            <dd className="tnum m-0 mt-0.5 text-[17px] font-bold text-ink">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="m-0 mt-2 font-typek text-[11px] text-ink-2">수 {periods.length}개를 화면이 바뀐 프레임 시각으로 쟀습니다.</p>
+    </Panel>
   );
 }
 

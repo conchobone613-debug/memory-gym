@@ -6,7 +6,8 @@ import { CALC_MAKERS } from './makers';
 import { seeded } from './rng';
 import { sqrtSig } from './bigmath';
 import {
-  CALC_LADDERS, calcLadderStatus, calcLevelItems, calcLevels, currentCalcLevel, evalCalcLevel, isContestLevel, nextSuggestion,
+  CALC_LADDERS, calcLadderStatus, calcLevelItems, calcLevels, calcPracticeIds, currentCalcLevel, evalCalcLevel, isContestLevel, nextSuggestion,
+  sessionFlashMs,
 } from './ladders';
 
 const SQ = calcLevels('sqrt');
@@ -133,5 +134,56 @@ describe('문항 만들기 표', () => {
     const q = m.make(seeded('m'), m.params(rules, SQ[0]));
     expect(q.prompt).toMatch(/^√\d{4}$/);
     expect(q.expected).toBe(sqrtSig(BigInt(q.prompt.slice(1)), 4, 'trunc'));
+  });
+});
+
+describe('덧셈·곱셈 사다리 — 기본값', () => {
+  it('곱셈 여덟 칸 — 2×2 부터 8×8, 마지막은 모의 대회', () => {
+    const m = calcLevels('multiplication');
+    expect(m.map((l) => l.name)).toEqual(['2×2', '3×3', '4×4', '5×5', '6×6', '7×7', '8×8', '모의 대회']);
+    expect(m.slice(0, 7).map((l) => l.params)).toEqual([2, 3, 4, 5, 6, 7, 8].map((d) => ({ digitsA: d, digitsB: d })));
+    expect(m.map((l) => l.perItemMs)).toEqual([8, 20, 40, 70, 110, 160, 220, 220].map((s) => s * 1000));
+    expect(m.map((l) => l.pass?.medianMs)).toEqual([...[8, 20, 40, 70, 110, 160, 220].map((s) => s * 1000), undefined]);
+    expect(m.slice(0, 7).every((l) => l.pass?.items === 20 && l.pass.accuracy === 0.9)).toBe(true);
+  });
+
+  it('덧셈 여섯 칸 — 2자리 × 5개 부터 10자리 × 10개, 마지막은 모의 대회', () => {
+    const a = calcLevels('addition');
+    expect(a.map((l) => l.name)).toEqual(['2자리 × 5개', '3자리 × 5개', '4자리 × 10개', '6자리 × 10개', '10자리 × 10개', '모의 대회']);
+    expect(a.map((l) => l.params)).toEqual([
+      { digits: 2, terms: 5 }, { digits: 3, terms: 5 }, { digits: 4, terms: 10 }, { digits: 6, terms: 10 }, { digits: 10, terms: 10 }, undefined,
+    ]);
+    expect(a.map((l) => l.perItemMs)).toEqual([10, 15, 40, 60, 100, 100].map((s) => s * 1000));
+    expect(a.slice(0, 5).every((l) => l.pass?.items === 20 && l.pass.accuracy === 0.9 && l.pass.medianMs === l.perItemMs)).toBe(true);
+  });
+});
+
+describe('플래시 판 거르기', () => {
+  const T = 1_800_000_000_000;
+  /** 덧셈 연습 한 판 — flashMs 가 있으면 플래시 판 */
+  function addRun(level: number, startedAt: number, count: number, flashMs = 0) {
+    const r = run(level, startedAt, count, count, 3000);
+    const s: CalcSession = { ...r.s, disciplineId: 'addition', params: { ...r.s.params, ...(flashMs ? { flash: 1, intervalMs: flashMs } : {}) } };
+    return { s, items: r.items.map((i) => ({ ...i, kind: 'add' })) };
+  }
+
+  it('세션의 플래시 간격 — 플래시 판이 아니면 0', () => {
+    expect(sessionFlashMs({ level: 1, items: 20 })).toBe(0);
+    expect(sessionFlashMs({ level: 1, flash: 1, intervalMs: 800 })).toBe(800);
+    expect(sessionFlashMs({ level: 1, flash: 0, intervalMs: 800 })).toBe(0);
+  });
+
+  it('같은 칸이라도 플래시 판끼리(같은 간격)만, 사다리는 플래시 아닌 판만', () => {
+    const plain = addRun(1, T, 20);
+    const f1 = addRun(1, T + 1, 20, 1000);
+    const f2 = addRun(1, T + 2, 20, 500);
+    const log = { sessions: [plain.s, f1.s, f2.s], items: [...plain.items, ...f1.items, ...f2.items] };
+    expect([...calcPracticeIds(log, 1)]).toEqual([plain.s.id]);
+    expect([...calcPracticeIds(log, 1, 1000)]).toEqual([f1.s.id]);
+    expect([...calcPracticeIds(log, 1, 500)]).toEqual([f2.s.id]);
+    expect(new Set(calcLevelItems(log, 1).map((i) => i.sessionId))).toEqual(new Set([plain.s.id]));
+    /* 플래시 판만 있으면 사다리는 비어 있다 */
+    const only = { sessions: [f1.s], items: f1.items };
+    expect(calcLadderStatus('addition', only)[0]).toMatchObject({ attempts: 0, passed: false });
   });
 });

@@ -255,6 +255,8 @@ export interface CalcItem {
   rtMs: number;
   /** 달력 단계 입력처럼 단계마다 잰 시간 */
   steps?: CalcStep[];
+  /** 플래시 암산 문항 — 설정 간격과 수마다 실제로 보인 시간·주기(색인이 아닌 칸이라 DB 버전 그대로, P5) */
+  flash?: { intervalMs: number; shownMs: number[]; periodMs: number[] };
   shownAt: number;
 }
 

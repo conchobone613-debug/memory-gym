@@ -56,6 +56,14 @@ describe('코스 행', () => {
     expect(await markStep(row.id, 1, 'sess-y', { kind: 'calendar', level: 1, steps: false })).toMatchObject({ done: [null, 'sess-y'] });
   });
 
+  it('계산 종목 항목을 플래시 암산으로 한 판은 적지 않는다', async () => {
+    const calc: Course = { say: '해 보세.', items: [{ kind: 'calc', eventId: 'addition', level: 1, items: 20, estMinutes: 4, why: '익힙니다.' }] };
+    const row = await saveCourse({ course: calc, source: 'rule', minutes: 15, input: summary });
+    expect(await markStep(row.id, 0, 'sess-f', { kind: 'calc', eventId: 'addition', level: 1, flash: true })).toBeUndefined();
+    expect(await db.coachLogs.get(row.id)).toMatchObject({ done: [null], followed: false });
+    expect(await markStep(row.id, 0, 'sess-p', { kind: 'calc', eventId: 'addition', level: 1, flash: false })).toMatchObject({ done: ['sess-p'], followed: true });
+  });
+
   it('어제 코스는 오늘 코스가 아니다', async () => {
     await saveCourse({ course, source: 'rule', minutes: 15, input: summary, now: Date.now() - 86_400_000 });
     expect(await todayCourse()).toBeUndefined();
@@ -160,6 +168,30 @@ describe('한 판 복기', () => {
     ]);
     /* 바로 앞 판은 1칸(100%)이지만 견줄 것은 같은 3칸의 지난 판(50%) */
     expect((await buildSessionReviewInput('calc', 'l3-new'))?.previous).toMatchObject({ accuracyPct: 50 });
+  });
+
+  it('덧셈 플래시 판은 같은 간격의 플래시 판끼리만 견주고, 칸의 통과 기준을 붙이지 않는다', async () => {
+    const add = (id: string, at: number, correct: number, flashMs = 0) => ({
+      id, disciplineId: 'addition', mode: 'practice' as const, rules: {},
+      params: { level: 1, items: 2, ...(flashMs ? { flash: 1, intervalMs: flashMs } : {}) }, seed: 'x',
+      startedAt: at, endedAt: at + 2000, correct, wrong: 2 - correct, score: correct,
+    });
+    const item = (sessionId: string, i: number, at: number, ok: boolean) => ({
+      id: `${sessionId}-${i}`, sessionId, index: i, kind: 'add', prompt: '12 + 34', expected: '46', answered: ok ? '46' : '47',
+      isCorrect: ok, rtMs: 1000, shownAt: at + i * 1000,
+    });
+    const rows = [
+      add('f-old', t - 3 * 86_400_000, 1, 1000), add('f-other', t - 2 * 86_400_000, 0, 500),
+      add('plain', t - 86_400_000, 2), add('f-new', t, 2, 1000), add('plain-new', t + 1000, 2),
+    ];
+    await db.calcSessions.bulkAdd(rows);
+    await db.calcItems.bulkAdd(rows.flatMap((s) => [item(s.id, 0, s.startedAt, s.correct > 0), item(s.id, 1, s.startedAt, s.correct > 1)]));
+    const f = await buildSessionReviewInput('calc', 'f-new');
+    expect(f?.previous).toMatchObject({ accuracyPct: 50 }); // 1.0초 플래시 판(f-old), 0.5초 판·보통 판은 건너뛴다
+    expect(f?.target).toBeUndefined();
+    const p = await buildSessionReviewInput('calc', 'plain-new');
+    expect(p?.previous).toMatchObject({ accuracyPct: 100 }); // 보통 판(plain), 바로 앞 플래시 판은 건너뛴다
+    expect(p?.target).toEqual({ accuracyPct: 90, sec: 10 });
   });
 
   it('받은 복기는 남겨 두고 다시 부르지 않는다', async () => {

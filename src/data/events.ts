@@ -232,8 +232,8 @@ export const CALC_EVENTS: CalcEvent[] = [
     id: 'addition',
     name: '덧셈',
     what: '10자리 수 10개의 합.',
-    status: 'locked',
-    needs: '자릿수·개수를 고르는 문제 생성기와 플래시 암산 화면.',
+    status: 'ready',
+    to: '/calc/addition/run',
     rules: [
       items(10), timeLimit(0), penalty,
       { key: 'digits', label: '자릿수', kind: 'number', default: 10, min: 1, max: 15, unit: '자리' },
@@ -245,8 +245,8 @@ export const CALC_EVENTS: CalcEvent[] = [
     id: 'multiplication',
     name: '곱셈',
     what: '8자리 × 8자리.',
-    status: 'locked',
-    needs: '2×2 부터 8×8 까지 단계별 생성기와 교차곱셈 해설.',
+    status: 'ready',
+    to: '/calc/multiplication/run',
     rules: [
       items(10), timeLimit(0), penalty,
       { key: 'digitsA', label: '앞 수 자릿수', kind: 'number', default: 8, min: 1, max: 12, unit: '자리' },

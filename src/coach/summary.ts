@@ -6,7 +6,7 @@ import { goalFor, LADDERS, type GoalStatus } from '../db/goals';
 import { calcSummaries, loadCalcLog, type CalcLog } from '../db/calcLog';
 import { CAL_LEVELS, CALENDAR_LADDER, currentLevel, ladderStatus, type LevelPass } from '../calc/calendarLadder';
 import { stepAverages } from '../calc/calendarDrill';
-import { calcLadderStatus, currentCalcLevel } from '../calc/ladders';
+import { calcLadderStatus, currentCalcLevel, sessionFlashMs } from '../calc/ladders';
 import { calcContestSessions } from '../calc/calcOutcome';
 import { defaultRules, getRules } from '../lib/rules';
 import { median } from '../lib/srs';
@@ -158,7 +158,8 @@ interface RungStatus { level: { n: number; name: string; pass?: LevelPass }; att
 
 /** 사다리 칸 상태 → 요약표의 칸 줄(달력·계산 종목 같은 모양). 통과 기준이 있는 칸만 */
 function rungsOf(statuses: RungStatus[], log: CalcLog, sums: SessionSummary[], now: number): CalendarRung[] {
-  const levelOf = new Map(log.sessions.map((s) => [s.id, Number(s.params.level)]));
+  /* 플래시 판은 사다리에 들지 않으므로(calcPracticeIds) 칸 줄의 한 문항 시간·최근 두 판에서도 뺀다 */
+  const levelOf = new Map(log.sessions.filter((s) => !sessionFlashMs(s.params)).map((s) => [s.id, Number(s.params.level)]));
   return statuses.filter((st) => st.level.pass).map((st) => {
     const p = st.level.pass!;
     const mine = sums.filter((x) => x.mode === 'practice' && levelOf.get(x.id) === st.level.n);

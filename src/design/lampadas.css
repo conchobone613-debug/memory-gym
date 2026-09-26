@@ -225,6 +225,9 @@
 .lp-key.is-lg { font-size: 17px; padding: 13px 24px 14px; }
 .lp-key.is-danger { --kt: var(--red); }
 
+/* 촘촘한 문제 카드(줄이 많은 세로셈): 휴대폰 높이에 들도록 둘레만 줄인다 — 한 판 동안 고정(calc/problem 의 STACK_CHROME) */
+.lp-question.is-tight { padding: 24px 12px 10px; gap: 6px; }
+
 /* 모의 대회의 방해 요소 없는 화면: 머리말·아래 탭을 내린다(useFocusMode) */
 :root[data-focus="on"] .lp-chrome { display: none; }
 
