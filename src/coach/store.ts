@@ -4,11 +4,12 @@ import { uid } from '../lib/random';
 import type { AiUsage } from '../lib/ai';
 import type { CoachSummary } from './summary';
 import type { ReviewInput } from './review';
+import type { WeeklyInput } from './weekly';
 import { playedMatches, type PlayedRun } from './catalog';
-import type { Course, Review } from './types';
+import type { Course, Review, WeeklyReview } from './types';
 
 /*
- * 스승님 기록(coachLogs) — 코스·복기 한 번이 한 행. 규칙 코치가 짠 코스도 남긴다
+ * 스승님 기록(coachLogs) — 코스·복기·주간 리뷰 한 번이 한 행. 규칙 코치가 짠 코스도 남긴다
  * (AI 코스와 규칙 코스를 '실제로 따라 한 비율' 로 견주는 근거, 기획서 §8.2).
  */
 
@@ -135,6 +136,26 @@ export async function saveReview(a: {
   const row: CoachLog = {
     id: uid(), kind: 'review', at: a.now ?? Date.now(), input: a.input, output: a.output, source: 'ai', sessionId: a.sessionId,
     ...(a.review ? { review: a.review } : {}),
+    ...(a.usage ? { inputTokens: a.usage.input, outputTokens: a.usage.output } : {}),
+    ...(a.aiError ? { aiError: a.aiError } : {}),
+  };
+  await db.coachLogs.add(row);
+  return row;
+}
+
+/** 가장 최근에 받은 주간 리뷰(검사를 마친 것). 실패 행(aiError)은 건너뛴다 */
+export async function latestWeekly(): Promise<CoachLog | undefined> {
+  const rows = await db.coachLogs.where('kind').equals('weekly').filter((r) => !!r.weekly).toArray();
+  return rows.sort((a, b) => b.at - a.at)[0];
+}
+
+/** 주간 리뷰 한 번 = 한 행(source 'ai') — 실패해도 쓴 토큰을 남겨 이번 달 사용량에 든다(isAiCall) */
+export async function saveWeekly(a: {
+  input: WeeklyInput; output: string; weekly?: WeeklyReview; usage?: AiUsage; aiError?: string; now?: number;
+}): Promise<CoachLog> {
+  const row: CoachLog = {
+    id: uid(), kind: 'weekly', at: a.now ?? Date.now(), input: a.input, output: a.output, source: 'ai',
+    ...(a.weekly ? { weekly: a.weekly } : {}),
     ...(a.usage ? { inputTokens: a.usage.input, outputTokens: a.usage.output } : {}),
     ...(a.aiError ? { aiError: a.aiError } : {}),
   };

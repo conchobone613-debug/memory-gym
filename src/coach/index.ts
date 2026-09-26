@@ -1,11 +1,12 @@
 import { getSettings, type CoachLog } from '../db/db';
 import type { SessionKind } from '../db/sessions';
 import { AiError } from '../lib/ai';
-import { askCourse, askReview } from './ask';
+import { askCourse, askReview, askWeekly } from './ask';
 import { buildSessionReviewInput } from './review';
 import { ruleCourse } from './rule';
-import { claimAutoAsk, courseRowsOn, reviewFor, saveCourse, saveReview, usageThisMonth } from './store';
+import { claimAutoAsk, courseRowsOn, reviewFor, saveCourse, saveReview, saveWeekly, usageThisMonth } from './store';
 import { loadCoachSummary } from './summary';
+import { loadWeeklyInput } from './weekly';
 
 /*
  * 스승님 — 화면이 부르는 입구. 숫자·판정은 코드, 말·계획은 AI(원칙 2). AI 가 없거나 실패하면 규칙 코치(원칙 3).
@@ -18,13 +19,17 @@ export {
 } from './catalog';
 export { buildSummary, loadCoachSummary, type CoachSummary, type SummaryInput } from './summary';
 export { ruleCourse } from './rule';
-export { validateCourse, validateReview, SAFE_SAY } from './validate';
-export { askCourse, askReview } from './ask';
+export { validateCourse, validateReview, validateWeekly, SAFE_SAY } from './validate';
+export { askCourse, askReview, askWeekly } from './ask';
 export { buildSessionReviewInput, type ReviewInput } from './review';
 export {
   todayCourse, courseRowsOn, claimAutoAsk, saveCourse, markStep, usageThisMonth, sumUsage, shouldAutoAsk, reviewFor, saveReview, isAiCall,
-  AUTO_CALL_CAP, PRICE_PER_M, type CoachUsage,
+  latestWeekly, saveWeekly, AUTO_CALL_CAP, PRICE_PER_M, type CoachUsage,
 } from './store';
+export {
+  buildWeeklyInput, loadWeeklyInput, ruleWeekly, weekRange, receivedThisWeek,
+  type WeeklyInput, type WeeklyDomain, type WeeklyDiscipline, type WeeklyWeak,
+} from './weekly';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const clampMinutes = (m: number) => Math.min(120, Math.max(3, Math.round(Number(m) || 15)));
@@ -96,6 +101,26 @@ export async function reviewSession(kind: SessionKind, sessionId: string, signal
     throw new Error(msg);
   } catch (e) {
     if (e instanceof AiError && !signal?.aborted) await saveReview({ sessionId, input, output: '', usage: e.usage, aiError: e.message });
+    throw e;
+  }
+}
+
+/**
+ * 스승님 주간 리뷰(버튼으로만) — 부를 때마다 새로 묻는다. 검사를 통과하면 남기고 돌려준다.
+ * 실패하면 오류를 던진다(쓴 토큰은 aiError 행으로 남겨 사용량에서 빠지지 않게) — 한 판 복기와 같은 모양.
+ */
+export async function weeklyReview(signal?: AbortSignal, now = Date.now()): Promise<CoachLog> {
+  const key = (await getSettings()).aiKey?.trim();
+  if (!key) throw new Error('설정에서 AI 키를 넣으면 스승님 주간 리뷰를 받을 수 있습니다.');
+  const input = await loadWeeklyInput(now);
+  try {
+    const r = await askWeekly(key, input, signal);
+    if (r.weekly) return saveWeekly({ input, output: r.raw, weekly: r.weekly, usage: r.usage });
+    const msg = '스승님 답을 쓸 수 없어 버렸습니다(기록에 없는 숫자 등). 한 번 더 눌러 주십시오.';
+    await saveWeekly({ input, output: r.raw, usage: r.usage, aiError: msg });
+    throw new Error(msg);
+  } catch (e) {
+    if (e instanceof AiError && !signal?.aborted) await saveWeekly({ input, output: '', usage: e.usage, aiError: e.message });
     throw e;
   }
 }

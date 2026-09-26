@@ -6,6 +6,7 @@ import {
 } from './catalog';
 import type { CoachSummary } from './summary';
 import type { ReviewInput } from './review';
+import type { WeeklyInput } from './weekly';
 
 /*
  * 스승님께 보내는 글 — 역할·규칙·예시(system)와 요약표(user).
@@ -146,4 +147,35 @@ export const REVIEW_SCHEMA: Record<string, unknown> = {
   additionalProperties: false,
   required: ['say', 'next'],
   properties: { say: str, next: str },
+};
+
+export const WEEKLY_SYSTEM = [
+  ...SAGE,
+  '제자의 한 주 훈련 표를 읽고 주간 리뷰를 해 줍니다. 이번 주(week)는 오늘 포함 최근 7일, prev 로 시작하는 값은 그 앞 7일(지난주)입니다.',
+  '',
+  '- say: 하게체 2~3문장. 이번 주를 지난주와 견주어 잘된 점 하나와 약한 곳(weak) 하나를 표에 적힌 실제 값으로 짚습니다.',
+  '- focus: 다음 주에 할 일 1~3개. 항목마다 평문 한 줄(…습니다). 하게체를 쓰지 않습니다.',
+  '- 숫자는 표에 적힌 값을 그대로만 씁니다 — 빼거나 더하거나 나누거나 어림해 새 숫자를 만들지 않습니다. 늘고 줄어든 것은 말로만 합니다.',
+  '',
+  '맞는 예',
+  '- say: "이번 주 기억력 42분 · 계산 18분으로 지난주 30분 · 12분보다 늘었네. 다만 곱셈 5×5 정확도가 72%로 가장 낮으니 그 칸을 눈여겨보게."',
+  '- say: "하루 목표 15분을 5일 채웠네. 달력 월 코드가 3.1초로 가장 느리니 그 단계를 끊어 쳐 보게."',
+  '- focus: "곱셈 5×5 칸을 연습 모드로 먼저 풉니다."',
+  '- focus: "느렸던 47 사슴 칸을 드릴 첫머리에 봅니다."',
+  '',
+  '틀린 예',
+  '- say: "지난주보다 18분이나 늘었구먼!" — 18 은 표에 없는 숫자입니다(직접 뺀 값).',
+  '- say: "정확도가 70% 남짓일세." — 표의 값(72)을 어림해 바꿨습니다.',
+  '- say: "이번 주도 수고하셨습니다." — 하게체가 아니고 실제 값이 없습니다.',
+  '- focus: "곱셈을 더 연습하게." — focus 는 평문(…습니다)입니다.',
+  '- focus: "매일 30분씩 훈련합니다." — 30 은 표에 없는 숫자입니다.',
+].join('\n');
+
+export const weeklyUser = (input: WeeklyInput) => `한 주 훈련 표(JSON):\n${JSON.stringify(input)}`;
+
+export const WEEKLY_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['say', 'focus'],
+  properties: { say: str, focus: { type: 'array', items: str } },
 };

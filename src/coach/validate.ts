@@ -3,11 +3,12 @@ import { calcLevels } from '../calc/ladders';
 import {
   CALC_MIN_ITEMS, calendarOpen, estimateMs, isCalcContest, MAX_COURSE_ITEMS, MAX_ITEMS, MIN_ITEMS, openCalcEvents, openMemoryEvents,
 } from './catalog';
-import { courseUser, reviewUser } from './prompts';
+import { courseUser, reviewUser, weeklyUser } from './prompts';
 import { defaultWhy, fill, finalize, fit, ruleCourse, type Draft } from './rule';
 import type { CoachSummary } from './summary';
 import type { ReviewInput } from './review';
-import type { Course, CourseItem, Review } from './types';
+import type { Course, CourseItem, Review, WeeklyReview } from './types';
+import type { WeeklyInput } from './weekly';
 import type { PickMode } from '../db/db';
 
 /*
@@ -28,8 +29,8 @@ const int = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.
 export const numbersIn = (text: string): number[] => (text.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
 
 /*
- * 숫자 검사는 단위까지 맞춘다 — 'N%' 는 요약의 *Pct 값, 'N초' 는 *Sec 값, 'N분' 은 *Min·minutes 값과 보낸 글에
- * 'N분' 으로 적힌 값(가진 시간·종목 예상 분), 'N일' 은 daysAgo·streak. '%p' 는 늘 버린다(요약에는 차이 값이 없다 —
+ * 숫자 검사는 단위까지 맞춘다 — 'N%' 는 요약의 *Pct 값, 'N초' 는 *Sec 값, 'N분' 은 *Min·*minutes 값과 보낸 글에
+ * 'N분' 으로 적힌 값(가진 시간·종목 예상 분), 'N일' 은 days*(daysAgo·daysMetGoal)·streak. '%p' 는 늘 버린다(요약에는 차이 값이 없다 —
  * 붙었다면 스승님이 직접 뺀 것). 그 밖의 숫자(단계·칸·문항 수 등)는 보낸 글에 있는 숫자면 받는다.
  */
 type Unit = '%' | '초' | '분' | '일';
@@ -37,7 +38,7 @@ export interface Allowed { any: Set<number>; unit: Record<Unit, Set<number>> }
 /* '일세'(…일세) 의 '일' 은 날 수가 아니다 */
 const NUM_UNIT = /(\d+(?:\.\d+)?)\s*(%p|%|초|분|일(?!세))?/g;
 const unitOfKey = (k: string): Unit | null =>
-  /pct$/i.test(k) ? '%' : /sec/i.test(k) ? '초' : /min$|^minutes$/i.test(k) ? '분' : k === 'daysAgo' || k === 'streak' ? '일' : null;
+  /pct$/i.test(k) ? '%' : /sec/i.test(k) ? '초' : /min$|minutes$/i.test(k) ? '분' : /^days/.test(k) || k === 'streak' ? '일' : null;
 
 /** 보낸 글(text)과 그 안의 요약(data)에서 받아 줄 숫자 */
 export function allowedIn(text: string, data: unknown): Allowed {
@@ -183,4 +184,19 @@ export function validateReview(raw: unknown, input: ReviewInput): Review | null 
   if (!say) return null;
   const next = oneLine(raw.next).slice(0, 120);
   return { say, next: next && plain(next) && numbersOk(next, allowed) ? next : '' };
+}
+
+const MAX_FOCUS = 3;
+
+/** 주간 리뷰 답 검사 — 복기와 같은 잣대. say 가 남지 않으면 null, focus 는 평문·표에 있는 숫자만 최대 3개 */
+export function validateWeekly(raw: unknown, input: WeeklyInput): WeeklyReview | null {
+  if (!isObj(raw)) return null;
+  const allowed = allowedIn(weeklyUser(input), input);
+  const say = keepSentences(typeof raw.say === 'string' ? raw.say : '', allowed)
+    .split(/(?<=[.!?])\s+/).slice(0, 3).join(' ').slice(0, 300);
+  if (!say) return null;
+  const focus = (Array.isArray(raw.focus) ? raw.focus : []).map(oneLine)
+    .filter((f, i, all) => f && f.length <= 120 && plain(f) && numbersOk(f, allowed) && all.indexOf(f) === i)
+    .slice(0, MAX_FOCUS);
+  return { say, focus };
 }

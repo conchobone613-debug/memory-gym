@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { confusionPairs, dailyRows, heatmap, mappingCells, movers } from '../db/analytics';
 import { goalFor } from '../db/goals';
 import GoalPanel from '../components/GoalPanel';
+import InsightsSection from '../components/InsightsSection';
 import { db, type ImageSet } from '../db/db';
 import { weeklyMarkdown } from '../lib/markdown';
 import { download } from '../lib/io';
@@ -94,6 +95,9 @@ export default function Stats() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* 종목별 기록(P7) — 두 영역을 한 화면에. 영역별 훈련 시간 그래프는 아래 '최근 기록' 과 같은 기간(days)을 쓴다 */}
+      <InsightsSection days={days} setDays={setDays} />
+
       {/* 최근 기록 — 기간 고르기가 위 수치와 아래 막대에 함께 걸린다 */}
       <section className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2">

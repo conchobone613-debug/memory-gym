@@ -2,8 +2,9 @@ import { blankImage, db, type ImageSet, type MemoImage } from '../db/db';
 
 /* ── 파일 저장/열기 ── */
 
-export function download(filename: string, text: string, mime = 'text/plain;charset=utf-8'): void {
-  const url = URL.createObjectURL(new Blob(['﻿' + text], { type: mime }));
+/** bom = false: BOM 을 이미 붙인 글(exportCsv)이거나, BOM 을 받지 않는 JSON 파서가 읽을 파일 */
+export function download(filename: string, text: string, mime = 'text/plain;charset=utf-8', bom = true): void {
+  const url = URL.createObjectURL(new Blob([(bom ? '﻿' : '') + text], { type: mime }));
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

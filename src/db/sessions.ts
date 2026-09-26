@@ -33,6 +33,8 @@ export interface SessionSummary {
   accuracy: number;
   /** 문항당 평균 반응시간. 종목 회상은 암기에 쓴 시간 ÷ 문항 수. 0 = 잴 것 없음 */
   perItemMs: number;
+  /** 대회식 점수 — 종목 회상은 점수가 있는 종목(듣기·이진수), 계산은 끝까지 치른 모의 대회만. 없으면 칸이 없다 */
+  score?: number;
 }
 
 interface Mark { shownAt: number; rtMs: number }
@@ -113,6 +115,7 @@ export function summarize(raw: RawLogs): SessionSummary[] {
       startedAt: s.startedAt, durationMs: s.memorizeUsedMs + (s.recallUsedMs ?? 0),
       items, correct: s.correct,
       perItemMs: !paced && s.stimulus.length ? Math.round(s.memorizeUsedMs / s.stimulus.length) : 0,
+      ...(s.score !== undefined ? { score: s.score } : {}),
     });
   }
 
@@ -124,6 +127,8 @@ export function summarize(raw: RawLogs): SessionSummary[] {
       title: findDiscipline(s.disciplineId)?.name ?? s.disciplineId, mode: s.mode,
       startedAt: s.startedAt, durationMs: activeMs(s.startedAt, at), items: at.length,
       correct: at.filter((a) => a.isCorrect).length, perItemMs: meanRt(at),
+      /* 취소한 모의 대회(endedAt 없음)의 score 는 중간 값이라 두지 않는다 */
+      ...(s.mode === 'contest' && s.endedAt ? { score: s.score } : {}),
     });
   }
 

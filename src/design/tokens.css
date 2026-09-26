@@ -48,6 +48,11 @@
   --banner: #1e2838e6;
   --desk: #221a13;
 
+  /* 그래프 계열(기록 탭) — 기억력 = --red, 계산 = 그래프 파랑. 앱 파랑 --blue 는 채도가 낮아 막대에서 회색으로 읽혀 쓰지 않는다.
+     카드 바탕에서 두 색 CVD ΔE 17.7 · 정상 26.0 · 대비 3:1 이상(검증 스크립트). 글자에는 쓰지 않는다. */
+  --chart-memory: #b3342b;
+  --chart-calc: #2f5a9c;
+
   /* 글꼴 */
   --font-sign: "Do Hyeon", "Gowun Batang", sans-serif;
   --font-type: "Courier Prime", "Nanum Gothic Coding", monospace;

@@ -31,3 +31,11 @@ export interface Review {
   /** 다음에 할 한 가지 — 평문 한 줄. 요약에 없는 숫자가 섞였으면 빈 글자 */
   next: string;
 }
+
+/** 스승님 주간 리뷰 */
+export interface WeeklyReview {
+  /** 하게체 2~3문장, 주간 표에 있는 값만 */
+  say: string;
+  /** 다음 주에 할 일 — 평문 한 줄씩, 0~3개 */
+  focus: string[];
+}

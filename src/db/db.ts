@@ -7,7 +7,7 @@ import {
 import { uid } from '../lib/random';
 import type { BinaryCode } from '../lib/binary';
 import type { SpokenLang } from '../lib/spoken';
-import type { Course, Review } from '../coach/types';
+import type { Course, Review, WeeklyReview } from '../coach/types';
 
 /* ───────────────── 타입 ───────────────── */
 
@@ -310,6 +310,8 @@ export interface CoachLog {
   sessionId?: string;
   /** 복기 행: 검사를 마친 스승님 말 */
   review?: Review;
+  /** 주간 리뷰 행: 검사를 마친 스승님 말과 다음 주 할 일(색인이 아닌 칸이라 DB 버전 그대로, P7) */
+  weekly?: WeeklyReview;
 }
 
 /** 큰 목표 하나. 주간 이정표는 저장하지 않고 지금 최고 기록과 기한 사이를 코드가 나눈다. */

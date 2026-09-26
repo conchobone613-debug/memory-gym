@@ -261,13 +261,13 @@ export default function Settings() {
           <div className={`mt-1 ${usage && usage.calls >= AUTO_CALL_CAP ? 'font-bold text-ink' : 'text-ink-2'}`}>
             {usage && usage.calls >= AUTO_CALL_CAP
               ? `이번 달 호출이 ${AUTO_CALL_CAP}회에 이르러 하루 한 번 자동 코스를 멈췄습니다. 다음 달 1일에 다시 켜집니다.`
-              : `안전판 — 이번 달 호출이 ${AUTO_CALL_CAP}회에 이르면 자동 코스를 멈춥니다. 직접 누르는 코스·복기는 막지 않습니다.`}
+              : `안전판 — 이번 달 호출이 ${AUTO_CALL_CAP}회에 이르면 자동 코스를 멈춥니다. 직접 누르는 코스·복기·주간 리뷰는 막지 않습니다.`}
           </div>
         </div>
 
         <p className={`mt-3 ${note}`}>
           키를 넣으시면 스승님이 기록 요약을 읽고 오늘의 코스와 한 판 복기를 짜 드리고, 이름 후보의 '다른 후보' 도
-          새로 지어 옵니다. 안 넣으셔도 규칙으로 짠 코스와 사전 후보로 돌아갑니다. 사용량은 이 기기에서 부른 스승님 호출(코스·복기)만 세며
+          새로 지어 옵니다. 안 넣으셔도 규칙으로 짠 코스와 사전 후보로 돌아갑니다. 사용량은 이 기기에서 부른 스승님 호출(코스·복기·주간 리뷰)만 세며
           값은 입력 백만 토큰당 {PRICE_PER_M.input}달러 · 출력 {PRICE_PER_M.output}달러로 어림한 것입니다.
         </p>
       </Folder>
