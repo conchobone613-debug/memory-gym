@@ -15,8 +15,8 @@ export default function Assets() {
   const filled = images.filter((i) => i.name.trim()).length;
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <Dymo className="mb-1 self-start">자산</Dymo>
+    <div className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4">
+      <Dymo className="mb-1 self-start lg:col-span-full lg:justify-self-start">자산</Dymo>
       <IndexCard
         to="/assets/sets"
         title="이미지 세트"

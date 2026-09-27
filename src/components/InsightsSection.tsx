@@ -44,10 +44,11 @@ export default function InsightsSection({ days, setDays }: { days: number; setDa
   const minutes = useMemo(() => (base ? domainMinutes(base.summaries, days, base.now) : []), [base, days]);
 
   return (
-    <section className="flex flex-col gap-2.5">
-      <Dymo className="self-start">종목별 기록</Dymo>
+    /* PC: 두 칸 판 — 머리 숫자·주간 리뷰는 나란히, 그래프·종목 목록·약점은 가로 전체 */
+    <section className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-5">
+      <Dymo className="self-start lg:col-span-2 lg:justify-self-start">종목별 기록</Dymo>
       {!base || !view ? (
-        <p className={caption}>기록을 읽는 중입니다.</p>
+        <p className={`${caption} lg:col-span-2`}>기록을 읽는 중입니다.</p>
       ) : (
         <>
           <HeadStats week={view.week} streak={view.streak} />
@@ -73,7 +74,7 @@ function HeadStats({ week, streak }: { week: WeeklyInput; streak: number }) {
     </span>
   );
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2 lg:self-start">
       <div className="row-span-2 grid">
         <Stat
           label="이번 주 훈련 시간"
@@ -159,6 +160,7 @@ function MinutesPanel({ rows, days, setDays }: { rows: DayMinutes[]; days: numbe
   return (
     <Panel
       title="영역별 훈련 시간(일별)"
+      className="lg:col-span-2"
       right={
         <select aria-label="그래프 기간" value={days} onChange={(e) => setDays(Number(e.target.value))}>
           <option value={7}>7일</option><option value={14}>14일</option><option value={30}>30일</option>
@@ -213,15 +215,16 @@ function MinutesTable({ rows }: { rows: DayMinutes[] }) {
 
 /** 종목 목록 — 영역마다 다이모 머리, 종목마다 한 장 */
 function DisciplineList({ cards }: { cards: DisciplineCard[] }) {
-  if (!cards.length) return <Panel><Empty>종목 기록이 쌓이면 나타납니다.</Empty></Panel>;
+  if (!cards.length) return <Panel className="lg:col-span-2"><Empty>종목 기록이 쌓이면 나타납니다.</Empty></Panel>;
   return (
     <>
       {DOMAINS.map((d) => {
         const list = cards.filter((c) => c.domain === d);
         if (!list.length) return null;
         return (
-          <div key={d} className="flex flex-col gap-2">
-            <Dymo tone={d === 'memory' ? 'red' : 'blue'} small className="mt-1 self-start">{DOMAIN_NAME[d]}</Dymo>
+          /* PC: 종목 카드는 짧아 두세 장씩 나란히 */
+          <div key={d} className="flex flex-col gap-2 lg:col-span-2 lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
+            <Dymo tone={d === 'memory' ? 'red' : 'blue'} small className="mt-1 self-start lg:col-span-full lg:justify-self-start">{DOMAIN_NAME[d]}</Dymo>
             {list.map((c) => <DisciplineRow key={c.id} c={c} />)}
           </div>
         );
@@ -289,8 +292,9 @@ function WeakPanel({ w }: { w: Weakness }) {
     },
   ];
   return (
-    <Panel title="약점 요약">
-      <div className="flex flex-col gap-4 font-typek text-[13px]">
+    <Panel title="약점 요약" className="lg:col-span-2">
+      {/* PC: 기억력 · 계산 두 칸을 나란히 */}
+      <div className="flex flex-col gap-4 font-typek text-[13px] lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
         {blocks.map((b) => {
           const groups = b.groups.filter((g) => g.rows.length);
           return (
@@ -330,8 +334,8 @@ function ExportPanel({ summaries }: { summaries: SessionSummary[] }) {
   };
   const none = summaries.length === 0;
   return (
-    <Panel title="기록 내려받기">
-      <p className={`m-0 ${caption}`}>
+    <Panel title="기록 내려받기" className="lg:col-span-2">
+      <p className={`m-0 ${caption} lg:max-w-[68ch]`}>
         연습·모의 대회 한 판이 한 줄입니다. CSV 는 노션 표에 그대로 붙일 수 있고, JSON 은 다른 곳으로 옮길 때 씁니다.
         AI 키와 이미지 이름은 들어가지 않습니다.
       </p>

@@ -24,7 +24,7 @@ import { useCoachReview } from '../components/CoachReview';
 import { courseStep } from '../coach';
 import { isTyping } from '../App';
 import { Empty, Field, Panel, fmtMs, fmtPct } from '../components/ui';
-import { Dymo, Folder, Held, Hud, Key, KeyLink, QuestionCard, ResultSheet, useJudge } from '../components/lp';
+import { Dymo, Folder, Held, Hud, Key, KeyLink, QuestionCard, ResultSheet, useJudge, usePcFocus } from '../components/lp';
 
 type Phase = 'setup' | 'asking' | 'feedback' | 'done';
 
@@ -141,6 +141,8 @@ export default function Drill() {
   const { show: showJudge, shake: shakeCard, reset: resetJudge } = judge;
   /* 스승님 복기 — 기록된 문항이 있는 결과에서만 */
   const coach = useCoachReview('drill', phase === 'done' && results.length > 0 ? sessionId : '');
+  /* 3단계를 푸는 동안 PC 왼쪽 메뉴를 내린다(휴대폰은 그대로). 1·2단계는 MappingDrill 이 스스로 한다. */
+  usePcFocus(stage === 3 && (phase === 'asking' || phase === 'feedback'));
 
   /**
    * 마지막에 쓰신 설정을 되살린다.
@@ -439,7 +441,7 @@ export default function Drill() {
   }, [continueAfterWrong, finish, phase, results, undo]);
 
   const stageTabs = (
-    <nav aria-label="기초 단계" className="grid grid-cols-3 gap-3 pt-1">
+    <nav aria-label="기초 단계" className="grid grid-cols-3 gap-3 pt-1 lg:col-start-1">
       {([
         { n: 1 as const, desc: '자음 하나', m: m1 },
         { n: 2 as const, desc: '자음 두 개', m: m2 },
@@ -478,10 +480,11 @@ export default function Drill() {
   if (phase === 'setup') {
     const namedCount = pool.length;
     return (
-      <div className="flex flex-col gap-5">
+      /* PC: 설정 서류철 | 목표 두 칸. 단계 탭은 서류철 위 칸에 */
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-x-8">
         <CourseBar step={course} />
         {stageTabs}
-        <Folder tab="3단계 설정" clip>
+        <Folder tab="3단계 설정" clip className="lg:col-start-1">
           <h2 className="font-sign text-[22px] leading-tight text-ink">이미지 변환 드릴</h2>
           <div className="mt-3 flex flex-col gap-4">
             {/* 체크 상자가 여럿이라 Field(label) 로 감싸지 않는다 — label 안의 label 은 첫 칸을 대신 누른다 */}
@@ -604,7 +607,7 @@ export default function Drill() {
         </Folder>
 
         {m3 && (
-          <section className="flex flex-col gap-2">
+          <section className="flex flex-col gap-2 lg:col-start-2">
             <span><Dymo tone="red" small>3단계 목표</Dymo></span>
             <GoalPanel goal={m3} />
           </section>
@@ -710,7 +713,7 @@ export default function Drill() {
   const shown = last?.trial ?? trial;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
       {judge.layer}
       <Hud left={<>이미지 3단계 · <b>{idx + 1}</b>/{queue.length}</>} streak={streak} judge={judge} />
 

@@ -94,26 +94,27 @@ export default function Stats() {
   const dayLabel = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 lg:gap-8">
       {/* 종목별 기록(P7) — 두 영역을 한 화면에. 영역별 훈련 시간 그래프는 아래 '최근 기록' 과 같은 기간(days)을 쓴다 */}
       <InsightsSection days={days} setDays={setDays} />
 
       {/* 최근 기록 — 기간 고르기가 위 수치와 아래 막대에 함께 걸린다 */}
-      <section className="flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-2">
+      {/* PC: 수치 네 칸(왼쪽) · 일별 막대(오른쪽) */}
+      <section className="flex flex-col gap-2.5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-x-5 lg:gap-y-4">
+        <div className="flex items-center justify-between gap-2 lg:col-span-2">
           <Dymo>최근 기록</Dymo>
           <select aria-label="기간" value={days} onChange={(e) => setDays(Number(e.target.value))}>
             <option value={7}>7일</option><option value={14}>14일</option><option value={30}>30일</option>
           </select>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 lg:self-start">
           <Stat label={`최근 ${days}일 시도`} value={`${totals.attempts}회`} />
           <Stat label="정확도" value={totals.attempts ? fmtPct(totals.accuracy) : '—'} />
           <Stat label="평균 중앙 반응시간" value={fmtMs(totals.medianRt)} />
           <Stat label="종목 세션" value={`${totals.practice}회`} />
         </div>
 
-        <Panel title="일별 시도" right={<Key tone="cream" size="sm" onClick={exportMd}>주간 요약 내려받기</Key>}>
+        <Panel title="일별 시도" className="lg:self-start" right={<Key tone="cream" size="sm" onClick={exportMd}>주간 요약 내려받기</Key>}>
           <div ref={chartRef} className="flex h-32 gap-[3px] border-b border-card-edge">
             {rows.map((r) => (
               <div
@@ -145,10 +146,11 @@ export default function Stats() {
       </section>
 
       {/* 기초 세 단계 */}
-      <section className="flex flex-col gap-2.5">
-        <Dymo className="self-start">기초 단계</Dymo>
-        <Panel>
-          <div className="flex flex-col gap-3">
+      {/* PC: 목표 막대(왼쪽) · 자음 매핑 숙련도(오른쪽). 숙련도가 아직 없으면 목표 막대가 두 칸을 다 쓰고 세 단계를 나란히 */}
+      <section className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-5 lg:gap-y-4">
+        <Dymo className="self-start lg:col-span-2 lg:justify-self-start">기초 단계</Dymo>
+        <Panel className={(m1?.attempts || m2?.attempts) ? '' : 'lg:col-span-2'}>
+          <div className={`flex flex-col gap-3 ${(m1?.attempts || m2?.attempts) ? '' : 'lg:grid lg:grid-cols-3 lg:gap-5'}`}>
             {[
               { t: '1단계 · 자음 하나', g: m1 },
               { t: '2단계 · 자음 두 개', g: m2 },
@@ -197,9 +199,11 @@ export default function Stats() {
       </section>
 
       {/* 이미지 약점 */}
-      <section className="flex flex-col gap-2.5">
-        <Dymo className="self-start">이미지 약점</Dymo>
+      {/* PC: 히트맵(왼쪽, 두 줄 차지) · 혼동 쌍과 약점 이미지(오른쪽 위아래). 남는 높이는 마지막 줄이 받아 오른쪽 둘 사이가 벌어지지 않게 */}
+      <section className="flex flex-col gap-2.5 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-rows-[auto_auto_1fr] lg:items-start lg:gap-x-5 lg:gap-y-4">
+        <Dymo className="self-start lg:col-span-2 lg:justify-self-start">이미지 약점</Dymo>
         <Panel
+          className="lg:row-span-2"
           title="반응시간 히트맵"
           right={
             <select aria-label="이미지 세트" value={activeSet?.id ?? ''} onChange={(e) => setSetId(e.target.value)}>

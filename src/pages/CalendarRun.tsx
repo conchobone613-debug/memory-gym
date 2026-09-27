@@ -26,7 +26,7 @@ import { useCoachReview } from '../components/CoachReview';
 import { courseStep } from '../coach';
 import {
   Countdown, Dymo, Folder, Held, Hud, IndexCard, Key, KeyLink, QuestionCard, ResultSheet,
-  pressVisual, useFocusMode, useFullscreen, useJudge,
+  pressVisual, useFocusMode, useFullscreen, useJudge, usePcFocus,
 } from '../components/lp';
 
 /*
@@ -366,6 +366,8 @@ export default function CalendarRun() {
 
   /* 모의 대회의 카운트다운·측정 동안에는 앱 머리말과 아래 탭도 내린다(방해 요소 없는 화면) */
   useFocusMode(phase === 'countdown' || (!!cfg?.contest && phase === 'asking'));
+  /* 연습 측정 동안은 PC 왼쪽 메뉴만 내린다 — 휴대폰은 머리말·아래 탭을 그대로 둔다 */
+  usePcFocus(phase === 'asking' || phase === 'feedback');
 
   const cur = queue[idx];
   const contestRun = phase === 'countdown' || !!cfg?.contest;
@@ -418,8 +420,9 @@ export default function CalendarRun() {
       setPicked(n);
       folderRef.current?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
     };
+    /* PC: 왼쪽 단에 머리·이번 판, 오른쪽 단에 사다리. 사다리가 길면 남는 높이는 마지막 1fr 줄이 받는다 */
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-[auto_auto_auto_1fr] lg:items-start lg:gap-x-8 lg:gap-y-5">
         <CourseBar step={course} />
         <header>
           <div className="flex items-center justify-between gap-2">
@@ -461,7 +464,7 @@ export default function CalendarRun() {
           </Folder>
         </div>
 
-        <section className="flex flex-col gap-2.5">
+        <section className="flex flex-col gap-2.5 lg:col-start-2 lg:row-span-4 lg:row-start-1">
           <Dymo small className="self-start">사다리</Dymo>
           {CAL_LEVELS.map((l, i) => {
             const s = ladder?.statuses[i];
@@ -497,7 +500,7 @@ export default function CalendarRun() {
     );
     if (!outcome) {
       return (
-        <Panel title="달력">
+        <Panel title="달력" className="lg:mx-auto lg:max-w-[var(--measure-w)]">
           <Empty>기록된 문항이 없습니다.</Empty>
           <div className="flex flex-col gap-4">
             <Key tone="red" size="big" onClick={begin}>한 번 더</Key>
@@ -571,7 +574,7 @@ export default function CalendarRun() {
   const heldStep = held?.wrongStep ? held.item.steps?.find((s) => s.name === held.wrongStep) : undefined;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
       {!cfg.contest && judge.layer}
 
       <div className="flex items-center gap-3">
@@ -643,7 +646,8 @@ function AnswerKeys({ weekday, base, keyRefs, onPress }: {
 }) {
   const vals = weekday ? weekdayOrder(base) : CODES;
   return (
-    <div className="flex justify-center gap-2 pt-1" role="group" aria-label={weekday ? '요일' : '코드'}>
+    /* PC 는 측정 기둥이 넓어 자판을 키운다(휴대폰 크기는 CELL 그대로) */
+    <div className="flex justify-center gap-2 pt-1 lg:gap-3 lg:pt-2" role="group" aria-label={weekday ? '요일' : '코드'}>
       {vals.map((v, i) => (
         <Key
           key={i}
@@ -651,7 +655,7 @@ function AnswerKeys({ weekday, base, keyRefs, onPress }: {
           tone="cream"
           size="round"
           style={CELL}
-          className="tnum"
+          className="tnum lg:h-[72px]! lg:w-16! lg:text-[24px]!"
           sub={weekday ? weekdayKey(v, base) : undefined}
           onClick={() => onPress(v)}
         >

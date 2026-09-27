@@ -103,17 +103,17 @@ export default function Palaces() {
     /* 자판을 눌러도 포커스를 가져가지 않는다 — 그래야 이어서 누르는 Enter·Space 가 단축키로만 간다. */
     const keepFocus = (e: React.MouseEvent) => e.preventDefault();
     return (
-      <div ref={walkRef} className="flex flex-col gap-4">
+      <div ref={walkRef} className="flex flex-col gap-4 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
         <Hud
           left={<>{palace.name} · <b>{walkIdx + 1}</b>/{loci.length}</>}
           right={<Key tone="cream" size="sm" onMouseDown={keepFocus} onClick={() => setWalk(false)}>나가기</Key>}
         />
         <div
-          className="lp-panel flex min-h-[18rem] cursor-pointer select-none flex-col items-center justify-center gap-4 px-5 py-8 text-center"
+          className="lp-panel flex min-h-[18rem] lg:min-h-[24rem] cursor-pointer select-none flex-col items-center justify-center gap-4 px-5 py-8 text-center"
           onClick={() => setHidden((h) => !h)}
         >
           <span className="tnum text-[14px] font-bold text-ink-2">{walkIdx + 1}번 장소</span>
-          <span className="font-sign text-[40px] leading-[1.1] break-keep [overflow-wrap:anywhere] text-ink">{hidden ? '● ● ●' : l?.name}</span>
+          <span className="font-sign text-[40px] lg:text-[56px] leading-[1.1] break-keep [overflow-wrap:anywhere] text-ink">{hidden ? '● ● ●' : l?.name}</span>
           {!hidden && l?.note && <span className="font-body text-[15px] leading-[1.5] text-ink-2">{l.note}</span>}
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -140,46 +140,52 @@ export default function Palaces() {
     );
   }
 
+  /*
+   * PC(1024px~)에서는 왼쪽에 궁전 목록, 오른쪽에 고른 궁전의 편집 서류철. 휴대폰에서 묶음 상자는 contents 로 사라진다.
+   * 궁전이 하나도 없으면 오른쪽이 비므로 두 단을 펴지 않고 좁은 한 단으로 둔다.
+   */
   return (
-    <div className="flex flex-col gap-4">
-      <header>
+    <div className={`flex flex-col gap-4 ${palace ? 'lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-x-8' : 'lg:max-w-lg'}`}>
+      <header className="lg:col-span-2">
         <h1 className="m-0 font-sign text-[40px] leading-none text-ink">궁전</h1>
         <p className="m-0 mt-1.5 font-typek text-[12px] font-bold text-ink-2">외운 이미지를 놓아 둘 자리 · 순서가 있는 길</p>
       </header>
 
-      <span><Dymo small>궁전 목록</Dymo></span>
-      {palaces.length === 0 ? (
-        <Empty>궁전이 없습니다. 아래에 이름을 넣어 만드십시오.</Empty>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {palaces.map((p) => {
-            const mine = lociOf(p.id);
-            const n = mine.length;
-            return (
-              <IndexCard
-                key={p.id}
-                title={p.name}
-                meta={`${n}곳`}
-                body={n === 0 ? '장소가 아직 없습니다' : n === 1 ? mine[0].name : `${mine[0].name} → ${mine[n - 1].name}`}
-                onClick={() => setPalaceId(p.id)}
-                /* 고른 궁전은 테두리 선으로(색에만 기대지 않는다) */
-                className={p.id === palaceId ? 'outline-2 outline-offset-2 outline-ink' : undefined}
-              />
-            );
-          })}
-        </div>
-      )}
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <span><Dymo small>궁전 목록</Dymo></span>
+        {palaces.length === 0 ? (
+          <Empty>궁전이 없습니다. 아래에 이름을 넣어 만드십시오.</Empty>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {palaces.map((p) => {
+              const mine = lociOf(p.id);
+              const n = mine.length;
+              return (
+                <IndexCard
+                  key={p.id}
+                  title={p.name}
+                  meta={`${n}곳`}
+                  body={n === 0 ? '장소가 아직 없습니다' : n === 1 ? mine[0].name : `${mine[0].name} → ${mine[n - 1].name}`}
+                  onClick={() => setPalaceId(p.id)}
+                  /* 고른 궁전은 테두리 선으로(색에만 기대지 않는다) */
+                  className={p.id === palaceId ? 'outline-2 outline-offset-2 outline-ink' : undefined}
+                />
+              );
+            })}
+          </div>
+        )}
 
-      <div className="flex gap-2.5">
-        <input
-          value={newPalace}
-          onChange={(e) => setNewPalace(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addPalace(); } }}
-          placeholder="새 궁전 이름 + Enter"
-          aria-label="새 궁전 이름"
-          className="min-w-0 flex-1"
-        />
-        <Key tone="cream" size="sm" onClick={addPalace}>추가</Key>
+        <div className="flex gap-2.5">
+          <input
+            value={newPalace}
+            onChange={(e) => setNewPalace(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addPalace(); } }}
+            placeholder="새 궁전 이름 + Enter"
+            aria-label="새 궁전 이름"
+            className="min-w-0 flex-1"
+          />
+          <Key tone="cream" size="sm" onClick={addPalace}>추가</Key>
+        </div>
       </div>
 
       {palace && (

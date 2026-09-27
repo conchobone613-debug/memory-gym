@@ -68,14 +68,20 @@ export default function Sets() {
     await db.imageSets.update(set.id, { name: next, updatedAt: Date.now() });
   };
 
+  /*
+   * PC(1024px~)에서는 왼쪽에 추천 이미지 서류철, 오른쪽에 내 세트 목록. 묶음 상자는 휴대폰에서 contents 로
+   * 사라져 예전과 같은 한 줄 기둥이 된다.
+   */
   return (
-    <div className="flex flex-col gap-4">
-      <BackupNudge />
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-x-8">
+      <div className="contents lg:col-span-2 lg:flex lg:flex-col lg:gap-4">
+        <BackupNudge />
 
-      <header>
-        <h1 className="m-0 font-sign text-[40px] leading-none text-ink">이미지 세트</h1>
-        <p className="m-0 mt-1.5 font-typek text-[12px] font-bold text-ink-2">숫자와 카드를 무엇으로 볼지 정해 두는 곳</p>
-      </header>
+        <header>
+          <h1 className="m-0 font-sign text-[40px] leading-none text-ink">이미지 세트</h1>
+          <p className="m-0 mt-1.5 font-typek text-[12px] font-bold text-ink-2">숫자와 카드를 무엇으로 볼지 정해 두는 곳</p>
+        </header>
+      </div>
 
       <Folder tab="추천 이미지">
         <p className="m-0 font-body text-[13px] leading-[1.55] text-ink">
@@ -90,65 +96,67 @@ export default function Sets() {
         </p>
       </Folder>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <Dymo small>내 세트</Dymo>
-        <span className="flex flex-wrap gap-2.5">
-          <Key tone="cream" size="sm" disabled={hasDigit3} onClick={() => addSet('숫자 000–999', 'digits:3', 'digit3')}>
-            + 3자리 숫자
-          </Key>
-          <Key tone="cream" size="sm" onClick={() => addSet('새 세트', undefined, 'custom')}>+ 빈 세트</Key>
-        </span>
-      </div>
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 lg:mt-0">
+          <Dymo small>내 세트</Dymo>
+          <span className="flex flex-wrap gap-2.5">
+            <Key tone="cream" size="sm" disabled={hasDigit3} onClick={() => addSet('숫자 000–999', 'digits:3', 'digit3')}>
+              + 3자리 숫자
+            </Key>
+            <Key tone="cream" size="sm" onClick={() => addSet('새 세트', undefined, 'custom')}>+ 빈 세트</Key>
+          </span>
+        </div>
 
-      {msg && <p role="status" className="m-0 font-typek text-[12px] text-ink">{msg}</p>}
+        {msg && <p role="status" className="m-0 font-typek text-[12px] text-ink">{msg}</p>}
 
-      {sets.length === 0 ? (
-        <Empty>세트가 없습니다.</Empty>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {sets.map((s) => {
-            const st = stat(s.id);
-            const empty = st.total - st.filled;
-            return (
-              <IndexCard
-                key={s.id}
-                title={s.name}
-                meta={`${st.filled}/${st.total}`}
-                body={`${DOMAIN_LABEL[s.domain]} · ${st.total === 0 ? '키가 없습니다' : empty ? `빈 칸 ${empty}개` : '다 채웠습니다'}`}
-              >
-                {renaming === s.id && (
-                  <input
-                    autoFocus
-                    defaultValue={s.name}
-                    onBlur={(e) => { rename(s, e.target.value); setRenaming(null); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    className="mt-2 w-full"
-                    aria-label="세트 이름"
-                  />
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2.5">
-                  <KeyLink to={`/assets/sets/${s.id}`} size="sm">편집</KeyLink>
-                  {renaming !== s.id && (
-                    <Key tone="cream" size="sm" onClick={() => setRenaming(s.id)}>이름 바꾸기</Key>
-                  )}
-                  {!s.builtin && (
-                    <ConfirmBtn
-                      size="sm"
-                      label="삭제"
-                      confirmLabel={`'${s.name}' 과 채운 이미지 ${st.filled}개가 사라집니다`}
-                      onConfirm={() => removeSet(s)}
+        {sets.length === 0 ? (
+          <Empty>세트가 없습니다.</Empty>
+        ) : (
+          <div className="flex flex-col gap-3 xl:grid xl:grid-cols-2 xl:items-start">
+            {sets.map((s) => {
+              const st = stat(s.id);
+              const empty = st.total - st.filled;
+              return (
+                <IndexCard
+                  key={s.id}
+                  title={s.name}
+                  meta={`${st.filled}/${st.total}`}
+                  body={`${DOMAIN_LABEL[s.domain]} · ${st.total === 0 ? '키가 없습니다' : empty ? `빈 칸 ${empty}개` : '다 채웠습니다'}`}
+                >
+                  {renaming === s.id && (
+                    <input
+                      autoFocus
+                      defaultValue={s.name}
+                      onBlur={(e) => { rename(s, e.target.value); setRenaming(null); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      className="mt-2 w-full"
+                      aria-label="세트 이름"
                     />
                   )}
-                </div>
-              </IndexCard>
-            );
-          })}
-        </div>
-      )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                    <KeyLink to={`/assets/sets/${s.id}`} size="sm">편집</KeyLink>
+                    {renaming !== s.id && (
+                      <Key tone="cream" size="sm" onClick={() => setRenaming(s.id)}>이름 바꾸기</Key>
+                    )}
+                    {!s.builtin && (
+                      <ConfirmBtn
+                        size="sm"
+                        label="삭제"
+                        confirmLabel={`'${s.name}' 과 채운 이미지 ${st.filled}개가 사라집니다`}
+                        onConfirm={() => removeSet(s)}
+                      />
+                    )}
+                  </div>
+                </IndexCard>
+              );
+            })}
+          </div>
+        )}
 
-      <p className="m-0 font-typek text-[11px] text-ink-2">
-        카드 A~10 은 숫자 세트의 이미지를 그대로 씁니다. 따로 채우실 것은 인물 12장뿐입니다.
-      </p>
+        <p className="m-0 font-typek text-[11px] text-ink-2">
+          카드 A~10 은 숫자 세트의 이미지를 그대로 씁니다. 따로 채우실 것은 인물 12장뿐입니다.
+        </p>
+      </div>
     </div>
   );
 }

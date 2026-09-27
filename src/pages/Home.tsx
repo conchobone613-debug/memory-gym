@@ -78,7 +78,7 @@ function CourseFolder({ needImages }: { needImages: boolean }) {
 
   if (!row || !course) {
     return (
-      <Folder tab="스승님" clip>
+      <Folder tab="스승님" clip className="lg:col-start-2 lg:row-span-2">
         <p className="m-0 font-typek text-[13px] text-ink-2">{notice || '오늘의 코스를 준비하는 중입니다.'}</p>
       </Folder>
     );
@@ -105,7 +105,7 @@ function CourseFolder({ needImages }: { needImages: boolean }) {
           : `규칙으로 짠 ${minutes}분 코스입니다.${hasKey ? '' : ' 설정에 AI 키를 넣으면 스승님이 짭니다.'}`;
 
   return (
-    <Folder tab="스승님" clip>
+    <Folder tab="스승님" clip className="lg:col-start-2 lg:row-span-2">
       <SageNote>{course.say}</SageNote>
       <p className="mt-2 mb-0 line-clamp-2 font-typek text-[12px] leading-snug text-ink-2" role="status">{caption}</p>
       {notice && <p className="mt-1 mb-0 font-typek text-[12px] font-bold text-ink" role="status">{notice}</p>}
@@ -198,35 +198,42 @@ export default function Home() {
   const todayMin = Math.floor(day.todayMs / 60_000);
 
   return (
-    <div className="flex flex-col gap-4">
-      <BackupNudge />
+    /*
+     * PC: 왼쪽 단은 (백업 쪽지)·텔레비전·이름·오늘의 상태 + 기억력 종목, 오른쪽 단은 스승님 서류철(두 줄 차지).
+     * 둘째 줄을 1fr 로 두어 서류철이 더 길 때 남는 높이가 기억력 종목 아래로 가게 한다(위 묶음과 사이가 벌어지지 않게).
+     */
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-8">
+      {/* 휴대폰에선 contents 라 없는 셈 — PC 에서만 왼쪽 단 첫 칸으로 묶는다 */}
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <BackupNudge />
 
-      <TvVideo poster={art('room.webp')} webm={art('room-loop.webm')} mp4={art('room-loop.mp4')} alt="1950년대 계산실" />
+        <TvVideo poster={art('room.webp')} webm={art('room-loop.webm')} mp4={art('room-loop.mp4')} alt="1950년대 계산실" />
 
-      <header>
-        {/* 화면 글자는 한국어 — 큰 제목은 한글 이름, 로마자는 부제 줄에 작게 */}
-        <h1 className="m-0 font-sign text-[40px] leading-none text-ink">{APP_NAME}</h1>
-        <p className="mt-1.5 font-typek text-xs font-bold tracking-[.08em] text-ink-2">{APP_NAME_KO} · 기억과 계산의 훈련소</p>
-      </header>
+        <header>
+          {/* 화면 글자는 한국어 — 큰 제목은 한글 이름, 로마자는 부제 줄에 작게 */}
+          <h1 className="m-0 font-sign text-[40px] leading-none text-ink">{APP_NAME}</h1>
+          <p className="mt-1.5 font-typek text-xs font-bold tracking-[.08em] text-ink-2">{APP_NAME_KO} · 기억과 계산의 훈련소</p>
+        </header>
 
-      {/* 오늘의 상태 줄 */}
-      <div className="grid grid-cols-[74px_1fr] items-stretch gap-2.5">
-        <TearCalendar head="연속" num={day.streak} unit="일째" />
-        <Gauge
-          top={<>오늘 <b>{todayMin}분</b> / {goalMin}분</>}
-          p={todayMin / goalMin}
-          /* 달력엔 부연 칸이 없어 '오늘 했는지'를 여기서 가른다 — 1분 미만만 한 날도 안 한 날과 달리 보이게 */
-          bottom={!day.doneToday
-            ? (day.streak ? '오늘 하면 연속이 이어집니다' : '오늘부터 시작')
-            : todayMin >= goalMin ? '오늘 목표를 채웠습니다' : `${goalMin - todayMin}분만 더 하면 오늘 목표`}
-        />
+        {/* 오늘의 상태 줄 */}
+        <div className="grid grid-cols-[74px_1fr] items-stretch gap-2.5">
+          <TearCalendar head="연속" num={day.streak} unit="일째" />
+          <Gauge
+            top={<>오늘 <b>{todayMin}분</b> / {goalMin}분</>}
+            p={todayMin / goalMin}
+            /* 달력엔 부연 칸이 없어 '오늘 했는지'를 여기서 가른다 — 1분 미만만 한 날도 안 한 날과 달리 보이게 */
+            bottom={!day.doneToday
+              ? (day.streak ? '오늘 하면 연속이 이어집니다' : '오늘부터 시작')
+              : todayMin >= goalMin ? '오늘 목표를 채웠습니다' : `${goalMin - todayMin}분만 더 하면 오늘 목표`}
+          />
+        </div>
       </div>
 
       {/* 오늘의 코스 — 스승님 말과 주 동작 하나(코스 시작) */}
       {/* 이미지 칸이 다 비어 있을 때만 세트 안내(불러오는 동안은 빈 목록이라 띄우지 않는다) */}
       <CourseFolder needImages={images.length > 0 && filled === 0} />
 
-      <section className="flex flex-col gap-2.5">
+      <section className="flex flex-col gap-2.5 lg:col-start-1">
         <Dymo tone="red" small className="self-start">기억력 종목</Dymo>
         {stages.map((s) => {
           const done = s.g?.checks.filter((c) => c.ok).length ?? 0;
@@ -245,8 +252,8 @@ export default function Home() {
         })}
       </section>
 
-      <section className="flex flex-col gap-2.5">
-        <Dymo tone="blue" small className="self-start">계산 종목</Dymo>
+      <section className="flex flex-col gap-2.5 lg:col-span-full lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4 xl:grid-cols-3">
+        <Dymo tone="blue" small className="self-start lg:col-span-full lg:justify-self-start">계산 종목</Dymo>
         {CALC_EVENTS.map((e) => {
           const locked = e.status !== 'ready';
           return (
@@ -262,8 +269,8 @@ export default function Home() {
         })}
       </section>
 
-      <section className="flex flex-col gap-2.5">
-        <Dymo small className="self-start">내 기록</Dymo>
+      <section className="flex flex-col gap-2.5 lg:col-span-full lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4">
+        <Dymo small className="self-start lg:col-span-full lg:justify-self-start">내 기록</Dymo>
         <div className="grid grid-cols-2 gap-2">
           <Stat label="오늘 시도" value={`${today?.attempts ?? 0}문제`} sub={today?.attempts ? `정확도 ${fmtPct(today.accuracy)}` : '아직'} />
           <Stat label="이번 주" value={`${week.attempts}문제`} sub={week.attempts ? `정확도 ${fmtPct(week.correct / week.attempts)}` : '아직'} />
@@ -290,7 +297,7 @@ export default function Home() {
           )}
         </Panel>
 
-        <details className="rounded-[4px] border border-dashed border-card-edge px-3 py-2 font-typek text-[11px] text-ink-2">
+        <details className="rounded-[4px] border border-dashed border-card-edge px-3 py-2 font-typek text-[11px] text-ink-2 lg:col-span-full">
           <summary className="cursor-pointer">키보드 단축키</summary>
           <ul className="mt-2 flex list-none flex-col gap-1.5 p-0">
             <li>기초 1·2단계: 자판의 자음 키 · 숫자 키 (한/영 무관, 화면 버튼도 있음) · <kbd>Tab</kbd> 모름</li>

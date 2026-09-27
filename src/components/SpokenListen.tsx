@@ -98,7 +98,7 @@ export default function SpokenListen({ digits, intervalMs, lang, onDone, onCance
   const left = t0 ? total - (now - t0) : total;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
       <Hud
         left={<>듣기 · <b>{said}</b>/{digits.length}자리</>}
         right={<span className="tnum text-[26px] font-bold leading-none text-ink">{mmss(left)}</span>}
@@ -107,9 +107,9 @@ export default function SpokenListen({ digits, intervalMs, lang, onDone, onCance
         <Key tone="cream" sub="Esc" onClick={() => cancelRef.current()}>취소</Key>
       </div>
       <Panel>
-        <div className="py-14 text-center">
-          <p className="m-0 font-sign text-[28px] leading-tight text-ink">귀로만 들으십시오</p>
-          <p className="m-0 mt-2 font-typek text-xs text-ink-2">되감기는 없습니다</p>
+        <div className="py-14 text-center lg:py-24">
+          <p className="m-0 font-sign text-[28px] leading-tight text-ink lg:text-[34px]">귀로만 들으십시오</p>
+          <p className="m-0 mt-2 font-typek text-xs text-ink-2 lg:text-[13px]">되감기는 없습니다</p>
         </div>
       </Panel>
     </div>

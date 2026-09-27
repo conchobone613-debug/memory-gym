@@ -14,7 +14,7 @@ import { median } from '../lib/srs';
 import { streaks } from '../lib/streak';
 import { isTyping } from '../App';
 import { Btn, Empty, Field, Panel, Stat, fmtMs, fmtPct } from '../components/ui';
-import { Held, Hud, Key, QuestionCard, ResultSheet, useJudge } from '../components/lp';
+import { Held, Hud, Key, QuestionCard, ResultSheet, useJudge, usePcFocus } from '../components/lp';
 import Keypad from '../components/Keypad';
 import ChosungKey from '../components/ChosungKey';
 import GoalPanel from '../components/GoalPanel';
@@ -83,6 +83,8 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
   const judge = useJudge();
   const { show: showJudge, shake, reset: resetJudge } = judge;
   const cardRef = useRef<HTMLDivElement>(null);
+  /* 푸는 동안 PC 왼쪽 메뉴를 내린다(휴대폰은 그대로) */
+  usePcFocus(phase === 'asking' || phase === 'feedback');
 
   /* 코스로 열면 주소의 문항 수(?n)로. 이 화면은 문항 수를 저장하지 않으므로 이번 판에만 쓰인다 */
   const [params] = useSearchParams();
@@ -307,12 +309,14 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
     const seen = stats.size;
     const total = stage === 1 ? 10 : 100;
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-x-8 lg:gap-y-5">
       <CourseBar step={course} />
       {header}
-      <Panel title={STAGE_TITLE[stage]}>
+      <Panel title={STAGE_TITLE[stage]} className="lg:col-span-2">
+        {/* PC: 자음표는 한 줄 전체, 그 아래 기록|목표, 방향|문항 수, 시작은 오른쪽 */}
+        <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-8">
         {settings && (
-          <div className="mb-4">
+          <div className="mb-4 lg:col-span-2 lg:[&_p]:max-w-[68ch]">
             <ChosungKey map={settings.chosungMap} compact={stage === 2} />
           </div>
         )}
@@ -343,7 +347,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           </div>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5 lg:contents">
           <Field label="문항 수">
             <input
               className="tnum w-28"
@@ -354,7 +358,8 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
               onChange={(e) => setCount(Number(e.target.value))}
             />
           </Field>
-          <Key tone="red" size="big" onClick={start}>시작</Key>
+          <Key tone="red" size="big" className="lg:col-start-2 lg:mt-1" onClick={start}>시작</Key>
+        </div>
         </div>
 
       </Panel>
@@ -366,7 +371,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
   if (phase === 'done') {
     if (results.length === 0 || !outcome) {
       return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:mx-auto lg:max-w-[var(--measure-w)]">
           {header}
           <Panel title={STAGE_TITLE[stage]}>
             <Empty>기록된 문항이 없습니다.</Empty>
@@ -438,7 +443,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
   const filled = held ? held.given : typed;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
       {judge.layer}
 
       <div className="flex items-center gap-3">
@@ -461,7 +466,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           {Array.from({ length: slots }).map((_, i) => (
             <span
               key={i}
-              className="grid size-14 place-items-center border-b-2 border-ink-2 bg-input font-type text-[28px] font-bold leading-none text-ink"
+              className="grid size-14 place-items-center border-b-2 border-ink-2 bg-input font-type text-[28px] font-bold leading-none text-ink lg:[@media(min-height:860px)]:size-[72px] lg:[@media(min-height:860px)]:text-[34px]"
             >
               {filled[i] ?? ''}
             </span>

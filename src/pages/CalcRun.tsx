@@ -95,8 +95,12 @@ const sec1 = (ms: number) => (ms / 1000).toFixed(1);
 const PHONE_H = 667;
 /** 수를 놓쳐 처음부터 다시 비추기 전 쉼(ms) — 이어지는 수로 보이지 않게 */
 const FLASH_REDO_GAP = 1000;
-/** 앱 기둥 폭(px) — 화면 폭, 넓은 화면에서는 lampadas.css 의 --col-w(480px) */
-const colW = () => Math.min(document.documentElement.clientWidth || window.innerWidth, 480);
+/** PC 화면(가로 1024px 이상) — 측정 화면을 lampadas.css 의 --measure-w(640px) 기둥에 둔다 */
+const isPc = () => window.matchMedia('(min-width: 1024px)').matches;
+/** 앱 기둥 폭(px) — 화면 폭, 넓은 화면에서는 lampadas.css 의 --col-w(480px), PC 는 측정 기둥 --measure-w(640px) */
+const colW = () => (isPc() ? 640 : Math.min(document.documentElement.clientWidth || window.innerWidth, 480));
+/** PC 본문 위 여백(lg:pt-8)이 휴대폰(pt-4)보다 큰 만큼 — 배치 높이에서 뺀다 */
+const PC_TOP_EXTRA = 16;
 /** 측정 중 문제 카드 안내 줄 — 한 판 동안 같다 */
 const askHelp = (maker: CalcMaker, p: RuleValues, contest: boolean) => `${maker.ask(p)} · Enter 제출${contest ? '' : ' · Tab 모름'}`;
 /** 안내 줄 한 줄 높이(px) — 배치 높이(STACK_CHROME)는 한 줄만 잡아 둔다 */
@@ -226,7 +230,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     /* 화면 크기는 시작할 때 한 번 재고 판 동안 그대로 둔다. 문항 수 칸을 고치다 누르면 기기 키보드가 높이를
        줄여 보이므로 기준 휴대폰 높이(667px)보다 작게 재지 않는다. 안내 줄이 접히면 그만큼 문제 칸 높이를 덜 쓴다 */
     const viewW = colW();
-    const lay = promptLayout(qs, Math.max(PHONE_H, window.innerHeight) - (helpRows(askHelp(maker, p, contest), viewW) - 1) * HELP_LINE, viewW);
+    const lay = promptLayout(qs, Math.max(PHONE_H, window.innerHeight) - (isPc() ? PC_TOP_EXTRA : 0) - (helpRows(askHelp(maker, p, contest), viewW) - 1) * HELP_LINE, viewW);
     const c: RunCfg = {
       level, contest, params: p, rules: { ...rules }, items, limitSec,
       penalty: Number(rules.penaltyPerWrong) || 0, size: lay.size,
@@ -565,8 +569,9 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
       setPicked(n);
       folderRef.current?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
     };
+    /* PC: 왼쪽 단에 머리·이번 판, 오른쪽 단에 사다리. 사다리가 길면 남는 높이는 마지막 1fr 줄이 받는다 */
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-[auto_auto_auto_1fr] lg:items-start lg:gap-x-8 lg:gap-y-5">
         <CourseBar step={course} />
         <header>
           <div className="flex items-center justify-between gap-2">
@@ -621,7 +626,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
           </Folder>
         </div>
 
-        <section className="flex flex-col gap-2.5">
+        <section className="flex flex-col gap-2.5 lg:col-start-2 lg:row-span-4 lg:row-start-1">
           <Dymo small className="self-start">사다리</Dymo>
           {levels.map((l, i) => {
             const s = ladder?.statuses[i];
@@ -660,7 +665,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
     );
     if (!outcome) {
       return (
-        <Panel title={ev.name}>
+        <Panel title={ev.name} className="lg:mx-auto lg:max-w-[var(--measure-w)]">
           <Empty>기록된 문항이 없습니다.</Empty>
           <div className="flex flex-col gap-4">
             {leftNote}
@@ -745,7 +750,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
   const runName = calcTypeLabel(ev.id, cfg.params) ?? cfg.level.name;
 
   return (
-    <div className={`flex flex-col ${tight ? 'gap-2' : 'gap-3'}`}>
+    <div className={`flex flex-col ${tight ? 'gap-2' : 'gap-3'} lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]`}>
       {!cfg.contest && judge.layer}
 
       <div className="flex items-center gap-3">

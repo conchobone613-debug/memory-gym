@@ -18,14 +18,14 @@ export default function Calc() {
   const rules = useLiveQuery(() => Promise.all(CALC_EVENTS.map((e) => getRules(e))), [], []);
 
   return (
-    <section className="flex flex-col gap-2.5">
-      <div className="flex items-center justify-between gap-2">
+    <section className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4 xl:grid-cols-3">
+      <div className="flex items-center justify-between gap-2 lg:col-span-full">
         <Dymo tone="blue">계산 종목</Dymo>
         <span className="font-typek text-xs text-ink-2">
           열림 <b className="tnum text-ink">{ready.length}/{CALC_EVENTS.length}</b>
         </span>
       </div>
-      <p className="font-typek text-[11px] text-ink-2">
+      <p className="font-typek text-[11px] text-ink-2 lg:col-span-full lg:-mt-1.5">
         세계 암산 대회 종목입니다. 오른쪽은 제한시간입니다. 규정 값은 설정에서 바꿀 수 있고, 공식 값으로
         덮어쓰시면 그대로 따릅니다.
       </p>

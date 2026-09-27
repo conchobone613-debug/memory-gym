@@ -9,7 +9,12 @@ const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
  * 칸 사이는 자판 둘레 테두리(4px)와 아래 그림자가 겹치지 않을 만큼 띄운다.
  */
 const CELL = { width: 56, height: 56, fontSize: 24 };
-const ROW_W = 'w-[320px] max-w-full'; // 56 × 5 + 10 × 4
+const ROW_W = 'w-[320px] max-w-full lg:[@media(min-height:860px)]:w-[416px]'; // 56 × 5 + 10 × 4 · PC 72 × 5 + 14 × 4
+/*
+ * PC(1024px 이상)는 측정 기둥이 넓어 칸을 키운다. 위 style 을 이겨야 해서 ! 를 붙인다.
+ * 단 창 높이가 860px 미만인 노트북은 키우면 모름·지우기가 화면 아래로 밀려 스크롤이 생기므로 그대로 둔다.
+ */
+const CELL_PC = 'lg:[@media(min-height:860px)]:size-[72px]! lg:[@media(min-height:860px)]:text-[30px]!';
 
 /**
  * 화면으로 답하는 길.
@@ -33,14 +38,14 @@ export default function Keypad({
   const keys = kind === 'jamo' ? JAMO : DIGITS;
   return (
     <div className="flex w-full flex-col items-center gap-4 pt-1">
-      <div className={`flex flex-wrap justify-center gap-x-[10px] gap-y-[14px] ${ROW_W}`}>
+      <div className={`flex flex-wrap justify-center gap-x-[10px] gap-y-[14px] lg:[@media(min-height:860px)]:gap-x-[14px] lg:[@media(min-height:860px)]:gap-y-[18px] ${ROW_W}`}>
         {keys.map((k) => (
           <Key
             key={k}
             tone="cream"
             size="round"
             style={CELL}
-            className={kind === 'digit' ? 'tnum' : undefined}
+            className={kind === 'digit' ? `tnum ${CELL_PC}` : CELL_PC}
             onClick={() => onPress(k)}
           >
             {k}

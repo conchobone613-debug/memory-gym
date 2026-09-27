@@ -21,7 +21,7 @@ import { pickVoice, speakWord, speechSupported, stopSpeech, unlockSpeech } from 
 import { scoredHistory, scoredOutcome } from '../lib/eventOutcome';
 import { isTyping } from '../App';
 import { Empty, Field, Panel, Stat, fmtPct } from '../components/ui';
-import { Countdown, Folder, Hud, Key, KeyLink, ResultSheet, useFocusMode, useFullscreen } from '../components/lp';
+import { Countdown, Folder, Hud, Key, KeyLink, ResultSheet, useFocusMode, useFullscreen, usePcFocus } from '../components/lp';
 import CourseBar from '../components/CourseBar';
 import SpokenListen from '../components/SpokenListen';
 import BinaryPad from '../components/BinaryPad';
@@ -255,6 +255,8 @@ export default function Practice() {
 
   /* 모의 대회의 카운트다운·암기·회상 동안에는 앱 머리말과 아래 탭도 내린다(방해 요소 없는 화면) */
   useFocusMode(!easy && (phase === 'countdown' || phase === 'memorize' || phase === 'recall'));
+  /* 연습의 암기·회상은 휴대폰에서는 메뉴를 두고, PC 에서만 왼쪽 메뉴를 내려 측정 기둥만 남긴다 */
+  usePcFocus(easy && (phase === 'memorize' || phase === 'recall'));
 
   const expected = useMemo(
     () => (mode === 'digits' ? chunkify(stimulus, chunk) : mode === 'binary' ? chunkify(stimulus, BINARY_CELL) : stimulus),
@@ -601,7 +603,9 @@ export default function Practice() {
           <p className="m-0 mt-2 rounded-[4px] border border-dashed border-ink-2 bg-card px-3 py-2 font-typek text-xs text-ink">{notice}</p>
         )}
         <Folder tab="이번 판" clip>
-          <div className="flex flex-col gap-3">
+          {/* PC: 왼쪽 단은 고르는 칸, 오른쪽 단은 이번 설정 쪽지와 시작. 휴대폰에서는 두 묶음이 contents 라 한 줄 흐름 그대로 */}
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] lg:items-start lg:gap-x-8">
+            <div className="contents lg:flex lg:flex-col lg:gap-3">
             <Field label="프리셋">
               <select
                 value={custom ? 'custom' : presetId}
@@ -711,6 +715,8 @@ export default function Practice() {
               <input type="checkbox" className="size-4" checked={unlimitedRecall} onChange={(e) => setUnlimitedRecall(e.target.checked)} />
               회상은 시간 제한 없이
             </label>
+            </div>
+            <div className="contents lg:flex lg:flex-col lg:gap-3">
             {/* 서류철에 물린 종이 한 장 — 이번 판 요약 */}
             <div className="rounded-[4px] bg-card px-3 py-2.5 font-typek text-xs leading-relaxed text-ink-2">
               <div className="font-bold text-ink">이번 설정</div>
@@ -729,6 +735,7 @@ export default function Practice() {
                 : `암기 ${mmss(memorizeSec * 1000)} · 회상 ${recallText}`}
             </div>
             <Key tone="red" size="big" disabled={blocked} onClick={begin}>시작</Key>
+            </div>
           </div>
         </Folder>
       </div>
@@ -746,7 +753,7 @@ export default function Practice() {
     }
     const left = deadline - nowMs;
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
         <Hud
           left={<>암기 · <b>{stimulus.length}</b>{mode === 'cards' ? '장' : '자리'}</>}
           right={<Clock ms={easy ? nowMs - startedAt : left} warn={!easy && left < 30000} />}
@@ -758,17 +765,17 @@ export default function Practice() {
         <Panel>
           {mode === 'binary' ? (
             /* 30자리 줄마다 한 블록. 폭 375px 에서 한 줄 5칸이 넘치지 않게 패널 여백을 조금 빌려 쓴다 */
-            <div className="-mx-2 flex flex-col gap-3">
+            <div className="-mx-2 flex flex-col gap-3 lg:mx-0 lg:gap-4">
               {cellRows(expected).map((row, r) => (
                 <div key={r}>
                   <div className="mb-0.5 font-typek text-[10px] text-ink-2">{r + 1}줄</div>
                   <div className="grid grid-cols-5 gap-x-1">
                     {row.map((c, j) => (
                       <div key={j} className="flex min-w-0 flex-col items-center">
-                        <span className="tnum inline-flex gap-[2px] text-base leading-tight tracking-[-0.03em] text-ink">
+                        <span className="tnum inline-flex gap-[2px] text-base leading-tight tracking-[-0.03em] text-ink lg:text-xl">
                           {run.code === 'b3' ? splitBits(c).map((p, k) => <span key={k}>{p}</span>) : c}
                         </span>
-                        {run.showKeys && <span className="tnum text-[11px] leading-tight text-ink-2">{bitsToKey(c, run.code)}</span>}
+                        {run.showKeys && <span className="tnum text-[11px] leading-tight text-ink-2 lg:text-[13px]">{bitsToKey(c, run.code)}</span>}
                       </div>
                     ))}
                   </div>
@@ -776,11 +783,11 @@ export default function Practice() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-5 gap-x-2 gap-y-2">
+            <div className="grid grid-cols-5 gap-x-2 gap-y-2 lg:gap-y-3">
               {expected.map((c, i) => (
                 <span
                   key={i}
-                  className={`tnum text-center text-2xl ${mode === 'cards' && 'HD'.includes(c[0]) ? 'text-red' : 'text-ink'}`}
+                  className={`tnum text-center text-2xl lg:text-3xl ${mode === 'cards' && 'HD'.includes(c[0]) ? 'text-red' : 'text-ink'}`}
                 >
                   {show(c)}
                 </span>
@@ -815,8 +822,8 @@ export default function Practice() {
           onKeyDown={(e) => onCellKey(i, e)}
           onFocus={pad ? (e) => onPadFocus(i, e.currentTarget) : undefined}
           className={bin
-            ? `tnum w-full text-center px-0.5! py-1.5! text-base! tracking-[-0.04em] ${pad ? (easy ? 'scroll-mt-16 scroll-mb-[calc(10rem_+_env(safe-area-inset-bottom))]' : 'scroll-mb-[calc(6rem_+_env(safe-area-inset-bottom))]') : ''}`
-            : 'tnum w-full text-center px-1! py-1.5! text-lg!'}
+            ? `tnum w-full text-center px-0.5! py-1.5! text-base! tracking-[-0.04em] lg:py-2! lg:text-lg! ${pad ? (easy ? 'scroll-mt-16 scroll-mb-[calc(10rem_+_env(safe-area-inset-bottom))] lg:scroll-mt-0 lg:scroll-mb-[calc(6rem_+_env(safe-area-inset-bottom))]' : 'scroll-mb-[calc(6rem_+_env(safe-area-inset-bottom))]') : ''}`
+            : 'tnum w-full text-center px-1! py-1.5! text-lg! lg:py-2! lg:text-xl!'}
           inputMode={pad ? 'none' : mode === 'cards' ? 'text' : 'numeric'}
           autoComplete={bin ? 'off' : undefined}
         />
@@ -824,7 +831,7 @@ export default function Practice() {
     );
     const cells = answers.map((_, i) => cell(i));
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
         <Hud
           left={<>회상 · <b>{answers.length}</b>칸</>}
           right={<Clock ms={open ? nowMs - recallStart.current : left} warn={!open && left < 60000} />}
@@ -839,16 +846,16 @@ export default function Practice() {
         <Panel>
           {bin ? (
             /* 30자리 줄 블록. 폭 375px 에서 한 줄 5칸이 넘치지 않게 패널 여백을 조금 빌려 쓴다 */
-            <div className="-mx-2 flex flex-col gap-3">
+            <div className="-mx-2 flex flex-col gap-3 lg:mx-0 lg:gap-4">
               {cellRows(cells).map((row, r) => (
                 <div key={r}>
                   <div className="mb-0.5 font-typek text-[10px] text-ink-2">{r + 1}줄</div>
-                  <div className="grid grid-cols-5 gap-1">{row}</div>
+                  <div className="grid grid-cols-5 gap-1 lg:gap-1.5">{row}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-5 gap-1.5">{cells}</div>
+            <div className="grid grid-cols-5 gap-1.5 lg:gap-2">{cells}</div>
           )}
         </Panel>
         {pad && <BinaryPad aboveNav={easy} onPress={padInput} onBackspace={() => padInput(null)} />}
@@ -896,8 +903,9 @@ export default function Practice() {
 
   /* ───────── 채점 + 원인 태그 ───────── */
   if (phase === 'grade') {
+    /* PC: 왼쪽 채점 표, 오른쪽 오답 원인 — 원인 목록과 저장 자판은 표를 내려도 곁에 남는다 */
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Panel title="채점">
           <div className="grid grid-cols-2 gap-2">
             {contest && (
@@ -918,11 +926,12 @@ export default function Practice() {
         <Panel
           title={`오답 원인 (${wrongCells.length}칸)`}
           right={<span className="font-typek text-[11px] text-ink-2">1~4 원인 · ↑↓ 이동</span>}
+          className="lg:sticky lg:top-8"
         >
           {wrongCells.length === 0 ? (
             <Empty>틀린 칸이 없습니다.</Empty>
           ) : (
-            <ul className="m-0 flex max-h-80 list-none flex-col gap-1.5 overflow-auto p-0">
+            <ul className="m-0 flex max-h-80 list-none flex-col gap-1.5 overflow-auto p-0 lg:max-h-[55vh]">
               {wrongCells.map((g, i) => (
                 <li
                   key={g.index}
@@ -990,7 +999,8 @@ export default function Practice() {
       }
     >
       <Panel title="채점 상세">
-        <div className="grid grid-cols-2 gap-2">
+        {/* PC: 흔한 묶음(오답·미기입·자릿수·합계)이 한 줄. 다섯째 칸(대회 종목)이 홀로 남으면 줄을 다 쓴다 */}
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:[&>:last-child:nth-child(4n+1)]:col-span-full">
           {/* 듣기·이진수 성적표의 글자판은 대회 점수가 차지해 맞힌 칸을 여기에 둔다 */}
           {contest && <Stat label="맞힌 칸" value={`${score.correct}/${score.total}`} />}
           <Stat label="오답" value={score.wrong} />

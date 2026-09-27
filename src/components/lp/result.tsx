@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Children, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { fx } from '../../design/fx';
 import { sfx } from '../../design/sfx';
 import { reduced } from '../../design/settings';
@@ -13,6 +13,10 @@ import { Key, SageNote, Stamp, Star, art } from './basic';
  *   → 별 뒤 120ms 도장 → 아까움이면 안내 칸·막대 떨림·똑딱·'한 판 더' 커짐 / 신기록이면 무대·전구·현수막·테이프·팡파르.
  * 아무 키나 누르면(또는 화면을 누르면) 곧장 끝 상태. 끝난 뒤 Enter = 한 판 더.
  * 신기록 무대는 화면 뒤(고정 층)에 켜지므로, 결과와 함께 보일 내용은 children 으로 넘긴다.
+ *
+ * PC(lg) 폭은 성적표가 스스로 정한다 — 부르는 화면은 폭 상자를 씌우지 않는다.
+ * 상세(children)가 있으면 왼쪽 성적표(스크롤해도 붙어 있음) · 오른쪽 상세 두 단, 없으면 측정 기둥 폭으로 가운데.
+ * 휴대폰에서는 두 묶음 상자가 contents 라 지금과 똑같이 한 줄로 내려간다.
  */
 
 export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', actions, sage, children }: {
@@ -32,6 +36,7 @@ export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', acti
   const passed = passedOf(outcome);
   const isNear = !outcome.record && !!outcome.near?.length;
   const isRecord = !!outcome.record;
+  const hasAside = Children.toArray(children).length > 0;
 
   const [done, setDone] = useState(false);
   const [upOn, setUpOn] = useState(false);
@@ -212,7 +217,14 @@ export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', acti
       )}
       <div ref={fxRef} className="lp-fx" aria-hidden />
 
-      <div className="relative z-[1] flex flex-col gap-2.5">
+      <div
+        className={`relative z-[1] flex flex-col gap-2.5 ${
+          hasAside
+            ? 'lg:grid lg:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] lg:items-start lg:gap-x-8'
+            : 'lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]'
+        }`}
+      >
+        <div className={`contents ${hasAside ? 'lg:sticky lg:top-8 lg:flex lg:flex-col lg:gap-2.5' : ''}`}>
         <div ref={sheetRef} className="lp-sheet">
           <div className="lp-sheet-title">
             {isRecord && recordOn ? (
@@ -284,8 +296,9 @@ export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', acti
         )}
         {actions}
         {!done && <div className="lp-skip">숫자가 넘어가는 동안 아무 키나 누르면 끝 상태로 건너뜁니다.</div>}
+        </div>
 
-        {children}
+        {hasAside && <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-2.5">{children}</div>}
       </div>
     </>
   );

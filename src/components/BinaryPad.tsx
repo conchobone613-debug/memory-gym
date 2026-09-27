@@ -24,7 +24,8 @@ export default function BinaryPad({ onPress, onBackspace, aboveNav }: {
     <div
       role="group"
       aria-label="이진수 자판"
-      className={`sticky z-10 -mx-3.5 grid grid-cols-3 gap-2 border-t border-card-edge bg-paper px-3.5 pt-2 ${aboveNav ? 'pb-2' : 'pb-[max(8px,env(safe-area-inset-bottom))]'}`}
+      /* PC(터치 노트북·큰 태블릿)는 아래 탭이 없어 화면 맨 아래에 붙는다 — 인라인 bottom 을 !로 덮는다. 측정 기둥 폭에 맞춘다 */
+      className={`sticky z-10 -mx-3.5 grid grid-cols-3 gap-2 border-t border-card-edge bg-paper px-3.5 pt-2 lg:bottom-0! lg:mx-0 lg:px-0 lg:pb-[max(8px,env(safe-area-inset-bottom))] ${aboveNav ? 'pb-2' : 'pb-[max(8px,env(safe-area-inset-bottom))]'}`}
       style={{ bottom: aboveNav ? ABOVE_NAV : 0 }}
     >
       <Key tone="cream" className="tnum" style={KEY} onMouseDown={keep} onClick={() => onPress('0')}>0</Key>

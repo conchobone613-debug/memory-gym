@@ -162,9 +162,13 @@ export default function SetEditor() {
 
   const label = (key: string) => (set.domain === 'cardFace' ? cardLabel(key) : key);
 
+  /*
+   * PC(1024px~)에서는 칸 판과 편집 서류철을 나란히 둔다 — 칸을 옮겨 가며 바로 옆에서 고친다.
+   * 칸 수(cols)는 그대로라 방향키 위아래 이동 폭이 화면과 맞는다. 넓은 창(xl)에서는 칸 글자만 키운다.
+   */
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-start justify-between gap-3">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:gap-x-8">
+      <header className="flex items-start justify-between gap-3 lg:col-span-2">
         <div className="min-w-0">
           <h1 className="m-0 truncate font-sign text-[32px] leading-[1.1] text-ink">{set.name}</h1>
           <p className="m-0 mt-1 font-typek text-[12px] font-bold text-ink-2">
@@ -191,16 +195,16 @@ export default function SetEditor() {
                   onDoubleClick={() => nameRef.current?.focus()}
                   title={img.name || undefined}
                   aria-pressed={on}
-                  className={`flex min-w-0 flex-col items-center gap-[3px] rounded-[3px] border px-0 ${dense ? 'py-[5px]' : 'py-2'} ${
+                  className={`flex min-w-0 flex-col items-center gap-[3px] rounded-[3px] border px-0 ${dense ? 'py-[5px] xl:py-2' : 'py-2 xl:py-3'} ${
                     has ? 'border-card-edge bg-card shadow-[var(--paper-lift)]' : 'border-dashed border-ink-2/40'
                   } ${on ? 'outline-2 outline-offset-1 outline-ink' : ''}`}
                 >
-                  <span className={`tnum font-bold leading-none ${dense ? 'text-[11px]' : 'text-[14px]'} ${has ? 'text-ink' : 'text-ink-2'}`}>
+                  <span className={`tnum font-bold leading-none ${dense ? 'text-[11px] xl:text-[13px]' : 'text-[14px] xl:text-[16px]'} ${has ? 'text-ink' : 'text-ink-2'}`}>
                     {label(img.key)}
                   </span>
                   <span
                     className={`w-full truncate text-center font-typek leading-[1.15] ${
-                      dense ? 'text-[10px] tracking-[-.04em]' : 'px-1.5 text-[13px]'
+                      dense ? 'text-[10px] tracking-[-.04em] xl:text-[12px]' : 'px-1.5 text-[13px] xl:text-[14px]'
                     } ${has ? 'text-ink' : 'text-ink-2/60'}`}
                   >
                     {img.name || '—'}
@@ -215,56 +219,59 @@ export default function SetEditor() {
         </div>
       )}
 
-      {draft && settings && (
-        <Folder tab={`${label(draft.key)} 편집`} clip>
-          <ImageFields
-            draft={draft}
-            onDraft={setDraft}
-            onSave={() => save()}
-            domain={set.domain}
-            map={settings.chosungMap}
-            suggestions={suggestions}
-            onPick={useSuggestion}
-            apiKey={settings.aiKey}
-            used={images.filter((i) => i.id !== draft.id && i.name.trim()).map((i) => i.name)}
-            nameRef={nameRef}
-            onNameKey={onNameKey}
-          />
+      {/* PC 오른쪽 단: 서류철 + 파일을 한 묶음으로 붙여 두고, 긴 판(000–999)을 내려가도 화면에 따라온다. 휴대폰에서는 contents 로 사라진다. */}
+      <div className="contents lg:sticky lg:top-8 lg:flex lg:flex-col lg:gap-4 lg:self-start">
+        {draft && settings && (
+          <Folder tab={`${label(draft.key)} 편집`} clip>
+            <ImageFields
+              draft={draft}
+              onDraft={setDraft}
+              onSave={() => save()}
+              domain={set.domain}
+              map={settings.chosungMap}
+              suggestions={suggestions}
+              onPick={useSuggestion}
+              apiKey={settings.aiKey}
+              used={images.filter((i) => i.id !== draft.id && i.name.trim()).map((i) => i.name)}
+              nameRef={nameRef}
+              onNameKey={onNameKey}
+            />
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            <Key tone="red" size="sm" onClick={() => save()}>저장</Key>
-            <Key tone="cream" size="sm" onClick={() => setCursor(nextEmpty(cursor))}>다음 빈 칸</Key>
-            {draft.name && (
-              <Key
-                tone="cream"
-                size="sm"
-                className="is-danger"
-                onClick={async () => {
-                  const cleared = { ...draft, name: '', aliases: [], note: '' };
-                  setDraft(cleared);
-                  await save(cleared);
-                }}
-              >
-                내용 지우기
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <Key tone="red" size="sm" onClick={() => save()}>저장</Key>
+              <Key tone="cream" size="sm" onClick={() => setCursor(nextEmpty(cursor))}>다음 빈 칸</Key>
+              {draft.name && (
+                <Key
+                  tone="cream"
+                  size="sm"
+                  className="is-danger"
+                  onClick={async () => {
+                    const cleared = { ...draft, name: '', aliases: [], note: '' };
+                    setDraft(cleared);
+                    await save(cleared);
+                  }}
+                >
+                  내용 지우기
+                </Key>
+              )}
+            </div>
+          </Folder>
+        )}
+
+        <div className="mt-2 flex flex-col gap-3 lg:mt-0">
+          <span><Dymo small>파일</Dymo></span>
+          <div className="flex flex-wrap gap-2.5">
+            <Key tone="cream" size="sm" onClick={doImport}>가져오기</Key>
+            <Key tone="cream" size="sm" onClick={doExportCsv}>CSV 내보내기</Key>
+            <Key tone="cream" size="sm" onClick={doExportJson}>JSON 내보내기</Key>
+            {set.keyGenerator && (
+              <Key tone="cream" size="sm" onClick={async () => setMsg(`빈 키 ${await ensureKeys(set)}개 생성`)}>
+                키 채우기
               </Key>
             )}
           </div>
-        </Folder>
-      )}
-
-      <div className="mt-2 flex flex-col gap-3">
-        <span><Dymo small>파일</Dymo></span>
-        <div className="flex flex-wrap gap-2.5">
-          <Key tone="cream" size="sm" onClick={doImport}>가져오기</Key>
-          <Key tone="cream" size="sm" onClick={doExportCsv}>CSV 내보내기</Key>
-          <Key tone="cream" size="sm" onClick={doExportJson}>JSON 내보내기</Key>
-          {set.keyGenerator && (
-            <Key tone="cream" size="sm" onClick={async () => setMsg(`빈 키 ${await ensureKeys(set)}개 생성`)}>
-              키 채우기
-            </Key>
-          )}
+          {msg && <p role="status" className="m-0 font-typek text-[12px] text-ink">{msg}</p>}
         </div>
-        {msg && <p role="status" className="m-0 font-typek text-[12px] text-ink">{msg}</p>}
       </div>
     </div>
   );

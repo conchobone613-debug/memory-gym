@@ -106,9 +106,11 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <Dymo className="self-start">설정</Dymo>
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6">
+      <Dymo className="self-start lg:col-span-2 lg:justify-self-start">설정</Dymo>
 
+      {/* PC 는 두 칸 — 왼쪽은 훈련에 쓰는 값, 오른쪽은 규정·스승님·기기·백업. 휴대폰에선 contents 라 한 줄 그대로다 */}
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
       <Folder tab="자음 매핑" clip>
         <div className="mb-3">
           <ChosungKey map={s.chosungMap} />
@@ -204,7 +206,9 @@ export default function Settings() {
           </Field>
         </div>
       </Folder>
+      </div>
 
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
       <div id="rules" className="scroll-mt-20"><RulesPanel /></div>
 
       <Folder tab="AI 스승님">
@@ -292,8 +296,9 @@ export default function Settings() {
           모든 데이터는 이 브라우저 안에만 있습니다. 서버로 나가지 않으니 기기를 옮기실 땐 백업 파일을 쓰십시오.
         </p>
       </Folder>
+      </div>
 
-      {msg && <p className={`font-typek text-[12px] ${msgCls(msg)}`} role="status">{msg.t}</p>}
+      {msg && <p className={`font-typek text-[12px] lg:col-span-2 ${msgCls(msg)}`} role="status">{msg.t}</p>}
     </div>
   );
 }

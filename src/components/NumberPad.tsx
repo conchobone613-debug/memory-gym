@@ -29,7 +29,8 @@ export default function NumberPad({ onType, onBackspace, onSubmit, onSkip, refs,
   const reg = (k: string) => (el: HTMLButtonElement | null) => { if (refs) refs.current[k] = el; };
   const key = compact ? KEY_COMPACT : KEY;
   return (
-    <div className="flex flex-col gap-2" role="group" aria-label="숫자 자판">
+    /* PC 는 측정 기둥(640px)을 다 채우면 키가 납작한 막대가 되어 휴대폰 자판 비율로 가운데에 둔다 */
+    <div className="flex flex-col gap-2 lg:mx-auto lg:w-full lg:max-w-[440px]" role="group" aria-label="숫자 자판">
       <div className="grid grid-cols-3 gap-2">
         {KEYS.map((k) => (
           <Key key={k} ref={reg(k)} tone="cream" className="tnum" style={key} onClick={() => onType(k)}>{k}</Key>
