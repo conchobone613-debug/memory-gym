@@ -5,7 +5,14 @@
  */
 
 /* ── 앱 기둥: 휴대폰 폭. 넓은 화면에서는 가운데 두고 바깥을 책상 색으로 (디자인 시스템 「화면 틀」) ── */
-:root { --col-w: 480px; }
+:root { --col-w: 480px; --frame-w: var(--col-w); }
+
+/* ── PC 화면(가로 1024px 이상 = Tailwind lg, 2026-09-28): 틀이 넓어지고 왼쪽 메뉴가 선다.
+   --frame-w 종이 틀 최대 폭(바깥은 여전히 책상) · --side-w 왼쪽 메뉴 · --measure-w 측정 화면(드릴·암기·회상·계산) 기둥.
+   휴대폰 폭에서는 --frame-w = --col-w 이고 나머지 둘은 쓰이지 않는다. ── */
+@media (min-width: 1024px) {
+  :root { --frame-w: 1320px; --side-w: 228px; --measure-w: 640px; }
+}
 
 /* ── 바탕: 종이 결 ── */
 .lp-grain { position: relative; isolation: isolate; }
@@ -123,7 +130,7 @@
 .lp-held b { font: 19px var(--font-sign); font-weight: 400; color: var(--ink); }
 
 /* ── 연출 층: 화면 전체를 덮지만 입력을 막지 않는다 ── */
-.lp-fx { position: fixed; top: 0; bottom: 0; left: 50%; width: min(100vw, var(--col-w)); transform: translateX(-50%); z-index: var(--layer-fx); pointer-events: none; overflow: hidden; }
+.lp-fx { position: fixed; top: 0; bottom: 0; left: 50%; width: min(100vw, var(--frame-w)); transform: translateX(-50%); z-index: var(--layer-fx); pointer-events: none; overflow: hidden; }
 .lp-edge { position: absolute; inset: 0; opacity: 0; }
 .lp-edge.is-good { box-shadow: var(--glow-good); }
 .lp-edge.is-bad { box-shadow: var(--glow-bad); }
@@ -159,9 +166,9 @@
 .lp-skip { font: 10.5px var(--font-typek); color: var(--ink-2); text-align: center; }
 
 /* ── 신기록: 퀴즈쇼 무대 ── */
-.lp-stage { position: fixed; top: 0; bottom: 0; left: 50%; width: min(100vw, var(--col-w)); transform: translateX(-50%); z-index: 0; opacity: 0; pointer-events: none; border-radius: 0; }
+.lp-stage { position: fixed; top: 0; bottom: 0; left: 50%; width: min(100vw, var(--frame-w)); transform: translateX(-50%); z-index: 0; opacity: 0; pointer-events: none; border-radius: 0; }
 .lp-stage img { object-position: 50% 40%; }
-.lp-marquee { position: fixed; top: 6px; bottom: 6px; left: 50%; width: calc(min(100vw, var(--col-w)) - 12px); transform: translateX(-50%); border-radius: 18px; pointer-events: none; z-index: 7; opacity: 0; }
+.lp-marquee { position: fixed; top: 6px; bottom: 6px; left: 50%; width: calc(min(100vw, var(--frame-w)) - 12px); transform: translateX(-50%); border-radius: 18px; pointer-events: none; z-index: 7; opacity: 0; }
 .lp-marquee i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--bulb); box-shadow: 0 0 8px 3px var(--bulb-halo); }
 .lp-banner { display: inline-block; font: 26px/1 var(--font-sign); color: var(--bulb); letter-spacing: .06em; padding: 7px 18px 6px; background: var(--banner); border: 3px solid var(--brass-light); border-radius: 12px; text-shadow: 0 0 14px var(--bulb-halo); }
 .lp-banner small { display: block; margin-top: 4px; font: 12px var(--font-typek); color: var(--brass-light); text-align: center; letter-spacing: .1em; text-shadow: none; }
@@ -230,6 +237,8 @@
 
 /* 모의 대회의 방해 요소 없는 화면: 머리말·아래 탭을 내린다(useFocusMode) */
 :root[data-focus="on"] .lp-chrome { display: none; }
+/* PC 에서만 메뉴를 내리는 측정 화면(usePcFocus) — 휴대폰 폭에서는 아무 일도 없다 */
+@media (min-width: 1024px) { :root[data-pc-focus="on"] .lp-chrome { display: none; } }
 
 /* 잠긴 목록 카드: 설명 끝이 '잠김' 도장과 겹치지 않게 */
 .lp-index.is-locked .lp-index-body { padding-right: 52px; }

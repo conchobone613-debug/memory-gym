@@ -44,6 +44,20 @@ export function useFocusMode(active: boolean) {
 }
 
 /**
+ * PC 화면에서만 내리는 방해 요소 없는 화면 — active 동안 PC 왼쪽 메뉴를 내려 측정 기둥만 남긴다(<html data-pc-focus>).
+ * 휴대폰은 건드리지 않는다(머리말·아래 탭 그대로). 드릴·연습처럼 휴대폰에서는 메뉴를 두던 측정 화면에 쓴다.
+ * 모의 대회처럼 휴대폰에서도 내려야 하면 useFocusMode 를 쓴다(PC 도 함께 내려간다).
+ */
+export function usePcFocus(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const root = document.documentElement;
+    root.dataset.pcFocus = 'on';
+    return () => { delete root.dataset.pcFocus; };
+  }, [active]);
+}
+
+/**
  * active 동안 전체 화면. 브라우저가 막으면(휴대폰 사파리 등) 조용히 넘어간다 — 화면 틀은 그대로 비운다.
  * 전체 화면은 사용자 동작(누름) 안에서만 켜지므로, 시작 버튼의 onClick 에서 enter() 를 부른다.
  */

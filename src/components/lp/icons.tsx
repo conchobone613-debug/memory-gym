@@ -22,6 +22,14 @@ export const IconFolder = ({ className }: P) => (
   </svg>
 );
 
+/** 기초 — 깎은 연필 (PC 왼쪽 메뉴) */
+export const IconPencil = ({ className }: P) => (
+  <svg {...base} className={className}>
+    <path d="M15.5 4.5l4 4L9 19l-5 1 1-5z" />
+    <path d="M13.5 6.5l4 4M5 15l4 4" />
+  </svg>
+);
+
 /** 기억 — 도서관 목록 카드 */
 export const IconCard = ({ className }: P) => (
   <svg {...base} className={className}>
