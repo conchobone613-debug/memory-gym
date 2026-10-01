@@ -112,7 +112,7 @@ export default function Settings() {
       {/* PC 는 두 칸 — 왼쪽은 훈련에 쓰는 값, 오른쪽은 규정·스승님·기기·백업. 휴대폰에선 contents 라 한 줄 그대로다 */}
       <div className="contents lg:flex lg:flex-col lg:gap-4">
       <Folder tab="자음 매핑" clip>
-        <div className="mb-3">
+        <div className="mb-3 lp-clip-room">
           <ChosungKey map={s.chosungMap} />
         </div>
         <div className="grid grid-cols-5 gap-1.5">

@@ -77,7 +77,10 @@ export function Dymo({ tone, small, children, className }: { tone?: 'red' | 'blu
 
 /* ── Folder: 서류철 상자 ──────────────────────────── */
 
-/** 한 덩어리의 할 일(스승님 쪽지, 설정 묶음, 오늘의 코스). 탭 이름은 두 낱말 이내. 서류철 안에 서류철 금지. */
+/**
+ * 한 덩어리의 할 일(스승님 쪽지, 설정 묶음, 오늘의 코스). 탭 이름은 두 낱말 이내. 서류철 안에 서류철 금지.
+ * clip 은 안쪽 첫 줄 오른쪽 끝을 덮는다 — 스승님 쪽지는 CSS 가 비우고, 다른 내용이 닿으면 첫 블록에 lp-clip-room.
+ */
 export function Folder({ tab, clip, children, className, id }: { tab: string; clip?: boolean; children: ReactNode; className?: string; id?: string }) {
   return (
     <div className={cx('lp-folder', className)} data-tab={tab} id={id}>
