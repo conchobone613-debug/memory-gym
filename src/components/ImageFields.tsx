@@ -12,22 +12,27 @@ const NOTES = new Map<string, string>();
 /** 청해 놓고 아직 안 온 묘사. 후보를 너무 일찍 눌러도 그 답을 기다려 쓴다. */
 const PENDING = new Map<string, Promise<void>>();
 
-/** names 중 캐시·진행 중이 아닌 것만 한 번에 청한다. 끝나면 NOTES 에 들어 있다(못 받은 이름은 ''로 두지 않고 비운다). */
+const NO_KEY = 'AI 키가 없어 세부 묘사를 지을 수 없습니다. 설정에서 AI 키를 확인해 주세요.';
+const failMsg = (e: unknown) => `AI 호출에 실패해 세부 묘사를 받지 못했습니다 — 키·연결을 확인해 주세요. (${(e as Error).message})`;
+
+/** names 중 캐시·진행 중이 아닌 것만 한 번에 청한다. 실패하면 던진다 — 빈 묘사로 덮지 않고 부르는 쪽이 알리게. 캐시에 안 넣어 다음에 다시 청한다. */
 function fetchNotes(apiKey: string, names: string[]): Promise<void> {
   const need = names.filter((n) => !NOTES.has(n) && !PENDING.has(n));
   if (need.length) {
     const p = askForNotes({ apiKey, names: need })
       .then((got) => { for (const n of need) NOTES.set(n, got[n] ?? ''); })
-      .catch(() => { /* 묘사는 덤이다 — 캐시에 안 넣어 다음에 다시 청한다. */ })
       .finally(() => { for (const n of need) PENDING.delete(n); });
     for (const n of need) PENDING.set(n, p);
   }
   return Promise.all(names.map((n) => PENDING.get(n))).then(() => undefined);
 }
 
-/** 후보를 누른 순간 쓸 묘사. 아직 없으면 청하고 기다린다. 못 받으면 ''. */
+/** 후보를 누른 순간 쓸 묘사. 아직 없으면 청하고 기다린다. 키가 없거나 호출이 실패하면 던진다. */
 async function noteFor(apiKey: string | undefined, name: string): Promise<string> {
-  if (!NOTES.has(name) && apiKey) await fetchNotes(apiKey, [name]);
+  if (!NOTES.has(name)) {
+    if (!apiKey) throw new Error(NO_KEY);
+    await fetchNotes(apiKey, [name]);
+  }
   return NOTES.get(name) ?? '';
 }
 
@@ -87,27 +92,29 @@ export default function ImageFields({
   const shown: Suggestion[] = ai.length ? ai.map((name) => ({ name, taken: false })) : dict;
 
   /*
-   * 후보마다 세부 묘사를 같이 준비해 둔다. 키가 있을 때만 — 보이는 후보 중 아직 없는 것만 한 번에 청한다.
-   * 늦게 오거나 못 받으면 그 후보는 빈 묘사로 들어간다(옛 이름의 묘사가 남아 어긋나는 것보다 낫다).
+   * 후보마다 세부 묘사를 같이 준비해 둔다 — 보이는 후보 중 아직 없는 것만 한 번에 청한다.
+   * 이 앱은 AI 가 기본이다. 키가 없거나 호출이 실패하면 빈 묘사로 넘기지 않고 화면에 알린다.
    */
   const [, bump] = useState(0);
   const shownKey = shown.map((s) => s.name).join(',');
   useEffect(() => {
     if (!apiKey) return;
     let live = true;
-    fetchNotes(apiKey, shown.map((s) => s.name)).then(() => { if (live) bump((v) => v + 1); });
+    fetchNotes(apiKey, shown.map((s) => s.name))
+      .then(() => { if (live) bump((v) => v + 1); })
+      .catch((e) => { if (live) setErr(failMsg(e)); });
     return () => { live = false; };
   }, [apiKey, shownKey]);
 
   /**
    * 키가 있으면 누를 때마다 **새로 지어 온다.** 사전은 칸마다 7개쯤이라 두세 번이면 바닥난다.
-   * 키가 없으면 예전처럼 사전을 넘긴다 — 키를 안 넣으셔도 쓰던 대로 돌아간다.
+   * 키가 없으면 지어 올 수 없다 — 사전으로 슬쩍 넘기지 않고 키 확인이 필요하다고 알린다.
    *
    * count 는 **보여 드릴** 개수다. 넉넉히 청해 걸러내는 일과, 빈손일 때 한 번 더 청하는 일은
    * askForNames 안에서 끝난다 — 여기서는 기다리는 동안 '짓는 중…' 만 길어진다.
    */
   const more = async () => {
-    if (!apiKey) { setPage((p) => (p + 1) % pages); return; }
+    if (!apiKey) { setErr(NO_KEY); return; }
     setAsking(true);
     setErr('');
     try {
@@ -123,7 +130,7 @@ export default function ImageFields({
         setErr(`두 번 청했지만 규칙에 맞는 이름이 없었습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 40)}`);
       } else {
         seen.current = [...seen.current, ...names];
-        /* 묘사도 같이 받아 둔다. 실패해도 이름은 보여 준다 — 위 effect 가 이어서 다시 청한다. */
+        /* 묘사도 같이 받아 둔다. 실패하면 아래 catch 가 알린다. */
         await fetchNotes(apiKey, names);
         setAi(names);
       }
@@ -197,7 +204,15 @@ export default function ImageFields({
                 key={sg.name}
                 tone="cream"
                 size="sm"
-                onClick={async () => onPick(sg.name, await noteFor(apiKey, sg.name))}
+                onClick={async () => {
+                  try {
+                    const note = await noteFor(apiKey, sg.name);
+                    setErr('');
+                    onPick(sg.name, note);
+                  } catch (e) {
+                    setErr((e as Error).message === NO_KEY ? NO_KEY : failMsg(e));
+                  }
+                }}
                 title={sg.taken ? '다른 칸에서 이미 쓰고 있습니다' : undefined}
                 className={sg.taken ? 'opacity-50' : undefined}
               >
@@ -218,7 +233,7 @@ export default function ImageFields({
               {asking ? '짓는 중…' : apiKey ? '다른 후보 짓기' : '다른 후보'}
             </Key>
           </div>
-          {err && <div className="mt-2 font-typek text-[11px] text-red">{err}</div>}
+          {(err || !apiKey) && <div className="mt-2 font-typek text-[11px] text-red">{err || NO_KEY}</div>}
         </div>
       )}
     </>
