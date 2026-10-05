@@ -760,8 +760,25 @@ export default function Drill() {
             </span>
             <span className="tnum text-[12px]">{fmtMs(last.rtMs)}</span>
           </div>
-          <div className="mt-1">정답 <b>{last.trial.image.name}</b></div>
-          {last.trial.image.note && <div className="mt-0.5 text-[12px]">{last.trial.image.note}</div>}
+          {(() => {
+            const liveImage = images.find((im) => im.id === last.trial.image.id) ?? last.trial.image;
+            return (
+              <>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span>정답 <b>{liveImage.name}</b></span>
+                  <button
+                    type="button"
+                    onClick={() => setEditId(liveImage.id)}
+                    title="눌러서 이름 고치기"
+                    className="font-typek text-[11px] text-ink-2 underline hover:text-ink"
+                  >
+                    고치기
+                  </button>
+                </div>
+                {liveImage.note && <div className="mt-0.5 text-[12px]">{liveImage.note}</div>}
+              </>
+            );
+          })()}
           {last.typedMatch === 'chosung' && (
             <div className="mt-1 text-[12px] font-bold text-red">초성은 맞았습니다 — 이름까지 떠올라야 합니다</div>
           )}
@@ -792,6 +809,7 @@ export default function Drill() {
         <span className="tnum">{mmss(elapsed)}</span>
         <button type="button" className="py-1 hover:text-ink" onClick={() => finish(results)}>중단 (Esc)</button>
       </div>
+      {editId && <ImageEditDialog imageId={editId} onClose={() => setEditId(null)} />}
     </div>
   );
 }
