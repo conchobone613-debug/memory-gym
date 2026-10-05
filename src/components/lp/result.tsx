@@ -290,7 +290,8 @@ export function ResultSheet({ outcome, onAgain, againLabel = '한 판 더', acti
         {sage ?? (outcome.sage && <SageNote small>{outcome.sage}</SageNote>)}
 
         {onAgain && (
-          <div ref={againRef}>
+          // 자판 아래로 번지는 테두리·그림자(약 6px)만큼 pb 를 보태 위쪽 여백과 같게 한다
+          <div ref={againRef} className="pb-1.5">
             <Key tone="red" size="big" sub="Enter" onClick={onAgain}>{againLabel}</Key>
           </div>
         )}
