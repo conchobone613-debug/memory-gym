@@ -711,6 +711,7 @@ export default function Drill() {
   /* 틀려서 붙잡혀 있는 동안에는 방금 틀린 문제를 계속 보여 준다 */
   const last = phase === 'feedback' ? results[results.length - 1] : undefined;
   const shown = last?.trial ?? trial;
+  const liveImage = last ? (images.find((im) => im.id === last.trial.image.id) ?? last.trial.image) : undefined;
 
   return (
     <div className="flex flex-col gap-3 lg:mx-auto lg:w-full lg:max-w-[var(--measure-w)]">
@@ -752,7 +753,7 @@ export default function Drill() {
         </QuestionCard>
       </div>
 
-      {phase === 'feedback' && last ? (
+      {phase === 'feedback' && last && liveImage ? (
         <Held>
           <div className="flex items-baseline justify-between gap-3">
             <span>
@@ -760,30 +761,14 @@ export default function Drill() {
             </span>
             <span className="tnum text-[12px]">{fmtMs(last.rtMs)}</span>
           </div>
-          {(() => {
-            const liveImage = images.find((im) => im.id === last.trial.image.id) ?? last.trial.image;
-            return (
-              <>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span>정답 <b>{liveImage.name}</b></span>
-                  <button
-                    type="button"
-                    onClick={() => setEditId(liveImage.id)}
-                    title="눌러서 이름 고치기"
-                    className="font-typek text-[11px] text-ink-2 underline hover:text-ink"
-                  >
-                    고치기
-                  </button>
-                </div>
-                {liveImage.note && <div className="mt-0.5 text-[12px]">{liveImage.note}</div>}
-              </>
-            );
-          })()}
+          <div className="mt-1">정답 <b>{liveImage.name}</b></div>
+          {liveImage.note && <div className="mt-0.5 text-[12px]">{liveImage.note}</div>}
           {last.typedMatch === 'chosung' && (
             <div className="mt-1 text-[12px] font-bold text-red">초성은 맞았습니다 — 이름까지 떠올라야 합니다</div>
           )}
-          <div className="mt-2.5">
+          <div className="mt-2.5 flex items-center gap-3">
             <Key size="sm" sub="Enter" onClick={continueAfterWrong}>계속</Key>
+            <Key tone="cream" size="sm" onClick={() => setEditId(liveImage.id)}>고치기</Key>
           </div>
         </Held>
       ) : (
