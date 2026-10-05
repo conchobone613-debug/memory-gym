@@ -62,8 +62,8 @@ export default function ImageEditDialog({ imageId, onClose }: { imageId: string;
     const d = next ?? draft;
     await db.images.put({ ...d, updatedAt: Date.now() });
   };
-  const pick = async (name: string) => {
-    const next = { ...draft, name };
+  const pick = async (name: string, note: string) => {
+    const next = name === draft.name ? draft : { ...draft, name, note, aliases: [] };
     setDraft(next);
     await save(next);
     nameRef.current?.focus();

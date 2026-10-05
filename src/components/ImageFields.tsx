@@ -3,9 +3,12 @@ import type { MemoImage, SetDomain } from '../db/db';
 import { hintForKey, type ChosungMap } from '../lib/hangul';
 import { faceHint } from '../lib/cards';
 import type { Suggestion } from '../lib/suggest';
-import { askForNames } from '../lib/ai';
+import { askForNames, askForNotes } from '../lib/ai';
 import { Field } from './ui';
 import { Key } from './lp';
+
+/** 후보 이름 → 지어 둔 세부 묘사. 팝업을 닫았다 열어도 다시 청하지 않게 모듈에 둔다. */
+const NOTES = new Map<string, string>();
 
 /**
  * 이미지 한 칸을 고치는 입력 묶음.
@@ -25,8 +28,11 @@ export default function ImageFields({
   domain: SetDomain;
   map: ChosungMap;
   suggestions: Suggestion[];
-  /** 후보를 눌렀을 때. 넣고 바로 저장하는 쪽이 자연스러워 부르는 쪽에 맡긴다. */
-  onPick: (name: string) => void;
+  /**
+   * 후보를 눌렀을 때. 넣고 바로 저장하는 쪽이 자연스러워 부르는 쪽에 맡긴다.
+   * note 는 그 후보에 맞춰 지은 세부 묘사 — 못 지었으면 ''. 이름이 바뀌면 옛 묘사·별칭은 남기지 않는다.
+   */
+  onPick: (name: string, note: string) => void;
   /** 있으면 '다른 후보' 가 AI 에게 새로 물어본다. 없으면 사전을 넘겨 본다. */
   apiKey?: string;
   /** 다른 칸이 이미 쓰고 있는 이름 — AI 에게 빼 달라고 넘긴다 */
@@ -59,6 +65,26 @@ export default function ImageFields({
   const dict = suggestions.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
   const shown: Suggestion[] = ai.length ? ai.map((name) => ({ name, taken: false })) : dict;
 
+  /*
+   * 후보마다 세부 묘사를 같이 준비해 둔다. 키가 있을 때만 — 보이는 후보 중 아직 없는 것만 한 번에 청한다.
+   * 늦게 오거나 못 받으면 그 후보는 빈 묘사로 들어간다(옛 이름의 묘사가 남아 어긋나는 것보다 낫다).
+   */
+  const [, bump] = useState(0);
+  const shownKey = shown.map((s) => s.name).join(',');
+  useEffect(() => {
+    if (!apiKey) return;
+    const need = shown.map((s) => s.name).filter((n) => !NOTES.has(n));
+    if (!need.length) return;
+    let live = true;
+    askForNotes({ apiKey, names: need })
+      .then((got) => {
+        for (const n of need) NOTES.set(n, got[n] ?? '');
+        if (live) bump((v) => v + 1);
+      })
+      .catch(() => { /* 묘사는 덤이다 — 실패해도 이름 고르기는 막지 않는다. 캐시에 안 넣어 다음에 다시 청한다. */ });
+    return () => { live = false; };
+  }, [apiKey, shownKey]);
+
   /**
    * 키가 있으면 누를 때마다 **새로 지어 온다.** 사전은 칸마다 7개쯤이라 두세 번이면 바닥난다.
    * 키가 없으면 예전처럼 사전을 넘긴다 — 키를 안 넣으셔도 쓰던 대로 돌아간다.
@@ -83,6 +109,11 @@ export default function ImageFields({
         setErr(`두 번 청했지만 규칙에 맞는 이름이 없었습니다. 받은 것 — ${raw.replace(/\s+/g, ' ').slice(0, 40)}`);
       } else {
         seen.current = [...seen.current, ...names];
+        /* 묘사도 같이 받아 둔다. 실패해도 이름은 보여 준다 — 위 effect 가 이어서 다시 청한다. */
+        try {
+          const got = await askForNotes({ apiKey, names });
+          for (const n of names) NOTES.set(n, got[n] ?? '');
+        } catch { /* 위와 같다 */ }
         setAi(names);
       }
     } catch (e) {
@@ -155,7 +186,7 @@ export default function ImageFields({
                 key={sg.name}
                 tone="cream"
                 size="sm"
-                onClick={() => onPick(sg.name)}
+                onClick={() => onPick(sg.name, NOTES.get(sg.name) ?? '')}
                 title={sg.taken ? '다른 칸에서 이미 쓰고 있습니다' : undefined}
                 className={sg.taken ? 'opacity-50' : undefined}
               >

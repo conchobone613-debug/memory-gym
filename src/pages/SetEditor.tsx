@@ -141,9 +141,9 @@ export default function SetEditor() {
     [draft, images, settings, set],
   );
 
-  const useSuggestion = async (name: string) => {
+  const useSuggestion = async (name: string, note: string) => {
     if (!draft) return;
-    const next = { ...draft, name };
+    const next = name === draft.name ? draft : { ...draft, name, note, aliases: [] };
     setDraft(next);
     await save(next);
     nameRef.current?.focus();

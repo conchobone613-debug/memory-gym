@@ -267,6 +267,40 @@ async function once(ask: AiAsk): Promise<{ names: string[]; raw: string }> {
   return { names: passed.filter((n) => ok.has(n)), raw };
 }
 
+/**
+ * 이름마다 '세부 묘사' 한 줄을 지어 달라고 한다 — 후보를 고르면 이름과 함께 묘사 칸에 들어간다.
+ * 묘사는 이름에 딸린 값이라, 이름만 바뀌고 옛 묘사가 남으면 둘이 어긋난다.
+ * 스타터 세트(starter.ts 원칙 5)와 같은 결로: 색·크기·동작 단서 하나, 쉼표로 이은 짧은 구절.
+ * 못 받은 이름은 빠진 채로 돌려준다 — 부르는 쪽이 빈 묘사로 둔다.
+ */
+export async function askForNotes(
+  { apiKey, names, signal }: { apiKey: string; names: string[]; signal?: AbortSignal },
+): Promise<Record<string, string>> {
+  if (!names.length) return {};
+  const raw = await call(apiKey, [
+    '기억술 이미지마다 헷갈리지 않게 **세부 묘사**를 한 줄씩 지어 주십시오.',
+    '',
+    '- 색·크기·동작 같은 눈에 보이는 단서를 하나 이상 넣고, 쉼표로 이은 짧은 구절로 (20자 안팎).',
+    '- 문장 끝맺음(~다, ~입니다)·마침표 없이.',
+    '',
+    `이름: ${names.join(', ')}`,
+    '',
+    '이름마다 한 줄씩 — 이름 | 묘사',
+    '예: 오리 | 납작한 노란 부리, 뒤뚱거리는 걸음',
+    '예: 우비 | 노란 비옷, 후드에 빗방울 맺힘',
+  ].join('\n'), signal, 100 + names.length * 60);
+
+  const out: Record<string, string> = {};
+  for (const line of raw.split('\n')) {
+    const cut = line.indexOf('|');
+    if (cut < 0) continue;
+    const name = (line.slice(0, cut).match(/[가-힣]+/) ?? [''])[0];
+    const note = line.slice(cut + 1).trim();
+    if (name && note && names.includes(name)) out[name] = note;
+  }
+  return out;
+}
+
 export async function askForNames(ask: AiAsk): Promise<{ names: string[]; raw: string }> {
   const want = ask.count ?? 5;
   const first = await once({ ...ask, count: want + EXTRA });
