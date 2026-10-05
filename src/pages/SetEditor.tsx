@@ -167,7 +167,7 @@ export default function SetEditor() {
    * 칸 수(cols)는 그대로라 방향키 위아래 이동 폭이 화면과 맞는다. 넓은 창(xl)에서는 칸 글자만 키운다.
    */
   return (
-    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:gap-x-8">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 xl:grid-cols-[minmax(0,1fr)_26rem] xl:gap-x-8">
       <header className="flex items-start justify-between gap-3 lg:col-span-2">
         <div className="min-w-0">
           <h1 className="m-0 truncate font-sign text-[32px] leading-[1.1] text-ink">{set.name}</h1>
@@ -181,7 +181,7 @@ export default function SetEditor() {
       {images.length === 0 ? (
         <Empty>이 세트에는 키가 없습니다. '키 채우기'를 누르시거나 CSV 로 가져오십시오.</Empty>
       ) : (
-        <div>
+        <div className="[container-type:inline-size]">
           {/* 칸은 종이 카드. 채운 칸 = 판판한 카드 + 이름, 빈 칸 = 점선 테두리 + '—' (색에만 기대지 않는다). */}
           <div className={`grid gap-[2px] ${cols === 10 ? 'grid-cols-10' : 'grid-cols-3'}`}>
             {images.map((img, i) => {
@@ -195,17 +195,20 @@ export default function SetEditor() {
                   onDoubleClick={() => nameRef.current?.focus()}
                   title={img.name || undefined}
                   aria-pressed={on}
-                  className={`flex min-w-0 flex-col items-center gap-[3px] rounded-[3px] border px-0 ${dense ? 'py-[5px] xl:py-2' : 'py-2 xl:py-3'} ${
+                  style={{ paddingBlock: dense ? 'clamp(5px,.9cqw,16px)' : 'clamp(8px,1.6cqw,26px)', gap: 'clamp(3px,.4cqw,8px)' }}
+                  className={`flex min-w-0 flex-col items-center rounded-[3px] border px-0 ${
                     has ? 'border-card-edge bg-card shadow-[var(--paper-lift)]' : 'border-dashed border-ink-2/40'
                   } ${on ? 'outline-2 outline-offset-1 outline-ink' : ''}`}
                 >
-                  <span className={`tnum font-bold leading-none ${dense ? 'text-[11px] xl:text-[13px]' : 'text-[14px] xl:text-[16px]'} ${has ? 'text-ink' : 'text-ink-2'}`}>
+                  <span
+                    style={{ fontSize: dense ? 'clamp(11px,1.35cqw,24px)' : 'clamp(14px,2.4cqw,30px)' }}
+                    className={`tnum font-bold leading-none ${has ? 'text-ink' : 'text-ink-2'}`}
+                  >
                     {label(img.key)}
                   </span>
                   <span
-                    className={`w-full truncate text-center font-typek leading-[1.15] ${
-                      dense ? 'text-[10px] tracking-[-.04em] xl:text-[12px]' : 'px-1.5 text-[13px] xl:text-[14px]'
-                    } ${has ? 'text-ink' : 'text-ink-2/60'}`}
+                    style={{ fontSize: dense ? 'clamp(10px,1.6cqw,28px)' : 'clamp(13px,2.6cqw,32px)' }}
+                    className={`w-full truncate text-center font-typek leading-[1.15] ${dense ? 'tracking-[-.04em]' : 'px-1.5'} ${has ? 'text-ink' : 'text-ink-2/60'}`}
                   >
                     {img.name || '—'}
                   </span>

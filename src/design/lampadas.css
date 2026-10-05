@@ -11,7 +11,7 @@
    --frame-w 종이 틀 최대 폭(바깥은 여전히 책상) · --side-w 왼쪽 메뉴 · --measure-w 측정 화면(드릴·암기·회상·계산) 기둥.
    휴대폰 폭에서는 --frame-w = --col-w 이고 나머지 둘은 쓰이지 않는다. ── */
 @media (min-width: 1024px) {
-  :root { --frame-w: 1320px; --side-w: 228px; --measure-w: 640px; }
+  :root { --frame-w: 2400px; --side-w: 228px; --measure-w: 640px; }
 }
 
 /* ── 바탕: 종이 결 ── */
