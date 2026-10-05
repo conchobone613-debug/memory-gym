@@ -9,6 +9,27 @@ import { Key } from './lp';
 
 /** 후보 이름 → 지어 둔 세부 묘사. 팝업을 닫았다 열어도 다시 청하지 않게 모듈에 둔다. */
 const NOTES = new Map<string, string>();
+/** 청해 놓고 아직 안 온 묘사. 후보를 너무 일찍 눌러도 그 답을 기다려 쓴다. */
+const PENDING = new Map<string, Promise<void>>();
+
+/** names 중 캐시·진행 중이 아닌 것만 한 번에 청한다. 끝나면 NOTES 에 들어 있다(못 받은 이름은 ''로 두지 않고 비운다). */
+function fetchNotes(apiKey: string, names: string[]): Promise<void> {
+  const need = names.filter((n) => !NOTES.has(n) && !PENDING.has(n));
+  if (need.length) {
+    const p = askForNotes({ apiKey, names: need })
+      .then((got) => { for (const n of need) NOTES.set(n, got[n] ?? ''); })
+      .catch(() => { /* 묘사는 덤이다 — 캐시에 안 넣어 다음에 다시 청한다. */ })
+      .finally(() => { for (const n of need) PENDING.delete(n); });
+    for (const n of need) PENDING.set(n, p);
+  }
+  return Promise.all(names.map((n) => PENDING.get(n))).then(() => undefined);
+}
+
+/** 후보를 누른 순간 쓸 묘사. 아직 없으면 청하고 기다린다. 못 받으면 ''. */
+async function noteFor(apiKey: string | undefined, name: string): Promise<string> {
+  if (!NOTES.has(name) && apiKey) await fetchNotes(apiKey, [name]);
+  return NOTES.get(name) ?? '';
+}
 
 /**
  * 이미지 한 칸을 고치는 입력 묶음.
@@ -73,15 +94,8 @@ export default function ImageFields({
   const shownKey = shown.map((s) => s.name).join(',');
   useEffect(() => {
     if (!apiKey) return;
-    const need = shown.map((s) => s.name).filter((n) => !NOTES.has(n));
-    if (!need.length) return;
     let live = true;
-    askForNotes({ apiKey, names: need })
-      .then((got) => {
-        for (const n of need) NOTES.set(n, got[n] ?? '');
-        if (live) bump((v) => v + 1);
-      })
-      .catch(() => { /* 묘사는 덤이다 — 실패해도 이름 고르기는 막지 않는다. 캐시에 안 넣어 다음에 다시 청한다. */ });
+    fetchNotes(apiKey, shown.map((s) => s.name)).then(() => { if (live) bump((v) => v + 1); });
     return () => { live = false; };
   }, [apiKey, shownKey]);
 
@@ -110,10 +124,7 @@ export default function ImageFields({
       } else {
         seen.current = [...seen.current, ...names];
         /* 묘사도 같이 받아 둔다. 실패해도 이름은 보여 준다 — 위 effect 가 이어서 다시 청한다. */
-        try {
-          const got = await askForNotes({ apiKey, names });
-          for (const n of names) NOTES.set(n, got[n] ?? '');
-        } catch { /* 위와 같다 */ }
+        await fetchNotes(apiKey, names);
         setAi(names);
       }
     } catch (e) {
@@ -186,7 +197,7 @@ export default function ImageFields({
                 key={sg.name}
                 tone="cream"
                 size="sm"
-                onClick={() => onPick(sg.name, NOTES.get(sg.name) ?? '')}
+                onClick={async () => onPick(sg.name, await noteFor(apiKey, sg.name))}
                 title={sg.taken ? '다른 칸에서 이미 쓰고 있습니다' : undefined}
                 className={sg.taken ? 'opacity-50' : undefined}
               >
