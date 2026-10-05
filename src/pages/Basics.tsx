@@ -768,7 +768,7 @@ export default function Drill() {
           )}
           <div className="mt-2.5 flex items-center gap-3">
             <Key size="sm" sub="Enter" onClick={continueAfterWrong}>계속</Key>
-            <Key tone="cream" size="sm" onClick={() => setEditId(liveImage.id)}>고치기</Key>
+            <Key tone="cream" size="sm" onClick={() => setEditId(liveImage.id)}>이미지 변경</Key>
           </div>
         </Held>
       ) : (
