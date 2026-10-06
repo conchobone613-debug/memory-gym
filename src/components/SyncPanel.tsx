@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getSettings, saveSettings } from '../db/db';
 import { isValidSyncCode, newSyncCode } from '../sync/config';
-import { syncOnce } from '../sync/engine';
+import { getAutoStatus, scheduleSync, subscribeAutoStatus, syncNow } from '../sync/auto';
 import { Btn, ConfirmBtn, Field } from './ui';
 import { Folder } from './lp';
 
@@ -23,6 +23,7 @@ export default function SyncPanel() {
   const [msg, setMsg] = useState<Msg | null>(null);
   const [entering, setEntering] = useState(false);
   const [entered, setEntered] = useState('');
+  const auto = useSyncExternalStore(subscribeAutoStatus, getAutoStatus);
 
   if (!settings) return null;
   const code = settings.syncCode;
@@ -31,9 +32,10 @@ export default function SyncPanel() {
     setBusy(true);
     setMsg({ t: '맞추는 중…', ok: true });
     try {
-      /* Firebase SDK 는 여기서만 받는다. 동기화를 안 쓰시면 내려받지도 않는다. */
-      const { firestoreRemote } = await import('../sync/firestore');
-      const r = await syncOnce(firestoreRemote(c));
+      await saveSettings({ syncCode: c });
+      const st = await syncNow();
+      if (st.state === 'error' || !st.last) throw new Error(st.error ?? '알 수 없는 오류');
+      const r = st.last;
       setMsg({
         t: `맞췄습니다 — 올린 기록 ${r.pushed}개, 받은 기록 ${r.pulled}개` +
           (r.assets === 'remote' ? ' · 이미지·궁전을 다른 기기 것과 합쳤습니다' : ''),
@@ -63,6 +65,7 @@ export default function SyncPanel() {
 
   const stop = async () => {
     await saveSettings({ syncCode: undefined, lastSyncAt: 0 });
+    scheduleSync();
     setMsg({ t: '이 기기에서 동기화를 껐습니다. 기록은 그대로 남아 있습니다.', ok: true });
   };
 
@@ -126,8 +129,15 @@ export default function SyncPanel() {
             />
           </div>
           <p className="mt-2 font-typek text-[14px] text-ink-2">
-            마지막 동기화 <span className="tnum text-ink">{fmt(settings.lastSyncAt)}</span>
+            자동 동기화 켜짐 — 고치시면 몇 초 안에 다른 기기에도 들어갑니다.
+            {' '}마지막 동기화 <span className="tnum text-ink">{fmt(settings.lastSyncAt)}</span>
+            {auto.state === 'syncing' && ' · 맞추는 중…'}
           </p>
+          {auto.state === 'error' && (
+            <p className="mt-1 font-typek text-[14px] font-bold text-ink" role="status">
+              자동 동기화 실패: {auto.error} — 인터넷이 다시 붙거나 창으로 돌아오시면 다시 시도합니다.
+            </p>
+          )}
         </>
       )}
 

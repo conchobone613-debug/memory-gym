@@ -38,8 +38,10 @@ async function collectAssets() {
    * lastBackupAt·lastSyncAt·recallCellsSynced 는 기기마다 다른 값이라 보내지 않는다.
    * aiKey 는 **비밀이라** 보내지 않는다 — 기기마다 각자 넣는다.
    */
-  const { lastBackupAt: _b, lastSyncAt: _s, recallCellsSynced: _r, aiKey: _k, ...shared } = settings;
-  return { imageSets, images, palaces, loci, settings: shared };
+  const { lastBackupAt: _b, lastSyncAt: _s, recallCellsSynced: _r, aiKey: _k, syncTombstones, ...shared } = settings;
+  /* 지운 것의 id → 지운 때. 옛 기기가 올린 묶음엔 없을 수 있다. */
+  const deleted: Record<string, number> = syncTombstones ?? {};
+  return { imageSets, images, palaces, loci, settings: shared, deleted };
 }
 
 type AssetBundle = Awaited<ReturnType<typeof collectAssets>>;
@@ -70,43 +72,68 @@ export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundl
     };
   }
 
+  /* 지운 표시는 양쪽 것을 합친다. 지운 뒤 다시 고친 행(updatedAt 이 더 늦음)은 살린다. */
+  const deleted: Record<string, number> = { ...(remote.deleted ?? {}) };
+  for (const [id, t] of Object.entries(local.deleted ?? {})) deleted[id] = Math.max(t, deleted[id] ?? 0);
+  const alive = (row: { id: string; updatedAt?: number }) => !(deleted[row.id] >= (row.updatedAt ?? 0));
+
+  /*
+   * 행마다 updatedAt 이 늦은 쪽. 같으면 저쪽 것 — 그래야 두 기기가 같은 결과로 모인다.
+   */
   const pick = <T extends { id: string; updatedAt?: number }>(a: T[], b: T[]): T[] => {
     const m = new Map<string, T>();
     for (const row of [...a, ...b]) {
       const cur = m.get(row.id);
       if (!cur || (row.updatedAt ?? 0) >= (cur.updatedAt ?? 0)) m.set(row.id, row);
     }
-    return [...m.values()];
+    return [...m.values()].filter(alive);
   };
+  const imageSets = pick(local.imageSets, remote.imageSets);
+  const setIds = new Set(imageSets.map((x) => x.id));
+  const palaces = pick(local.palaces, remote.palaces);
+  const palaceIds = new Set(palaces.map((x) => x.id));
   return {
-    imageSets: pick(local.imageSets, remote.imageSets),
-    images: pick(local.images, remote.images),
-    palaces: pick(local.palaces, remote.palaces),
-    /* 장소는 updatedAt 이 없다. 장소가 더 많은 쪽을 통째로 택한다 — 순서가 섞이면 궁전이 망가진다 */
-    loci: remote.loci.length > local.loci.length ? remote.loci : local.loci,
+    imageSets,
+    images: pick(local.images, remote.images).filter((x) => setIds.has(x.setId)),
+    palaces,
+    /* 장소도 행마다 고른다(2026-10-06 전엔 '많은 쪽 통째로' — 지운 장소가 되살아났다) */
+    loci: pick(local.loci, remote.loci).filter((x) => palaceIds.has(x.palaceId)),
     settings: local.settings,
+    deleted,
   };
+}
+
+/**
+ * 설정을 뺀 나머지가 같은지 — 행 순서는 보지 않는다.
+ * 설정은 이 기기 것을 보낼 뿐 합치지 않으므로 비교에서 뺀다.
+ */
+export function sameAssets(a: AssetBundle, b: AssetBundle): boolean {
+  const rows = (l: { id: string }[]) => l.map((r) => JSON.stringify(r)).sort();
+  const body = (x: AssetBundle) => JSON.stringify([
+    rows(x.imageSets), rows(x.images), rows(x.palaces), rows(x.loci),
+    Object.entries(x.deleted ?? {}).sort(),
+  ]);
+  return body(a) === body(b);
 }
 
 async function applyAssets(b: AssetBundle) {
   await db.transaction('rw', db.imageSets, db.images, db.imageStats, db.palaces, db.loci, async () => {
-    /* 합친 결과에 없는 세트는 이 기기에서도 치운다 (갓 켠 기기의 빈 기본 세트) */
-    const keep = new Set(b.imageSets.map((s) => s.id));
-    const stale = (await db.imageSets.toArray()).filter((s) => !keep.has(s.id)).map((s) => s.id);
-    if (stale.length) {
-      const staleImages = (await db.images.toArray()).filter((i) => stale.includes(i.setId)).map((i) => i.id);
-      await db.images.bulkDelete(staleImages);
-      await db.imageStats.bulkDelete(staleImages);
-      await db.imageSets.bulkDelete(stale);
-    }
+    /* 합친 결과에 없는 것은 이 기기에서도 치운다 (갓 켠 기기의 빈 기본 세트, 다른 기기에서 지운 것) */
+    const keepSets = new Set(b.imageSets.map((s) => s.id));
+    const keepImages = new Set(b.images.map((i) => i.id));
+    const staleImages = (await db.images.toArray()).filter((i) => !keepImages.has(i.id)).map((i) => i.id);
+    await db.images.bulkDelete(staleImages);
+    await db.imageStats.bulkDelete(staleImages);
+    await db.imageSets.bulkDelete((await db.imageSets.toArray()).filter((s) => !keepSets.has(s.id)).map((s) => s.id));
+    const keepPalaces = new Set(b.palaces.map((p) => p.id));
+    await db.palaces.bulkDelete((await db.palaces.toArray()).filter((p) => !keepPalaces.has(p.id)).map((p) => p.id));
     if (b.imageSets.length) await db.imageSets.bulkPut(b.imageSets);
     if (b.images.length) await db.images.bulkPut(b.images);
     if (b.palaces.length) await db.palaces.bulkPut(b.palaces);
-    if (b.loci.length) {
-      await db.loci.clear();
-      await db.loci.bulkAdd(b.loci);
-    }
+    await db.loci.clear();
+    if (b.loci.length) await db.loci.bulkAdd(b.loci);
   });
+  await saveSettings({ syncTombstones: b.deleted });
 }
 
 /* ── 기록 ───────────────────────────────────────── */
@@ -176,13 +203,23 @@ export function splitRows(rows: LogRows, limit = BATCH_BYTES): LogRows[] {
 async function applyLogs(rows: Partial<Record<LogTable, unknown[]>>): Promise<number> {
   let n = 0;
   for (const name of LOG_TABLES) {
-    const list = rows[name];
+    const list = rows[name] as { id: string }[] | undefined;
     if (!list?.length) continue;
-    await db.table(name).bulkPut(list as never[]);
-    n += list.length;
+    /* 이미 가진 기록은 세지 않는다 — 겹쳐 받는 구간(PULL_OVERLAP)이 있어서다 */
+    const have = await db.table(name).bulkGet(list.map((r) => r.id));
+    const fresh = list.filter((_, i) => !have[i]);
+    if (fresh.length) await db.table(name).bulkPut(fresh as never[]);
+    n += fresh.length;
   }
   return n;
 }
+
+/**
+ * 내려받을 때 마지막 동기화보다 이만큼 앞부터 다시 훑는다.
+ * 묶음의 시각은 올린 기기가 '올리기 시작한 때'라, 저쪽이 올리는 도중에 이쪽이 맞추면
+ * 그 묶음이 이쪽 lastSyncAt 보다 앞 시각으로 늦게 도착한다. 기기 시계 차이도 여기서 덮는다.
+ */
+export const PULL_OVERLAP = 10 * 60_000;
 
 /* ── 원격 창구 (Firestore 구현은 firestore.ts 가 준다) ── */
 
@@ -203,7 +240,7 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   const now = Date.now();
 
   /* 1. 기록 내려받기 */
-  const batches = await remote.listBatches(since);
+  const batches = await remote.listBatches(since ? since - PULL_OVERLAP : 0);
   let pulled = 0;
   for (const b of batches) pulled += await applyLogs(b.rows);
 
@@ -213,9 +250,12 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   let assets: SyncResult['assets'] = 'same';
   if (remoteAssets) {
     const merged = mergeAssets(localAssets, remoteAssets.bundle);
-    await applyAssets(merged);
-    assets = JSON.stringify(merged.images) === JSON.stringify(localAssets.images) ? 'same' : 'remote';
-    await remote.putAssets(merged, now);
+    /*
+     * 바뀐 쪽에만 쓴다. 자동 동기화에서 이게 빠지면 두 기기가 서로의 쓰기에 깨어나
+     * 끝없이 주고받는다.
+     */
+    if (!sameAssets(merged, localAssets)) { await applyAssets(merged); assets = 'remote'; }
+    if (!sameAssets(merged, remoteAssets.bundle)) await remote.putAssets(merged, now);
   } else {
     await remote.putAssets(localAssets, now);
     assets = 'local';

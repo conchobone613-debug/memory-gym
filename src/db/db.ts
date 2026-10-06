@@ -138,6 +138,8 @@ export interface Locus {
   order: number;
   name: string;
   note: string;
+  /** 동기화가 기기 사이에서 늦은 쪽을 고르는 기준. 2026-10-06 전 장소에는 없다. */
+  updatedAt?: number;
 }
 
 export interface ImageStat {
@@ -187,6 +189,11 @@ export interface AppSettings {
    * 없으면 다음 동기화가 칸 전체를 한 번 올린다(`sync/engine.ts`). 기기마다 다른 값이라 동기화에서 뺀다.
    */
   recallCellsSynced?: boolean;
+  /**
+   * 지운 세트·이미지·궁전·장소의 id → 지운 때. 동기화가 다른 기기 것과 합칠 때 되살리지 않으려고 남긴다.
+   * 설정으로 보내지 않고 자산 묶음의 `deleted` 로 따로 보낸다(`sync/engine.ts`).
+   */
+  syncTombstones?: Record<string, number>;
   /**
    * AI 이름 후보를 받을 때 쓰는 Anthropic 키.
    *
@@ -453,6 +460,14 @@ export async function getSettings(): Promise<AppSettings> {
 export async function saveSettings(patch: Partial<AppSettings>): Promise<void> {
   const cur = await getSettings();
   await db.settings.put({ ...cur, ...patch, key: 'app' });
+}
+
+/** 지운 자산의 id 를 남긴다. 동기화가 다른 기기 것과 합칠 때 되살리지 않게 한다. */
+export async function markDeleted(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const t = Date.now();
+  const cur = (await getSettings()).syncTombstones ?? {};
+  await saveSettings({ syncTombstones: { ...cur, ...Object.fromEntries(ids.map((id) => [id, t])) } });
 }
 
 /* ───────────────── 키 공간 생성 ───────────────── */

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
-  getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, type Firestore,
+  getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, onSnapshot, type Firestore,
 } from 'firebase/firestore';
 import { FIREBASE_CONFIG } from './config';
 import type { Remote } from './engine';
@@ -50,4 +50,26 @@ export function firestoreRemote(code: string): Remote {
       await setDoc(doc(root, 'batches', id), { createdAt, json: JSON.stringify(rows) });
     },
   };
+}
+
+/**
+ * 다른 기기가 올리면 곧바로 `onChange` 를 부른다. 돌려준 함수로 끊는다.
+ * 처음 붙을 때 오는 첫 알림은 지금 상태일 뿐이라 건너뛴다. 이 기기가 쓴 것도 한 번 울리지만,
+ * 그때 맞추면 바뀐 게 없어 아무것도 쓰지 않고 끝난다.
+ */
+export function watchRemote(code: string, onChange: () => void): () => void {
+  const root = doc(store(), 'sync', code);
+  const skipFirst = () => {
+    let first = true;
+    return (snap: { metadata: { hasPendingWrites: boolean } }) => {
+      if (first) { first = false; return; }
+      if (!snap.metadata.hasPendingWrites) onChange();
+    };
+  };
+  const offAssets = onSnapshot(doc(root, 'bundles', 'assets'), skipFirst());
+  const offBatches = onSnapshot(
+    query(collection(root, 'batches'), where('createdAt', '>', Date.now() - 10 * 60_000)),
+    skipFirst(),
+  );
+  return () => { offAssets(); offBatches(); };
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Locus, type Palace } from '../db/db';
+import { db, markDeleted, type Locus, type Palace } from '../db/db';
 import { uid } from '../lib/random';
 import { isTyping } from '../App';
 import { ConfirmBtn, Empty, Field } from '../components/ui';
@@ -44,13 +44,14 @@ export default function Palaces() {
       await db.loci.bulkDelete(loci.map((l) => l.id));
       await db.palaces.delete(palace.id);
     });
+    await markDeleted([palace.id, ...loci.map((l) => l.id)]);
     setPalaceId('');
   };
 
   const addLocus = async () => {
     const name = newLocus.trim();
     if (!name || !palaceId) return;
-    await db.loci.add({ id: uid(), palaceId, order: loci.length, name, note: '' });
+    await db.loci.add({ id: uid(), palaceId, order: loci.length, name, note: '', updatedAt: Date.now() });
     setNewLocus('');
     addRef.current?.focus();
   };
@@ -60,8 +61,8 @@ export default function Palaces() {
     if (to < 0 || to >= loci.length) return;
     const a = loci[index], b = loci[to];
     await db.transaction('rw', db.loci, async () => {
-      await db.loci.update(a.id, { order: b.order });
-      await db.loci.update(b.id, { order: a.order });
+      await db.loci.update(a.id, { order: b.order, updatedAt: Date.now() });
+      await db.loci.update(b.id, { order: a.order, updatedAt: Date.now() });
     });
   };
 
@@ -69,8 +70,9 @@ export default function Palaces() {
     await db.transaction('rw', db.loci, async () => {
       await db.loci.delete(l.id);
       const rest = (await db.loci.where('palaceId').equals(palaceId).toArray()).sort((x, y) => x.order - y.order);
-      for (let i = 0; i < rest.length; i++) await db.loci.update(rest[i].id, { order: i });
+      for (let i = 0; i < rest.length; i++) await db.loci.update(rest[i].id, { order: i, updatedAt: Date.now() });
     });
+    await markDeleted([l.id]);
   };
 
   /* 워크스루 한 걸음 — 자판과 단축키가 같은 길로 간다 */
@@ -241,7 +243,7 @@ export default function Palaces() {
                   <span className="tnum row-span-2 self-start pt-1.5 text-right text-[16px] font-bold text-ink">{i + 1}</span>
                   <input
                     defaultValue={l.name}
-                    onBlur={(e) => db.loci.update(l.id, { name: e.target.value })}
+                    onBlur={(e) => db.loci.update(l.id, { name: e.target.value, updatedAt: Date.now() })}
                     aria-label={`${i + 1}번 장소 이름`}
                     className="w-full"
                   />
@@ -251,7 +253,7 @@ export default function Palaces() {
                   </span>
                   <input
                     defaultValue={l.note}
-                    onBlur={(e) => db.loci.update(l.id, { note: e.target.value })}
+                    onBlur={(e) => db.loci.update(l.id, { note: e.target.value, updatedAt: Date.now() })}
                     placeholder="메모"
                     aria-label={`${i + 1}번 장소 메모`}
                     className="w-full"

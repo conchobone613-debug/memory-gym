@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, ensureKeys, type ImageSet } from '../db/db';
+import { db, ensureKeys, markDeleted, type ImageSet } from '../db/db';
 import { uid } from '../lib/random';
 import { loadStarter } from '../data/starter';
 import { ConfirmBtn, Empty } from '../components/ui';
@@ -59,6 +59,7 @@ export default function Sets() {
       await db.imageStats.bulkDelete(ids);
       await db.imageSets.delete(set.id);
     });
+    await markDeleted([set.id, ...ids]);
     setMsg(`'${set.name}' 세트를 지웠습니다.`);
   };
 
@@ -90,9 +91,8 @@ export default function Sets() {
         </p>
         <Key tone="cream" size="big" className="mt-4" onClick={fillStarter}>추천 이미지 112개 채우기</Key>
         <p className="m-0 mt-4 font-typek text-[13px] leading-[1.5] text-ink-2">
-          이미지는 <b className="text-ink">브라우저마다 따로</b> 저장됩니다. 다른 기기나 다른 브라우저에서 열면
-          빈 칸으로 시작하는 것이 정상입니다. 옮기실 땐 설정의 백업 파일을 쓰시거나, 위 버튼으로 추천 목록을
-          다시 넣으십시오.
+          이미지는 <b className="text-ink">브라우저마다 따로</b> 저장됩니다. 여러 기기에서 같은 이미지를 쓰시려면
+          설정의 <b className="text-ink">기기 동기화</b>를 켜 두십시오 — 한 곳에서 고치면 몇 초 안에 다른 기기에도 들어갑니다.
         </p>
       </Folder>
 

@@ -11,6 +11,7 @@ import ChosungKey from '../components/ChosungKey';
 import SyncPanel from '../components/SyncPanel';
 import RulesPanel from '../components/RulesPanel';
 import { useSearchParams } from 'react-router-dom';
+import { scheduleSync } from '../sync/auto';
 import { isValidSyncCode } from '../sync/config';
 
 /*
@@ -40,7 +41,7 @@ export default function Settings() {
     const c = params.get('sync');
     if (!c) return;
     setParams({}, { replace: true });
-    if (isValidSyncCode(c)) saveSettings({ syncCode: c.toLowerCase(), lastSyncAt: 0 }).then(() => setMsg({ t: '동기화 코드를 넣었습니다. 아래에서 지금 맞추기를 누르십시오.', ok: true }));
+    if (isValidSyncCode(c)) saveSettings({ syncCode: c.toLowerCase(), lastSyncAt: 0 }).then(() => { scheduleSync(); setMsg({ t: '동기화 코드를 넣었습니다. 곧 다른 기기 것과 맞춥니다.', ok: true }); });
     else setMsg({ t: '주소에 담긴 동기화 코드 형식이 올바르지 않습니다.', ok: false });
   }, [params, setParams]);
 
