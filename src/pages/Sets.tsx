@@ -79,17 +79,17 @@ export default function Sets() {
 
         <header>
           <h1 className="m-0 font-sign text-[40px] leading-none text-ink">이미지 세트</h1>
-          <p className="m-0 mt-1.5 font-typek text-[12px] font-bold text-ink-2">숫자와 카드를 무엇으로 볼지 정해 두는 곳</p>
+          <p className="m-0 mt-1.5 font-typek text-[14px] font-bold text-ink-2">숫자와 카드를 무엇으로 볼지 정해 두는 곳</p>
         </header>
       </div>
 
       <Folder tab="추천 이미지">
-        <p className="m-0 font-body text-[13px] leading-[1.55] text-ink">
+        <p className="m-0 font-body text-[15px] leading-[1.55] text-ink">
           숫자 00–99 와 인물 카드 12장에 제가 고른 이미지를 한 번에 넣습니다. <b>비어 있는 칸에만</b> 들어가고
           회장님이 직접 쓰신 칸은 건드리지 않습니다. 마음에 안 드는 칸은 편집에서 바꾸시면 됩니다.
         </p>
         <Key tone="cream" size="big" className="mt-4" onClick={fillStarter}>추천 이미지 112개 채우기</Key>
-        <p className="m-0 mt-4 font-typek text-[11px] leading-[1.5] text-ink-2">
+        <p className="m-0 mt-4 font-typek text-[13px] leading-[1.5] text-ink-2">
           이미지는 <b className="text-ink">브라우저마다 따로</b> 저장됩니다. 다른 기기나 다른 브라우저에서 열면
           빈 칸으로 시작하는 것이 정상입니다. 옮기실 땐 설정의 백업 파일을 쓰시거나, 위 버튼으로 추천 목록을
           다시 넣으십시오.
@@ -107,7 +107,7 @@ export default function Sets() {
           </span>
         </div>
 
-        {msg && <p role="status" className="m-0 font-typek text-[12px] text-ink">{msg}</p>}
+        {msg && <p role="status" className="m-0 font-typek text-[14px] text-ink">{msg}</p>}
 
         {sets.length === 0 ? (
           <Empty>세트가 없습니다.</Empty>
@@ -153,7 +153,7 @@ export default function Sets() {
           </div>
         )}
 
-        <p className="m-0 font-typek text-[11px] text-ink-2">
+        <p className="m-0 font-typek text-[13px] text-ink-2">
           카드 A~10 은 숫자 세트의 이미지를 그대로 씁니다. 따로 채우실 것은 인물 12장뿐입니다.
         </p>
       </div>

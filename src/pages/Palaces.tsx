@@ -135,7 +135,7 @@ export default function Palaces() {
         >
           다음 장소
         </Key>
-        <p className="m-0 text-center font-typek text-[11px] text-ink-2">카드를 누르면 가리고 보입니다 · Esc 나가기</p>
+        <p className="m-0 text-center font-typek text-[13px] text-ink-2">카드를 누르면 가리고 보입니다 · Esc 나가기</p>
       </div>
     );
   }
@@ -148,7 +148,7 @@ export default function Palaces() {
     <div className={`flex flex-col gap-4 ${palace ? 'lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-x-8' : 'lg:max-w-lg'}`}>
       <header className="lg:col-span-2">
         <h1 className="m-0 font-sign text-[40px] leading-none text-ink">궁전</h1>
-        <p className="m-0 mt-1.5 font-typek text-[12px] font-bold text-ink-2">외운 이미지를 놓아 둘 자리 · 순서가 있는 길</p>
+        <p className="m-0 mt-1.5 font-typek text-[14px] font-bold text-ink-2">외운 이미지를 놓아 둘 자리 · 순서가 있는 길</p>
       </header>
 
       <div className="contents lg:flex lg:flex-col lg:gap-4">
@@ -212,7 +212,7 @@ export default function Palaces() {
             />
           </div>
 
-          <div className="mt-5 mb-2 font-typek text-[12px] font-bold text-ink-2">
+          <div className="mt-5 mb-2 font-typek text-[14px] font-bold text-ink-2">
             장소 <span className="tnum text-ink">{loci.length}</span>곳 · 걸어가는 순서대로
           </div>
           <div className="flex gap-2.5">

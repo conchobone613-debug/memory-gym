@@ -331,7 +331,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
         {goal && <div className="mb-4"><GoalPanel goal={goal} /></div>}
 
         <div className="mb-5">
-          <div className="mb-2 font-typek text-[11px] font-bold tracking-wide text-ink-2">방향</div>
+          <div className="mb-2 font-typek text-[13px] font-bold tracking-wide text-ink-2">방향</div>
           <div className="flex flex-wrap gap-x-3 gap-y-4" role="group" aria-label="방향">
             {DIRS.map((o) => (
               <Key
@@ -418,7 +418,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
           <Panel title="틀린 문제">
             <ul className="flex flex-col">
               {wrongs.map((r, i) => (
-                <li key={i} className="flex items-baseline gap-2 border-b border-card-edge py-1.5 font-typek text-[13px] last:border-b-0">
+                <li key={i} className="flex items-baseline gap-2 border-b border-card-edge py-1.5 font-typek text-[15px] last:border-b-0">
                   <span className="tnum min-w-10 text-[17px] font-bold text-ink">{r.q.prompt}</span>
                   <span className="text-ink-2">→</span>
                   <span className="text-ink">{r.q.answer}</span>
@@ -450,7 +450,7 @@ export default function MappingDrill({ stage, header }: { stage: Stage; header?:
         {results.length > 0 && (
           <Btn size="sm" disabled={undoing} onClick={undo}>← 앞 문제</Btn>
         )}
-        <span className="tnum ml-auto text-[13px] text-ink-2">{mmss(elapsed)}</span>
+        <span className="tnum ml-auto text-[15px] text-ink-2">{mmss(elapsed)}</span>
         <Btn size="sm" onClick={() => finish(results)}>중단 (Esc)</Btn>
       </div>
 

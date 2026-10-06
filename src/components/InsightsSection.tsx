@@ -21,7 +21,7 @@ import { Empty, Panel, Stat } from './ui';
  * 둘러보는 화면이라 빨간 자판은 두지 않는다.
  */
 
-const caption = 'font-typek text-[11px] leading-relaxed text-ink-2';
+const caption = 'font-typek text-[13px] leading-relaxed text-ink-2';
 const DOMAINS: Domain[] = ['memory', 'calc'];
 
 export default function InsightsSection({ days, setDays }: { days: number; setDays: (d: number) => void }) {
@@ -69,7 +69,7 @@ function HeadStats({ week, streak }: { week: WeeklyInput; streak: number }) {
   const line = (d: Domain, min: number) => (
     <span className="flex items-center gap-1.5">
       <SeriesKey d={d} />
-      <span className="font-typek text-[12px] font-normal text-ink-2">{DOMAIN_NAME[d]}</span>
+      <span className="font-typek text-[14px] font-normal text-ink-2">{DOMAIN_NAME[d]}</span>
       <span className="text-[19px]">{min}분</span>
     </span>
   );
@@ -146,7 +146,7 @@ function WeeklyFolder({ week, now, hasKey }: { week: WeeklyInput; now: number; h
           <Key tone="cream" size="sm" disabled={ask.busy} onClick={request}>
             {ask.busy ? '스승님이 이번 주를 보는 중…' : receivedThisWeek(row, now) ? '다시 받기' : '스승님께 주간 리뷰 받기'}
           </Key>
-          {ask.err && <p className="m-0 text-center font-typek text-[12px] font-bold text-ink" role="status">{ask.err}</p>}
+          {ask.err && <p className="m-0 text-center font-typek text-[14px] font-bold text-ink" role="status">{ask.err}</p>}
         </div>
       )}
     </Folder>
@@ -172,7 +172,7 @@ function MinutesPanel({ rows, days, setDays }: { rows: DayMinutes[]; days: numbe
       ) : (
         <>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3 font-typek text-[12px] text-ink-2">
+            <div className="flex items-center gap-3 font-typek text-[14px] text-ink-2">
               {DOMAINS.map((d) => (
                 <span key={d} className="flex items-center gap-1.5"><SeriesKey d={d} />{DOMAIN_NAME[d]}</span>
               ))}
@@ -190,8 +190,8 @@ function MinutesPanel({ rows, days, setDays }: { rows: DayMinutes[]; days: numbe
 
 function MinutesTable({ rows }: { rows: DayMinutes[] }) {
   return (
-    <table className="w-full font-typek text-[13px]">
-      <thead className="text-[11px] text-ink-2">
+    <table className="w-full font-typek text-[15px]">
+      <thead className="text-[13px] text-ink-2">
         <tr>
           <th className="py-1 text-left font-normal">날짜</th>
           <th className="text-right font-normal">기억력</th>
@@ -294,7 +294,7 @@ function WeakPanel({ w }: { w: Weakness }) {
   return (
     <Panel title="약점 요약" className="lg:col-span-2">
       {/* PC: 기억력 · 계산 두 칸을 나란히 */}
-      <div className="flex flex-col gap-4 font-typek text-[13px] lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
+      <div className="flex flex-col gap-4 font-typek text-[15px] lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
         {blocks.map((b) => {
           const groups = b.groups.filter((g) => g.rows.length);
           return (
@@ -304,13 +304,13 @@ function WeakPanel({ w }: { w: Weakness }) {
                 <p className="m-0 mt-1 text-[12.5px] text-ink-2">기록이 쌓이면 나타납니다.</p>
               ) : groups.map((g) => (
                 <div key={g.head} className="mt-2">
-                  <div className="mb-0.5 text-[11px] font-bold text-ink-2">{g.head}</div>
+                  <div className="mb-0.5 text-[13px] font-bold text-ink-2">{g.head}</div>
                   {g.rows.map((r) => (
                     <div key={r.k} className="flex justify-between gap-2 border-t border-card-edge py-1.5">
                       <span className="tnum min-w-0 truncate">{r.name}</span>
                       <span className="shrink-0 whitespace-nowrap">
                         <b className="tnum">{r.val}</b>
-                        {r.n && <span className="text-[11px] text-ink-2"> · {r.n}</span>}
+                        {r.n && <span className="text-[13px] text-ink-2"> · {r.n}</span>}
                       </span>
                     </div>
                   ))}

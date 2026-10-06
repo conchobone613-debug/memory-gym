@@ -196,7 +196,7 @@ export default function ImageFields({
 
       {suggestions.length > 0 && (
         <div className="mt-4">
-          <div className="mb-2 font-typek text-[11px] font-bold tracking-wide text-ink-2">이름 후보</div>
+          <div className="mb-2 font-typek text-[13px] font-bold tracking-wide text-ink-2">이름 후보</div>
           {/* 후보는 크림색 자판, '다른 후보' 는 남색 자판. 이미 쓰는 이름은 줄을 긋고 흐리게(누를 수는 있다). */}
           <div className="flex flex-wrap items-center gap-2.5">
             {shown.map((sg) => (
@@ -233,7 +233,7 @@ export default function ImageFields({
               {asking ? '짓는 중…' : apiKey ? '다른 후보 짓기' : '다른 후보'}
             </Key>
           </div>
-          {(err || !apiKey) && <div className="mt-2 font-typek text-[11px] text-red">{err || NO_KEY}</div>}
+          {(err || !apiKey) && <div className="mt-2 font-typek text-[13px] text-red">{err || NO_KEY}</div>}
         </div>
       )}
     </>

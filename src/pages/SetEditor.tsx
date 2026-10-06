@@ -171,7 +171,7 @@ export default function SetEditor() {
       <header className="flex items-start justify-between gap-3 lg:col-span-2">
         <div className="min-w-0">
           <h1 className="m-0 truncate font-sign text-[32px] leading-[1.1] text-ink">{set.name}</h1>
-          <p className="m-0 mt-1 font-typek text-[12px] font-bold text-ink-2">
+          <p className="m-0 mt-1 font-typek text-[14px] font-bold text-ink-2">
             채운 이미지 <span className="tnum text-ink">{filled}/{images.length}</span>
           </p>
         </div>
@@ -216,7 +216,7 @@ export default function SetEditor() {
               );
             })}
           </div>
-          <p className="m-0 mt-2.5 font-typek text-[11px] leading-[1.5] text-ink-2">
+          <p className="m-0 mt-2.5 font-typek text-[13px] leading-[1.5] text-ink-2">
             방향키 이동 · Enter 이름 쓰기 · 이름 칸에서 Enter 다음 칸, Shift+Enter 다음 빈 칸
           </p>
         </div>
@@ -273,7 +273,7 @@ export default function SetEditor() {
               </Key>
             )}
           </div>
-          {msg && <p role="status" className="m-0 font-typek text-[12px] text-ink">{msg}</p>}
+          {msg && <p role="status" className="m-0 font-typek text-[14px] text-ink">{msg}</p>}
         </div>
       </div>
     </div>

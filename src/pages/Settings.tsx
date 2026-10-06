@@ -20,7 +20,7 @@ import { isValidSyncCode } from '../sync/config';
 
 /** 좁은 칸(한 글자·자음 셋)은 안쪽 여백을 줄여 글자가 잘리지 않게 한다. 입력칸 기본 모양이 index.css 에 있어 인라인으로 준다. */
 const narrow = { padding: '.4rem .2rem' };
-const note = 'font-typek text-[12px] leading-relaxed text-ink-2';
+const note = 'font-typek text-[14px] leading-relaxed text-ink-2';
 /** 알림 한 줄. 실패·형식 오류(ok=false)는 성공색(chalk) 대신 굵은 잉크로 칠한다. */
 type Msg = { t: string; ok: boolean };
 const msgCls = (m: Msg) => (m.ok ? 'text-chalk' : 'font-bold text-ink');
@@ -241,9 +241,9 @@ export default function Settings() {
             )}
           </div>
         </div>
-        {aiMsg && <p className={`mt-3 font-typek text-[12px] ${msgCls(aiMsg)}`} role="status">{aiMsg.t}</p>}
+        {aiMsg && <p className={`mt-3 font-typek text-[14px] ${msgCls(aiMsg)}`} role="status">{aiMsg.t}</p>}
 
-        <label className="mt-4 flex items-start gap-2 font-typek text-[13px] text-ink">
+        <label className="mt-4 flex items-start gap-2 font-typek text-[15px] text-ink">
           <input
             type="checkbox"
             className="mt-0.5 size-4 shrink-0"
@@ -253,7 +253,7 @@ export default function Settings() {
           <span>홈을 열 때 하루 한 번 코스 짜기</span>
         </label>
 
-        <div className="mt-3 rounded-[4px] bg-card px-3 py-2.5 font-typek text-[12px] leading-relaxed text-ink">
+        <div className="mt-3 rounded-[4px] bg-card px-3 py-2.5 font-typek text-[14px] leading-relaxed text-ink">
           <div className="font-bold">이번 달 사용량</div>
           {usage ? (
             <span className="tnum">
@@ -289,7 +289,7 @@ export default function Settings() {
             onConfirm={wipe}
           />
         </div>
-        <p className="mt-3 font-typek text-[12px] font-bold leading-relaxed text-ink">
+        <p className="mt-3 font-typek text-[14px] font-bold leading-relaxed text-ink">
           '백업에서 복원' 은 파일을 고르는 즉시 현재 데이터를 덮어씁니다. 먼저 백업을 받아 두십시오.
         </p>
         <p className={`mt-2 ${note}`}>
@@ -298,7 +298,7 @@ export default function Settings() {
       </Folder>
       </div>
 
-      {msg && <p className={`font-typek text-[12px] lg:col-span-2 ${msgCls(msg)}`} role="status">{msg.t}</p>}
+      {msg && <p className={`font-typek text-[14px] lg:col-span-2 ${msgCls(msg)}`} role="status">{msg.t}</p>}
     </div>
   );
 }

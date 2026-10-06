@@ -36,7 +36,7 @@
 .lp-key.is-round { width: 50px; height: 50px; padding: 0; display: inline-grid; place-items: center; font-size: 18px; }
 .lp-key.is-big { display: block; width: 100%; font-size: 17px; padding: 14px 20px 15px; border-radius: var(--radius-key-big); }
 .lp-key.is-sm { font-size: 13px; padding: 8px 14px 9px; }
-.lp-key small { display: block; margin-top: 3px; font-size: 10px; font-weight: 400; opacity: .75; }
+.lp-key small { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; opacity: .75; }
 .lp-key:disabled, .lp-key[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; box-shadow: var(--key-up); }
 
 /* ── 중간 제목: 다이모 라벨 테이프 ── */

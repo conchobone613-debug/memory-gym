@@ -42,7 +42,7 @@ export default function CourseBar({ step, sessionId, played }: { step: CourseSte
   if (played && !playedMatches(item, played)) {
     return (
       <div className="flex flex-col gap-1.5">
-        <p className="m-0 text-center font-typek text-[12px] text-ink-2">이 판은 코스 항목과 설정이 달라 코스에 적지 않았습니다.</p>
+        <p className="m-0 text-center font-typek text-[14px] text-ink-2">이 판은 코스 항목과 설정이 달라 코스에 적지 않았습니다.</p>
         {/* 같은 주소로 돌아가면 화면이 그대로라(달력은 주소가 곧 칸) 홈의 '이어 하기' 로 보낸다 */}
         <KeyLink to="/" size="big" sub={`${step.index + 1}/${n} · ${itemLabel(item)}`}>코스로 돌아가기</KeyLink>
       </div>

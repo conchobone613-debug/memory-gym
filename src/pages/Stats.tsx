@@ -23,7 +23,7 @@ const speed = (t: number) => tint(`color-mix(in srgb, var(--red) ${Math.round(t 
 const wrong = (errRate: number) => tint('var(--blue)', Math.round(35 + Math.min(1, errRate) * 25));
 
 const cellBox = 'rounded-[2px] border border-card-edge px-0.5 py-1 text-center';
-const caption = 'font-typek text-[11px] leading-relaxed text-ink-2';
+const caption = 'font-typek text-[13px] leading-relaxed text-ink-2';
 
 export default function Stats() {
   const sets = useLiveQuery(() => db.imageSets.toArray(), [], [] as ImageSet[]);
@@ -134,7 +134,7 @@ export default function Stats() {
           </div>
           <div className="mt-1 flex gap-[3px]">
             {rows.map((r, i) => (
-              <span key={r.day} className="tnum flex min-w-0 flex-1 justify-center whitespace-nowrap text-[9px] text-ink-2">
+              <span key={r.day} className="tnum flex min-w-0 flex-1 justify-center whitespace-nowrap text-[12px] text-ink-2">
                 {(rows.length - 1 - i) % labelStep === 0 ? dayLabel(r.day) : ''}
               </span>
             ))}
@@ -157,7 +157,7 @@ export default function Stats() {
               { t: '3단계 · 이미지', g: m3 },
             ].map((x) => (
               <div key={x.t} className="flex flex-col gap-1.5">
-                <div className="font-typek text-[12px] font-bold text-ink-2">{x.t}</div>
+                <div className="font-typek text-[14px] font-bold text-ink-2">{x.t}</div>
                 {x.g ? <GoalPanel goal={x.g} /> : null}
               </div>
             ))}
@@ -178,8 +178,8 @@ export default function Stats() {
                       : c.accuracy < 0.9 ? wrong(1 - c.accuracy) : speed(Math.min(1, c.medianRt / 4000)),
                   }}
                 >
-                  <div className={`tnum text-sm font-bold ${c.attempts ? 'text-ink' : 'text-ink-2'}`}>{c.unit}</div>
-                  <div className="tnum text-[10px] text-ink-2">
+                  <div className={`tnum text-[15px] font-bold ${c.attempts ? 'text-ink' : 'text-ink-2'}`}>{c.unit}</div>
+                  <div className="tnum text-[12px] text-ink-2">
                     {c.attempts ? (c.medianRt / 1000).toFixed(1) : '·'}
                   </div>
                 </div>
@@ -215,7 +215,7 @@ export default function Stats() {
             <Empty>세트에 이미지가 없습니다.</Empty>
           ) : (
             <>
-              <p className="mb-2 font-typek text-[12px] text-ink-2">
+              <p className="mb-2 font-typek text-[14px] text-ink-2">
                 측정된 이미지 <b className="tnum text-ink">{measured.length}/{cells.length}</b>
               </p>
               <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
@@ -226,8 +226,8 @@ export default function Stats() {
                     className={cellBox}
                     style={{ background: color(c.medianRt, c.attempts, c.errRate) }}
                   >
-                    <div className="tnum text-[10px] text-ink-2">{label(c.key)}</div>
-                    <div className={`tnum text-[11px] ${c.attempts ? 'font-bold text-ink' : 'text-ink-2'}`}>
+                    <div className="tnum text-[12px] text-ink-2">{label(c.key)}</div>
+                    <div className={`tnum text-[13px] ${c.attempts ? 'font-bold text-ink' : 'text-ink-2'}`}>
                       {c.medianRt ? (c.medianRt / 1000).toFixed(1) : c.attempts ? '✕' : '·'}
                     </div>
                   </div>
@@ -247,8 +247,8 @@ export default function Stats() {
           {pairs.length === 0 ? (
             <Empty>아직 혼동 기록이 없습니다.</Empty>
           ) : (
-            <table className="w-full font-typek text-[13px]">
-              <thead className="text-[11px] text-ink-2">
+            <table className="w-full font-typek text-[15px]">
+              <thead className="text-[13px] text-ink-2">
                 <tr>
                   <th className="py-1 text-left font-normal">정답</th><th className="text-left font-normal">답한 것</th>
                   <th className="text-right font-normal">횟수</th><th className="text-right font-normal">출처</th>
@@ -260,7 +260,7 @@ export default function Stats() {
                     <td className="tnum py-1.5">{p.expected}</td>
                     <td className="tnum text-blue">{p.answered}</td>
                     <td className="tnum text-right">{p.count}</td>
-                    <td className="text-right text-[11px] text-ink-2">{p.source}</td>
+                    <td className="text-right text-[13px] text-ink-2">{p.source}</td>
                   </tr>
                 ))}
               </tbody>
@@ -272,9 +272,9 @@ export default function Stats() {
           {mv.slowest.length === 0 && mv.worst.length === 0 ? (
             <Empty>드릴 기록이 쌓이면 나타납니다.</Empty>
           ) : (
-            <div className="flex flex-col gap-3 font-typek text-[13px]">
+            <div className="flex flex-col gap-3 font-typek text-[15px]">
               <div>
-                <div className="mb-1 text-[11px] font-bold text-ink-2">가장 느림</div>
+                <div className="mb-1 text-[13px] font-bold text-ink-2">가장 느림</div>
                 {mv.slowest.map((m) => (
                   <div key={m.key} className="flex justify-between gap-2 border-t border-card-edge py-1.5">
                     <span className="tnum min-w-0 truncate">{m.key} {m.name}</span>
@@ -283,7 +283,7 @@ export default function Stats() {
                 ))}
               </div>
               <div>
-                <div className="mb-1 text-[11px] font-bold text-ink-2">오답률 높음</div>
+                <div className="mb-1 text-[13px] font-bold text-ink-2">오답률 높음</div>
                 {mv.worst.map((m) => (
                   <div key={m.key} className="flex justify-between gap-2 border-t border-card-edge py-1.5">
                     <span className="tnum min-w-0 truncate">{m.key} {m.name}</span>

@@ -13,7 +13,7 @@ import { Folder } from './lp';
 export default function RulesPanel() {
   return (
     <Folder tab="계산 규정">
-      <p className="mb-3 font-typek text-[12px] leading-relaxed text-ink-2">
+      <p className="mb-3 font-typek text-[14px] leading-relaxed text-ink-2">
         기본값은 요청서 값입니다. 공식 규정을 확인하시면 여기서 바꾸십시오. 제한시간 0 은 아직 넣지 않았다는 뜻입니다.
       </p>
       <div className="flex flex-col gap-2">
@@ -62,7 +62,7 @@ function EventRules({ ev }: { ev: CalcEvent }) {
         <Btn size="sm" onClick={async () => { await resetRules(ev); setV(await getRules(ev)); setMsg('기본값으로 되돌렸습니다'); }}>
           기본값으로
         </Btn>
-        {msg && <span className="font-typek text-[12px] text-chalk" role="status">{msg}</span>}
+        {msg && <span className="font-typek text-[14px] text-chalk" role="status">{msg}</span>}
       </div>
     </details>
   );

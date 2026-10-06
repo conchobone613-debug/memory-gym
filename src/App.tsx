@@ -128,7 +128,7 @@ function SideNav({ pathname, sound }: { pathname: string; sound: boolean }) {
       <div className="flex items-start justify-between gap-2 px-2">
         <Link to="/" className="flex flex-col no-underline">
           <span className="font-sign text-[30px] leading-none text-ink">{APP_NAME}</span>
-          <span className="mt-1.5 font-typek text-[11px] tracking-[.12em] text-ink-2">{APP_NAME_KO}</span>
+          <span className="mt-1.5 font-typek text-[13px] tracking-[.12em] text-ink-2">{APP_NAME_KO}</span>
         </Link>
         <SoundButton sound={sound} />
       </div>
@@ -142,12 +142,12 @@ function SideNav({ pathname, sound }: { pathname: string; sound: boolean }) {
                 <Link
                   to={g.to}
                   aria-current={headOn ? 'page' : undefined}
-                  className={`px-2 pb-1 font-typek text-[11px] tracking-[.14em] no-underline ${headOn ? 'font-bold text-red' : 'text-ink-2 hover:text-ink'}`}
+                  className={`px-2 pb-1 font-typek text-[13px] tracking-[.14em] no-underline ${headOn ? 'font-bold text-red' : 'text-ink-2 hover:text-ink'}`}
                 >
                   {g.group}
                 </Link>
               ) : (
-                <span className="px-2 pb-1 font-typek text-[11px] tracking-[.14em] text-ink-2">{g.group}</span>
+                <span className="px-2 pb-1 font-typek text-[13px] tracking-[.14em] text-ink-2">{g.group}</span>
               ))}
               {g.items.map((t) => {
                 const on = tabActive(pathname, t);
@@ -186,7 +186,7 @@ function Shell() {
       <header className="lp-chrome sticky top-0 z-20 flex items-center justify-between border-b border-card-edge bg-paper/95 px-3.5 py-2.5 backdrop-blur lg:hidden">
         <Link to="/" className="flex items-baseline gap-2 no-underline">
           <span className="font-sign text-[22px] leading-none text-ink">{APP_NAME}</span>
-          <span className="font-typek text-[10px] tracking-[.12em] text-ink-2">{APP_NAME_KO}</span>
+          <span className="font-typek text-[12px] tracking-[.12em] text-ink-2">{APP_NAME_KO}</span>
         </Link>
         <span className="flex items-center gap-1">
           <SoundButton sound={sound} />
@@ -239,7 +239,7 @@ function Shell() {
               key={t.to}
               to={t.to}
               aria-current={on ? 'page' : undefined}
-              className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 font-typek text-[11px] ${on ? 'font-bold text-ink' : 'text-ink-2'}`}
+              className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 font-typek text-[13px] ${on ? 'font-bold text-ink' : 'text-ink-2'}`}
             >
               {on && <span aria-hidden className="absolute top-0 h-[3px] w-8 rounded-b-[2px] bg-red" />}
               {t.icon}

@@ -64,7 +64,7 @@ export default function CalcDetail() {
       <div className="contents lg:flex lg:flex-col lg:gap-6">
         {!open && (
           <Panel title="아직 잠긴 종목입니다">
-            <p className="text-sm text-ink-2">
+            <p className="text-[15px] text-ink-2">
               <b className="text-ink">열려면</b> — {ev.needs}
             </p>
           </Panel>
@@ -73,7 +73,7 @@ export default function CalcDetail() {
         {/* 빨간 자판은 모의 대회 시작 하나 — 이 화면의 주 동작 */}
         <Folder tab="시작" clip>
           <h2 className="text-xl leading-tight text-ink">연습</h2>
-          <p className="mt-1 text-sm text-ink-2">난이도를 고르고, 한 문제마다 바로 채점과 풀이를 봅니다.</p>
+          <p className="mt-1 text-[15px] text-ink-2">난이도를 고르고, 한 문제마다 바로 채점과 풀이를 봅니다.</p>
           <div className="mt-3">
             {open && ev.to ? <KeyLink to={ev.to} size="big">연습 시작</KeyLink> : <Key size="big" disabled>연습 시작</Key>}
           </div>
@@ -81,7 +81,7 @@ export default function CalcDetail() {
           <hr className="my-5 border-dashed border-manila-dark" />
 
           <h2 className="text-xl leading-tight text-ink">모의 대회</h2>
-          <p className="mt-1 text-sm text-ink-2">아래 규정대로 전체 화면에서 치르고, 끝나면 결과를 봅니다.</p>
+          <p className="mt-1 text-[15px] text-ink-2">아래 규정대로 전체 화면에서 치르고, 끝나면 결과를 봅니다.</p>
           <div className="mt-3">
             {open && ev.to
               ? <KeyLink to={`${ev.to}?mode=contest`} tone="red" size="big">모의 대회 시작</KeyLink>
@@ -95,7 +95,7 @@ export default function CalcDetail() {
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
             {ev.rules.map((f) => (
               <div key={f.key} className="flex flex-col">
-                <dt className="font-typek text-[11px] text-ink-2">{f.label}</dt>
+                <dt className="font-typek text-[13px] text-ink-2">{f.label}</dt>
                 <dd className="tnum text-[15px] font-bold text-ink">{show(f.key)}</dd>
               </div>
             ))}
@@ -111,8 +111,8 @@ export default function CalcDetail() {
               <ul className="max-h-64 overflow-auto lg:max-h-96">
                 {rows.map((s) => (
                   <li key={s.id} className="flex items-center gap-2 border-t border-card-edge py-1.5 font-typek text-[12.5px] first:border-0">
-                    <span className="tnum text-xs text-ink-2">{localDayKey(s.startedAt)}</span>
-                    <span className="rounded-[3px] border border-card-edge px-1.5 text-[11px] text-ink-2">
+                    <span className="tnum text-[13px] text-ink-2">{localDayKey(s.startedAt)}</span>
+                    <span className="rounded-[3px] border border-card-edge px-1.5 text-[13px] text-ink-2">
                       {s.mode === 'contest' ? '모의 대회' : '연습'}
                     </span>
                     <span className="truncate text-ink">{detail(s.id)}</span>

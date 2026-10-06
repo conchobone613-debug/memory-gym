@@ -579,7 +579,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
             <KeyLink to={`/calc/${ev.id}`} tone="cream" size="sm">종목 화면</KeyLink>
           </div>
           <h1 className="mt-4 font-sign text-[40px] leading-[1.05] text-ink">{ev.name}</h1>
-          <p className="mt-1.5 font-typek text-xs text-ink-2">답은 숫자 자판이나 키보드로 치고 Enter 로 냅니다.</p>
+          <p className="mt-1.5 font-typek text-[13px] text-ink-2">답은 숫자 자판이나 키보드로 치고 Enter 로 냅니다.</p>
         </header>
 
         <div ref={folderRef} className="scroll-mt-16">
@@ -587,7 +587,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
             <div className="flex flex-col gap-3">
               <div>
                 <h2 className="text-xl leading-tight text-ink">{level.n}. {level.name}</h2>
-                <p className="mt-1 text-sm text-ink-2">{level.what}{p && ` · ${maker.ask(p)}`}</p>
+                <p className="mt-1 text-[15px] text-ink-2">{level.what}{p && ` · ${maker.ask(p)}`}</p>
               </div>
               {typeOpts && (
                 <Field label="유형" hint="한 유형만 푼 판은 사다리·코스에 들지 않고, 같은 유형 판끼리 기록을 견줍니다.">
@@ -603,7 +603,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
               )}
               {maker.flash && !contest && (
                 <>
-                  <label className="flex items-start gap-2 font-typek text-[13px] text-ink">
+                  <label className="flex items-start gap-2 font-typek text-[15px] text-ink">
                     <input type="checkbox" className="mt-0.5 size-4 shrink-0" checked={flashOn} onChange={(e) => setFlashOn(e.target.checked)} />
                     <span>플래시 암산 — 수를 하나씩 비춥니다</span>
                   </label>
@@ -754,7 +754,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
       {!cfg.contest && judge.layer}
 
       <div className="flex items-center gap-3">
-        {!cfg.contest && <span className="tnum text-[13px] text-ink-2">{mmss(elapsed)}</span>}
+        {!cfg.contest && <span className="tnum text-[15px] text-ink-2">{mmss(elapsed)}</span>}
         <Btn size="sm" className="ml-auto" onClick={cfg.contest ? cancel : stop}>{cfg.contest ? '취소 (Esc)' : '중단 (Esc)'}</Btn>
       </div>
 
@@ -802,7 +802,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
             {cfg.flashMs > 0 && held.q.lines && (
               <Stack lines={held.q.lines} className="my-1.5 font-type text-[15px] leading-tight font-bold text-ink" />
             )}
-            <Explain lines={held.q.explain} className="mt-1 text-[12px]" />
+            <Explain lines={held.q.explain} className="mt-1 text-[14px]" />
           </Held>
         </>
       )}
@@ -814,7 +814,7 @@ function Runner({ ev, maker, levels }: { ev: CalcEvent; maker: CalcMaker; levels
 function ContestRules({ ev, rules }: { ev: CalcEvent; rules: RuleValues }) {
   const limit = Number(rules.timeLimitSec) || 0;
   return (
-    <div className="rounded-[4px] bg-card px-3 py-2.5 font-typek text-xs leading-relaxed text-ink-2">
+    <div className="rounded-[4px] bg-card px-3 py-2.5 font-typek text-[13px] leading-relaxed text-ink-2">
       <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-1">
         {ev.rules.map((f) => (
           <div key={f.key} className="flex items-baseline justify-between gap-2">
@@ -891,7 +891,7 @@ function FlashPanel({ intervalMs, results }: { intervalMs: number; results: Resu
           </div>
         ))}
       </dl>
-      <p className="m-0 mt-2 font-typek text-[11px] text-ink-2">수 {periods.length}개를 화면이 바뀐 프레임 시각으로 쟀습니다.</p>
+      <p className="m-0 mt-2 font-typek text-[13px] text-ink-2">수 {periods.length}개를 화면이 바뀐 프레임 시각으로 쟀습니다.</p>
     </Panel>
   );
 }
@@ -922,14 +922,14 @@ function Bars({ bars }: { bars: OutcomeGoal[] }) {
 /** 틀린 문제 한 줄: 문제 → 정답 · 친 답, 아래 풀이 */
 function WrongRow({ r }: { r: Result }) {
   return (
-    <li className="border-b border-card-edge py-1.5 font-typek text-[13px] last:border-b-0">
+    <li className="border-b border-card-edge py-1.5 font-typek text-[15px] last:border-b-0">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="tnum text-[15px] font-bold text-ink">{r.q.prompt}</span>
         <span className="text-ink-2">→</span>
         <span className="tnum text-ink">{r.q.expected}</span>
         <span className="tnum ml-auto text-blue">{r.given ? `입력 ${r.given}` : '모름'}</span>
       </div>
-      <Explain lines={r.q.explain} className="mt-0.5 text-[11px] text-ink-2" />
+      <Explain lines={r.q.explain} className="mt-0.5 text-[13px] text-ink-2" />
     </li>
   );
 }

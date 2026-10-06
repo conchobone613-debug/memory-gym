@@ -73,7 +73,7 @@ export function useCoachReview(kind: SessionKind, sessionId: string): { sage?: R
       <Key tone="cream" size="sm" disabled={busy} onClick={request}>
         {busy ? '스승님이 이 판을 보는 중…' : '스승님께 복기 받기'}
       </Key>
-      {err && <p className="m-0 text-center font-typek text-[12px] font-bold text-ink" role="status">{err}</p>}
+      {err && <p className="m-0 text-center font-typek text-[14px] font-bold text-ink" role="status">{err}</p>}
     </div>
   ) : null;
 

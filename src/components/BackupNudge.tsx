@@ -31,7 +31,7 @@ export default function BackupNudge() {
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-[4px] border border-dashed border-red bg-near px-3 py-2.5">
-      <p className="m-0 min-w-48 flex-1 font-typek text-xs leading-relaxed text-ink">
+      <p className="m-0 min-w-48 flex-1 font-typek text-[13px] leading-relaxed text-ink">
         <b>이 기록은 지금 이 브라우저 안에만 있습니다.</b>{' '}
         <span className="text-ink-2">
           {last

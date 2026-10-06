@@ -33,7 +33,7 @@ export default function ChosungKey({ map, compact = false }: { map: ChosungMap; 
       </div>
 
       {!compact && (
-        <div className="mt-2 flex flex-col gap-1 border-t border-card-edge px-1 pt-2 font-typek text-[12px] leading-[1.6] text-ink-2">
+        <div className="mt-2 flex flex-col gap-1 border-t border-card-edge px-1 pt-2 font-typek text-[14px] leading-[1.6] text-ink-2">
           <p>
             <b className="text-ink">가나다 순서 그대로입니다.</b> 대표 자음만 세면
             ㄱ·ㄴ·ㄷ·ㄹ·ㅁ·ㅂ·ㅅ·ㅈ·ㅎ 아홉 개가 1부터 9까지이고, 동그란 <b className="text-ink">ㅇ 만 0</b> 으로

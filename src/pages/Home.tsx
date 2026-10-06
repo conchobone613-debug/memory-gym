@@ -79,7 +79,7 @@ function CourseFolder({ needImages }: { needImages: boolean }) {
   if (!row || !course) {
     return (
       <Folder tab="스승님" clip className="lg:col-start-2 lg:row-span-2">
-        <p className="m-0 font-typek text-[13px] text-ink-2">{notice || '오늘의 코스를 준비하는 중입니다.'}</p>
+        <p className="m-0 font-typek text-[15px] text-ink-2">{notice || '오늘의 코스를 준비하는 중입니다.'}</p>
       </Folder>
     );
   }
@@ -107,8 +107,8 @@ function CourseFolder({ needImages }: { needImages: boolean }) {
   return (
     <Folder tab="스승님" clip className="lg:col-start-2 lg:row-span-2">
       <SageNote>{course.say}</SageNote>
-      <p className="mt-2 mb-0 line-clamp-2 font-typek text-[12px] leading-snug text-ink-2" role="status">{caption}</p>
-      {notice && <p className="mt-1 mb-0 font-typek text-[12px] font-bold text-ink" role="status">{notice}</p>}
+      <p className="mt-2 mb-0 line-clamp-2 font-typek text-[14px] leading-snug text-ink-2" role="status">{caption}</p>
+      {notice && <p className="mt-1 mb-0 font-typek text-[14px] font-bold text-ink" role="status">{notice}</p>}
 
       <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="오늘 쓸 시간">
         {opts.map((m) => (
@@ -163,7 +163,7 @@ function CourseFolder({ needImages }: { needImages: boolean }) {
       </div>
 
       {needImages && (
-        <p className="mt-3 mb-0 font-typek text-[12px] leading-relaxed text-ink-2">
+        <p className="mt-3 mb-0 font-typek text-[14px] leading-relaxed text-ink-2">
           이미지 이름이 아직 비어 있습니다. <Link to="/assets/sets" className="font-bold text-ink underline">이미지 세트</Link>를
           먼저 채우면 3단계와 기억력 종목을 제대로 할 수 있습니다.
         </p>
@@ -212,7 +212,7 @@ export default function Home() {
         <header>
           {/* 화면 글자는 한국어 — 큰 제목은 한글 이름, 로마자는 부제 줄에 작게 */}
           <h1 className="m-0 font-sign text-[40px] leading-none text-ink">{APP_NAME}</h1>
-          <p className="mt-1.5 font-typek text-xs font-bold tracking-[.08em] text-ink-2">{APP_NAME_KO} · 기억과 계산의 훈련소</p>
+          <p className="mt-1.5 font-typek text-[13px] font-bold tracking-[.08em] text-ink-2">{APP_NAME_KO} · 기억과 계산의 훈련소</p>
         </header>
 
         {/* 오늘의 상태 줄 */}
@@ -285,19 +285,19 @@ export default function Home() {
             <ul className="m-0 list-none p-0">
               {summaries.slice(0, 5).map((s) => (
                 <li key={s.id} className="flex items-center gap-2 border-t border-card-edge py-2 first:border-0">
-                  <span className="tnum text-xs text-ink-2">{localDayKey(s.startedAt).slice(5)}</span>
-                  <span className="rounded-[3px] border border-card-edge px-1.5 font-typek text-[11px] text-ink-2">
+                  <span className="tnum text-[13px] text-ink-2">{localDayKey(s.startedAt).slice(5)}</span>
+                  <span className="rounded-[3px] border border-card-edge px-1.5 font-typek text-[13px] text-ink-2">
                     {s.mode === 'practice' ? '연습' : '모의 대회'}
                   </span>
-                  <span className="flex-1 truncate px-1 font-typek text-[13px] text-ink">{s.title}</span>
-                  <span className="tnum text-sm text-ink">{fmtPct(s.accuracy)}</span>
+                  <span className="flex-1 truncate px-1 font-typek text-[15px] text-ink">{s.title}</span>
+                  <span className="tnum text-[15px] text-ink">{fmtPct(s.accuracy)}</span>
                 </li>
               ))}
             </ul>
           )}
         </Panel>
 
-        <details className="rounded-[4px] border border-dashed border-card-edge px-3 py-2 font-typek text-[11px] text-ink-2 lg:col-span-full">
+        <details className="rounded-[4px] border border-dashed border-card-edge px-3 py-2 font-typek text-[13px] text-ink-2 lg:col-span-full">
           <summary className="cursor-pointer">키보드 단축키</summary>
           <ul className="mt-2 flex list-none flex-col gap-1.5 p-0">
             <li>기초 1·2단계: 자판의 자음 키 · 숫자 키 (한/영 무관, 화면 버튼도 있음) · <kbd>Tab</kbd> 모름</li>

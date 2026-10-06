@@ -430,7 +430,7 @@ export default function CalendarRun() {
             <KeyLink to="/calc/calendar" tone="cream" size="sm">종목 화면</KeyLink>
           </div>
           <h1 className="mt-4 font-sign text-[40px] leading-[1.05] text-ink">달력</h1>
-          <p className="mt-1.5 font-typek text-xs text-ink-2">
+          <p className="mt-1.5 font-typek text-[13px] text-ink-2">
             요일 번호(규정) — {base === 'mon1' ? '월요일 = 1 … 일요일 = 7' : '일요일 = 0 … 토요일 = 6'}
           </p>
         </header>
@@ -440,7 +440,7 @@ export default function CalendarRun() {
             <div className="flex flex-col gap-3">
               <div>
                 <h2 className="text-xl leading-tight text-ink">{level.n}. {level.name}</h2>
-                <p className="mt-1 text-sm text-ink-2">{level.what}{level.drill !== 'code' && ` · ${from}–${to}년`}</p>
+                <p className="mt-1 text-[15px] text-ink-2">{level.what}{level.drill !== 'code' && ` · ${from}–${to}년`}</p>
               </div>
               {!contest && (
                 <Field label="문항 수">
@@ -448,13 +448,13 @@ export default function CalendarRun() {
                 </Field>
               )}
               {level.drill === 'full' && (
-                <label className="flex items-start gap-2 font-typek text-[13px] text-ink">
+                <label className="flex items-start gap-2 font-typek text-[15px] text-ink">
                   <input type="checkbox" className="mt-0.5 size-4 shrink-0" checked={stepsOn} onChange={(e) => setStepsOn(e.target.checked)} />
                   <span>단계 입력 — 연도 코드 → 월 코드 → 요일을 차례로 눌러 단계마다 시간을 잽니다</span>
                 </label>
               )}
               {contest && (
-                <p className="m-0 rounded-[4px] bg-card px-3 py-2.5 font-typek text-xs leading-relaxed text-ink-2">
+                <p className="m-0 rounded-[4px] bg-card px-3 py-2.5 font-typek text-[13px] leading-relaxed text-ink-2">
                   제한시간 {limit}초 · 오답 감점 {Number(rules?.penaltyPerWrong) || 0}점 · 시작하면 전체 화면
                   {!limitSet && <><br />규정 제한시간이 비어 있어 {DEFAULT_LIMIT}초로 치릅니다.</>}
                 </p>
@@ -578,7 +578,7 @@ export default function CalendarRun() {
       {!cfg.contest && judge.layer}
 
       <div className="flex items-center gap-3">
-        {!cfg.contest && <span className="tnum text-[13px] text-ink-2">{mmss(Math.floor((now - startAt) / 1000))}</span>}
+        {!cfg.contest && <span className="tnum text-[15px] text-ink-2">{mmss(Math.floor((now - startAt) / 1000))}</span>}
         <Btn size="sm" className="ml-auto" onClick={cfg.contest ? cancel : stop}>{cfg.contest ? '취소 (Esc)' : '중단 (Esc)'}</Btn>
       </div>
 
@@ -597,7 +597,7 @@ export default function CalendarRun() {
 
       {phase === 'asking' && (
         <>
-          {cur.steps && <p className="m-0 text-center font-typek text-[12px] text-ink-2">{cur.steps[step].name}</p>}
+          {cur.steps && <p className="m-0 text-center font-typek text-[14px] text-ink-2">{cur.steps[step].name}</p>}
           <AnswerKeys weekday={asksWeekday(cur, step)} base={cfg.base} keyRefs={keyRefs} onPress={press} />
           {!cfg.contest && (
             <div className="flex justify-center pt-1">
@@ -623,7 +623,7 @@ export default function CalendarRun() {
                 '모름으로 넘겼습니다'
               )}
             </div>
-            <div className="mt-1 text-[12px] leading-snug">{explain(held.item)}</div>
+            <div className="mt-1 text-[14px] leading-snug">{explain(held.item)}</div>
           </Held>
           <Key size="big" sub="Enter" onClick={continueAfterWrong}>계속</Key>
         </>
@@ -674,7 +674,7 @@ function StepSlots({ steps, filled }: { steps: CalStepSpec[]; filled: CalcStep[]
         const got = filled[i];
         return (
           <span key={s.name} className="flex w-[84px] flex-col items-center gap-1">
-            <span className="font-typek text-[10px] text-ink-2">{s.name}</span>
+            <span className="font-typek text-[12px] text-ink-2">{s.name}</span>
             <span className={`grid h-11 w-full place-items-center border-b-2 border-ink-2 bg-input font-type text-[22px] font-bold leading-none ${got?.ok === false ? 'text-blue' : 'text-ink'}`}>
               {got?.given ? (s.name === '요일' ? WEEKDAY_KO[Number(got.given)] : got.given) : ''}
             </span>
@@ -709,17 +709,17 @@ function WrongRow({ r }: { r: Result }) {
   const wd = r.item.kind === 'full';
   const spec = r.wrongStep ? r.item.steps?.find((s) => s.name === r.wrongStep) : undefined;
   return (
-    <li className="border-b border-card-edge py-1.5 font-typek text-[13px] last:border-b-0">
+    <li className="border-b border-card-edge py-1.5 font-typek text-[15px] last:border-b-0">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="tnum text-[15px] font-bold text-ink">{r.item.prompt}</span>
-        {r.item.kind === 'month' && r.item.note && <span className="text-[11px] text-ink-2">{r.item.note}</span>}
+        {r.item.kind === 'month' && r.item.note && <span className="text-[13px] text-ink-2">{r.item.note}</span>}
         <span className="text-ink-2">→</span>
         <span className="text-ink">{valText(wd, r.item.expected)}</span>
         <span className="ml-auto text-blue">
           {!r.given ? '모름' : spec ? `${spec.name} ${r.given} (정답 ${spec.expected})` : `입력 ${valText(wd, r.given)}`}
         </span>
       </div>
-      <div className="mt-0.5 text-[11px] leading-snug text-ink-2">{explain(r.item)}</div>
+      <div className="mt-0.5 text-[13px] leading-snug text-ink-2">{explain(r.item)}</div>
     </li>
   );
 }

@@ -13,9 +13,9 @@ export default function GoalPanel({ goal, celebrate = false }: { goal: GoalStatu
   /* 결과 화면: 성적표가 막대를 이미 보여 주므로 도달했다는 말과 다음 단계만 */
   if (goal.passed && celebrate) {
     return (
-      <div className="lp-stat font-typek text-[13px] text-ink">
+      <div className="lp-stat font-typek text-[15px] text-ink">
         <b className="text-chalk">목표 도달 — 이 단계는 끝내셔도 됩니다.</b>
-        <div className="mt-0.5 text-[12px] text-ink-2">다음은 <b className="text-ink">{goal.next}</b>입니다.</div>
+        <div className="mt-0.5 text-[14px] text-ink-2">다음은 <b className="text-ink">{goal.next}</b>입니다.</div>
       </div>
     );
   }
@@ -27,7 +27,7 @@ export default function GoalPanel({ goal, celebrate = false }: { goal: GoalStatu
 
   return (
     <div className="lp-stat">
-      <div className="flex items-baseline justify-between gap-2 font-typek text-[12px] font-bold text-ink-2">
+      <div className="flex items-baseline justify-between gap-2 font-typek text-[14px] font-bold text-ink-2">
         <span className={goal.passed ? 'text-chalk' : undefined}>{goal.passed ? '목표에 도달한 단계입니다' : '목표까지'}</span>
         <span className="tnum text-ink">{done}/{goal.checks.length}</span>
       </div>
@@ -45,7 +45,7 @@ export default function GoalPanel({ goal, celebrate = false }: { goal: GoalStatu
         ))}
       </div>
       {goal.passed && (
-        <div className="mt-2 font-typek text-[12px] text-ink-2">다음은 <b className="text-ink">{goal.next}</b>입니다.</div>
+        <div className="mt-2 font-typek text-[14px] text-ink-2">다음은 <b className="text-ink">{goal.next}</b>입니다.</div>
       )}
     </div>
   );

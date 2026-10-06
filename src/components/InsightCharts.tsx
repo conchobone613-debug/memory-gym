@@ -150,7 +150,7 @@ export function MinutesChart({ rows }: { rows: DayMinutes[] }) {
       </div>
       <div aria-hidden className="mt-1 ml-7 flex gap-[2px]">
         {rows.map((d, i) => (
-          <span key={d.day} className="tnum flex min-w-0 flex-1 justify-center whitespace-nowrap text-[9px] text-ink-2">
+          <span key={d.day} className="tnum flex min-w-0 flex-1 justify-center whitespace-nowrap text-[12px] text-ink-2">
             {(n - 1 - i) % every === 0 ? shortDay(d.day) : ''}
           </span>
         ))}
@@ -213,8 +213,8 @@ export function TrendLine({ values, days, unit, color, label }: {
               <>
                 <line x1={box.x0} x2={box.x1} y1={box.y0} y2={box.y0} stroke="var(--card-edge)" strokeWidth={1} />
                 <line x1={box.x0} x2={box.x1} y1={box.y1} y2={box.y1} stroke="var(--card-edge)" strokeWidth={1} />
-                <text x={box.x0 - 5} y={box.y0} textAnchor="end" dominantBaseline="middle" fontSize={9.5} fill="var(--ink-2)" className="tnum">{hi}</text>
-                <text x={box.x0 - 5} y={box.y1} textAnchor="end" dominantBaseline="middle" fontSize={9.5} fill="var(--ink-2)" className="tnum">{lo}</text>
+                <text x={box.x0 - 5} y={box.y0} textAnchor="end" dominantBaseline="middle" fontSize={11.5} fill="var(--ink-2)" className="tnum">{hi}</text>
+                <text x={box.x0 - 5} y={box.y1} textAnchor="end" dominantBaseline="middle" fontSize={11.5} fill="var(--ink-2)" className="tnum">{lo}</text>
               </>
             )}
             {n > 1 && (
@@ -233,7 +233,7 @@ export function TrendLine({ values, days, unit, color, label }: {
               x={last.x + 8}
               y={Math.min(TREND_H - 7, Math.max(7, last.y))}
               dominantBaseline="middle"
-              fontSize={11.5}
+              fontSize={12.5}
               fontWeight={700}
               fill="var(--ink)"
               className="tnum"

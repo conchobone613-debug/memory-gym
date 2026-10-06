@@ -462,7 +462,7 @@ export default function Drill() {
               {t.n}단계
             </Key>
             {t.m && t.m.attempts > 0 && (
-              <span className="tnum text-center text-[11px] leading-tight text-ink-2">
+              <span className="tnum text-center text-[13px] leading-tight text-ink-2">
                 {fmtPct(t.m.accuracy)} · {fmtMs(t.m.medianRt)}
                 {t.m.passed && <b className="block font-typek text-chalk">통과</b>}
               </span>
@@ -489,7 +489,7 @@ export default function Drill() {
           <div className="mt-3 flex flex-col gap-4">
             {/* 체크 상자가 여럿이라 Field(label) 로 감싸지 않는다 — label 안의 label 은 첫 칸을 대신 누른다 */}
             <div className="flex flex-col gap-2">
-              <span className="font-typek text-[11px] font-bold tracking-wide text-ink-2">세트</span>
+              <span className="font-typek text-[13px] font-bold tracking-wide text-ink-2">세트</span>
               {sets.map((s) => {
                 const mine = images.filter((i) => i.setId === s.id && i.name.trim());
                 const on = selected.includes(s.id);
@@ -546,14 +546,14 @@ export default function Drill() {
                                 }`}
                               >
                                 <span className="tnum block text-[11.5px]">{from}–{to}</span>
-                                <span className="tnum block text-[10px] opacity-75">{count}칸</span>
+                                <span className="tnum block text-[12px] opacity-75">{count}칸</span>
                               </button>
                             );
                           })}
                         </div>
                         <button
                           type="button"
-                          className="mt-1 font-typek text-[11px] text-ink-2 underline hover:text-ink"
+                          className="mt-1 font-typek text-[13px] text-ink-2 underline hover:text-ink"
                           onClick={() => setDecades((c) => ({ ...c, [s.id]: [] }))}
                         >
                           전체
@@ -676,15 +676,15 @@ export default function Drill() {
                         title="눌러서 이름 고치기"
                         className="flex w-full items-baseline gap-2 border-b border-card-edge px-1 py-1.5 text-left hover:bg-manila/60"
                       >
-                        <span className="tnum w-9 shrink-0 text-[13px] text-ink-2">{r.trial.display}</span>
+                        <span className="tnum w-9 shrink-0 text-[15px] text-ink-2">{r.trial.display}</span>
                         <span className="min-w-0 flex-1 truncate font-typek text-[14px] text-ink">{live.name || '—'}</span>
                         {badChosung(live, dom, settings?.chosungMap) && (
-                          <span className="shrink-0 font-typek text-[11px] text-blue">초성 ✕</span>
+                          <span className="shrink-0 font-typek text-[13px] text-blue">초성 ✕</span>
                         )}
                         {typed && (
-                          <span className={`max-w-[6rem] shrink truncate font-typek text-[11px] ${ok ? 'text-ink-2' : 'text-blue'}`}>{typed}</span>
+                          <span className={`max-w-[6rem] shrink truncate font-typek text-[13px] ${ok ? 'text-ink-2' : 'text-blue'}`}>{typed}</span>
                         )}
-                        <span className="tnum w-12 shrink-0 text-right text-[12px] text-ink-2">{fmtMs(r.rtMs)}</span>
+                        <span className="tnum w-12 shrink-0 text-right text-[14px] text-ink-2">{fmtMs(r.rtMs)}</span>
                         <span
                           className={`tnum w-3 shrink-0 text-center text-[14px] font-bold ${ok ? 'text-chalk' : 'text-blue'}`}
                           aria-label={ok ? '정답' : '오답'}
@@ -695,7 +695,7 @@ export default function Drill() {
                     );
                   })}
                 </div>
-                <p className="mt-2 font-typek text-[11px] text-ink-2">줄을 누르면 그 이미지의 이름을 바로 고칠 수 있습니다.</p>
+                <p className="mt-2 font-typek text-[13px] text-ink-2">줄을 누르면 그 이미지의 이름을 바로 고칠 수 있습니다.</p>
               </Panel>
             )}
           </ResultSheet>
@@ -759,12 +759,12 @@ export default function Drill() {
             <span>
               {last.typedInput ? <>치신 것 <span className="text-blue">{last.typedInput}</span></> : '모름'}
             </span>
-            <span className="tnum text-[12px]">{fmtMs(last.rtMs)}</span>
+            <span className="tnum text-[14px]">{fmtMs(last.rtMs)}</span>
           </div>
           <div className="mt-1">정답 <b>{liveImage.name}</b></div>
-          {liveImage.note && <div className="mt-0.5 text-[12px]">{liveImage.note}</div>}
+          {liveImage.note && <div className="mt-0.5 text-[14px]">{liveImage.note}</div>}
           {last.typedMatch === 'chosung' && (
-            <div className="mt-1 text-[12px] font-bold text-red">초성은 맞았습니다 — 이름까지 떠올라야 합니다</div>
+            <div className="mt-1 text-[14px] font-bold text-red">초성은 맞았습니다 — 이름까지 떠올라야 합니다</div>
           )}
           <div className="mt-2.5 flex items-center gap-3">
             <Key size="sm" sub="Enter" onClick={continueAfterWrong}>계속</Key>
@@ -778,11 +778,11 @@ export default function Drill() {
             <Key tone="cream" size="sm" sub="Enter" disabled={!typedInput.trim()} onClick={() => submit()}>확인</Key>
             <Key tone="cream" size="sm" sub="Tab" onClick={() => submit(true)}>모름</Key>
           </div>
-          {imeHint && <p className="font-typek text-[12px] font-bold text-red">한/영을 한글로</p>}
+          {imeHint && <p className="font-typek text-[14px] font-bold text-red">한/영을 한글로</p>}
         </div>
       )}
 
-      <div className="flex items-center justify-between font-typek text-[12px] text-ink-2">
+      <div className="flex items-center justify-between font-typek text-[14px] text-ink-2">
         <button
           type="button"
           className={`py-1 hover:text-ink disabled:opacity-40 ${results.length ? '' : 'invisible'}`}

@@ -109,7 +109,7 @@ export default function SpokenListen({ digits, intervalMs, lang, onDone, onCance
       <Panel>
         <div className="py-14 text-center lg:py-24">
           <p className="m-0 font-sign text-[28px] leading-tight text-ink lg:text-[34px]">귀로만 들으십시오</p>
-          <p className="m-0 mt-2 font-typek text-xs text-ink-2 lg:text-[13px]">되감기는 없습니다</p>
+          <p className="m-0 mt-2 font-typek text-[13px] text-ink-2 lg:text-[15px]">되감기는 없습니다</p>
         </div>
       </Panel>
     </div>

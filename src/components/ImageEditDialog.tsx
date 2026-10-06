@@ -99,7 +99,7 @@ export default function ImageEditDialog({ imageId, onClose }: { imageId: string;
             onNameKey={(e) => { if (e.key === 'Enter') { e.preventDefault(); close(); } }}
           />
           <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
-            <span className="mr-auto font-typek text-[11px] text-ink-2">Enter 저장 · Esc 닫기</span>
+            <span className="mr-auto font-typek text-[13px] text-ink-2">Enter 저장 · Esc 닫기</span>
             <Key onClick={close}>저장하고 닫기</Key>
           </div>
         </Folder>

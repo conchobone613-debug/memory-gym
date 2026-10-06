@@ -593,14 +593,14 @@ export default function Practice() {
       <div className="flex flex-col gap-1">
         {course && <div className="mb-2"><CourseBar step={course} /></div>}
         <h1 className="m-0 text-[30px] leading-tight text-ink">{easy ? '연습' : '모의 대회'}</h1>
-        <p className="m-0 font-typek text-xs text-ink-2">
+        <p className="m-0 font-typek text-[13px] text-ink-2">
           {evName && `${evName} · `}
           {style === 'spoken'
             ? (easy ? '낭독을 늦추고 분량을 4분의 1로 줄입니다' : '한 번만 읽습니다 · 시작하면 전체 화면')
             : easy ? '시간을 재지 않고 분량을 4분의 1로 줄입니다' : '대회 규격 시간으로 잽니다 · 시작하면 전체 화면'}
         </p>
         {notice && (
-          <p className="m-0 mt-2 rounded-[4px] border border-dashed border-ink-2 bg-card px-3 py-2 font-typek text-xs text-ink">{notice}</p>
+          <p className="m-0 mt-2 rounded-[4px] border border-dashed border-ink-2 bg-card px-3 py-2 font-typek text-[13px] text-ink">{notice}</p>
         )}
         <Folder tab="이번 판" clip>
           {/* PC: 왼쪽 단은 고르는 칸, 오른쪽 단은 이번 설정 쪽지와 시작. 휴대폰에서는 두 묶음이 contents 라 한 줄 흐름 그대로 */}
@@ -664,7 +664,7 @@ export default function Practice() {
             )}
             {style === 'spoken' && (
               <>
-                {!speechOk && <p className="m-0 font-typek text-xs text-ink">이 브라우저는 음성 합성을 지원하지 않습니다</p>}
+                {!speechOk && <p className="m-0 font-typek text-[13px] text-ink">이 브라우저는 음성 합성을 지원하지 않습니다</p>}
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="목소리 언어">
                     <select
@@ -686,7 +686,7 @@ export default function Practice() {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <Key tone="cream" size="sm" disabled={!speechOk} onClick={testVoice}>소리 시험</Key>
-                  {voiceNote && <span className="font-typek text-[11px] text-ink-2">{voiceNote}</span>}
+                  {voiceNote && <span className="font-typek text-[13px] text-ink-2">{voiceNote}</span>}
                 </div>
               </>
             )}
@@ -698,7 +698,7 @@ export default function Practice() {
                   </select>
                 </Field>
                 {easy && (
-                  <label className="flex items-center gap-2 font-typek text-[13px] text-ink">
+                  <label className="flex items-center gap-2 font-typek text-[15px] text-ink">
                     <input type="checkbox" className="size-4" checked={showKeys} onChange={(e) => setShowKeys(e.target.checked)} />
                     외우는 동안 바꾼 숫자 보이기
                   </label>
@@ -711,14 +711,14 @@ export default function Practice() {
                 {palaces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Field>
-            <label className="flex items-center gap-2 font-typek text-[13px] text-ink">
+            <label className="flex items-center gap-2 font-typek text-[15px] text-ink">
               <input type="checkbox" className="size-4" checked={unlimitedRecall} onChange={(e) => setUnlimitedRecall(e.target.checked)} />
               회상은 시간 제한 없이
             </label>
             </div>
             <div className="contents lg:flex lg:flex-col lg:gap-3">
             {/* 서류철에 물린 종이 한 장 — 이번 판 요약 */}
-            <div className="rounded-[4px] bg-card px-3 py-2.5 font-typek text-xs leading-relaxed text-ink-2">
+            <div className="rounded-[4px] bg-card px-3 py-2.5 font-typek text-[13px] leading-relaxed text-ink-2">
               <div className="font-bold text-ink">이번 설정</div>
               {style === 'spoken'
                 ? `숫자 ${planN}자리 · ${gapMs === 1000 ? '초당 1개' : `${gapMs / 1000}초에 1개`}`
@@ -768,14 +768,14 @@ export default function Practice() {
             <div className="-mx-2 flex flex-col gap-3 lg:mx-0 lg:gap-4">
               {cellRows(expected).map((row, r) => (
                 <div key={r}>
-                  <div className="mb-0.5 font-typek text-[10px] text-ink-2">{r + 1}줄</div>
+                  <div className="mb-0.5 font-typek text-[12px] text-ink-2">{r + 1}줄</div>
                   <div className="grid grid-cols-5 gap-x-1">
                     {row.map((c, j) => (
                       <div key={j} className="flex min-w-0 flex-col items-center">
                         <span className="tnum inline-flex gap-[2px] text-base leading-tight tracking-[-0.03em] text-ink lg:text-xl">
                           {run.code === 'b3' ? splitBits(c).map((p, k) => <span key={k}>{p}</span>) : c}
                         </span>
-                        {run.showKeys && <span className="tnum text-[11px] leading-tight text-ink-2 lg:text-[13px]">{bitsToKey(c, run.code)}</span>}
+                        {run.showKeys && <span className="tnum text-[13px] leading-tight text-ink-2 lg:text-[15px]">{bitsToKey(c, run.code)}</span>}
                       </div>
                     ))}
                   </div>
@@ -808,9 +808,9 @@ export default function Practice() {
     const pad = bin && coarse;
     const cell = (i: number) => (
       <div key={i} className="flex min-w-0 flex-col items-center">
-        {!bin && <span className="tnum text-[10px] text-ink-2">{i + 1}</span>}
+        {!bin && <span className="tnum text-[12px] text-ink-2">{i + 1}</span>}
         {loci[i] && (
-          <span className="w-full truncate text-center font-typek text-[10px] text-ink-2" title={loci[i].name}>
+          <span className="w-full truncate text-center font-typek text-[12px] text-ink-2" title={loci[i].name}>
             {loci[i].name}
           </span>
         )}
@@ -837,7 +837,7 @@ export default function Practice() {
           right={<Clock ms={open ? nowMs - recallStart.current : left} warn={!open && left < 60000} />}
         />
         <div className="flex items-center justify-between gap-3">
-          <p className="m-0 font-typek text-[11px] leading-snug text-ink-2">
+          <p className="m-0 font-typek text-[13px] leading-snug text-ink-2">
             {mode === 'cards' ? '카드 입력: s7 · ha(에이스) · dt 또는 d10 · ck'
               : bin ? '0과 1만 · 여섯 자리를 채우면 다음 칸' : '기억나는 만큼 채우십시오'}
           </p>
@@ -849,7 +849,7 @@ export default function Practice() {
             <div className="-mx-2 flex flex-col gap-3 lg:mx-0 lg:gap-4">
               {cellRows(cells).map((row, r) => (
                 <div key={r}>
-                  <div className="mb-0.5 font-typek text-[10px] text-ink-2">{r + 1}줄</div>
+                  <div className="mb-0.5 font-typek text-[12px] text-ink-2">{r + 1}줄</div>
                   <div className="grid grid-cols-5 gap-1 lg:gap-1.5">{row}</div>
                 </div>
               ))}
@@ -874,14 +874,14 @@ export default function Practice() {
         }`}
       >
         {loci[g.index] && (
-          <div className="truncate font-typek text-[10px] text-ink-2" title={loci[g.index].name}>
+          <div className="truncate font-typek text-[12px] text-ink-2" title={loci[g.index].name}>
             {loci[g.index].name}
           </div>
         )}
         {/* 이진수 6자리가 휴대폰 폭 한 칸에 들어가게 조금 작게 */}
-        <div className={`tnum text-ink ${mode === 'binary' ? 'text-[13px] tracking-tight' : 'text-sm'}`}>{show(g.expected)}</div>
-        {name && <div className="truncate font-typek text-[10px] text-ink-2" title={name}>{name}</div>}
-        {!g.isCorrect && <div className="tnum text-[11px] text-blue">{g.blank ? '—' : show(g.answered)}</div>}
+        <div className={`tnum text-ink ${mode === 'binary' ? 'text-[15px] tracking-tight' : 'text-[15px]'}`}>{show(g.expected)}</div>
+        {name && <div className="truncate font-typek text-[12px] text-ink-2" title={name}>{name}</div>}
+        {!g.isCorrect && <div className="tnum text-[13px] text-blue">{g.blank ? '—' : show(g.answered)}</div>}
       </div>
     );
   };
@@ -890,7 +890,7 @@ export default function Practice() {
     <div className="mt-4 flex flex-col gap-3">
       {cellRows(graded).map((row, r) => (
         <div key={r}>
-          <div className="mb-1 font-typek text-[11px] text-ink-2">
+          <div className="mb-1 font-typek text-[13px] text-ink-2">
             {r + 1}줄 · <b className="tnum text-ink">{contest?.rows[r]?.score ?? 0}점</b>
           </div>
           <div className="grid grid-cols-5 gap-1.5">{row.map(gradeCell)}</div>
@@ -925,7 +925,7 @@ export default function Practice() {
 
         <Panel
           title={`오답 원인 (${wrongCells.length}칸)`}
-          right={<span className="font-typek text-[11px] text-ink-2">1~4 원인 · ↑↓ 이동</span>}
+          right={<span className="font-typek text-[13px] text-ink-2">1~4 원인 · ↑↓ 이동</span>}
           className="lg:sticky lg:top-8"
         >
           {wrongCells.length === 0 ? (
@@ -941,7 +941,7 @@ export default function Practice() {
                   }`}
                 >
                   <div className="flex items-baseline gap-3">
-                    <span className="tnum text-xs text-ink-2">#{g.index + 1}</span>
+                    <span className="tnum text-[13px] text-ink-2">#{g.index + 1}</span>
                     <span className="tnum text-[15px] text-ink">
                       {show(g.expected)}
                       <span className="text-blue"> ← {g.blank ? '—' : show(g.answered)}</span>
@@ -1009,7 +1009,7 @@ export default function Practice() {
           <Stat label="합계 시간" value={mmss(memorizeUsedMs + recallUsedMs)} sub={limitText} />
         </div>
         {gradeGrid}
-        <p className="mt-3 font-typek text-[11px] text-ink-2">세션 {sessionId.slice(0, 8)} · 출제 수열과 칸별 기록이 모두 저장되었습니다.</p>
+        <p className="mt-3 font-typek text-[13px] text-ink-2">세션 {sessionId.slice(0, 8)} · 출제 수열과 칸별 기록이 모두 저장되었습니다.</p>
       </Panel>
     </ResultSheet>
   );

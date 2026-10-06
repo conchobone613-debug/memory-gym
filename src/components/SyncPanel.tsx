@@ -125,15 +125,15 @@ export default function SyncPanel() {
               onConfirm={stop}
             />
           </div>
-          <p className="mt-2 font-typek text-[12px] text-ink-2">
+          <p className="mt-2 font-typek text-[14px] text-ink-2">
             마지막 동기화 <span className="tnum text-ink">{fmt(settings.lastSyncAt)}</span>
           </p>
         </>
       )}
 
-      {msg && <p className={`mt-3 font-typek text-[12px] ${msg.ok ? 'text-chalk' : 'font-bold text-ink'}`} role="status">{msg.t}</p>}
+      {msg && <p className={`mt-3 font-typek text-[14px] ${msg.ok ? 'text-chalk' : 'font-bold text-ink'}`} role="status">{msg.t}</p>}
 
-      <p className="mt-3 font-typek text-[12px] leading-relaxed text-ink-2">
+      <p className="mt-3 font-typek text-[14px] leading-relaxed text-ink-2">
         기록은 코드를 아는 사람만 읽을 수 있습니다. 코드는 128비트 난수라 찍어서 맞힐 수 없고,
         목록으로 훑는 것도 막아 두었습니다. 올라가는 것은 이미지 이름과 반응시간뿐이며 신원 정보는 없습니다.
       </p>

@@ -83,7 +83,7 @@ export function ConfirmBtn({ label, confirmLabel, onConfirm, size = 'md' }: {
   }
   return (
     <span className="inline-flex flex-wrap items-center gap-2 rounded-[4px] border border-dashed border-red bg-near px-2 py-1.5">
-      <span className="font-typek text-xs text-red">{confirmLabel}</span>
+      <span className="font-typek text-[13px] text-red">{confirmLabel}</span>
       <Btn variant="danger" size="sm" onClick={() => { setArmed(false); onConfirm(); }}>지웁니다</Btn>
       <Btn size="sm" onClick={() => setArmed(false)}>취소</Btn>
     </span>
@@ -93,15 +93,15 @@ export function ConfirmBtn({ label, confirmLabel, onConfirm, size = 'md' }: {
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-typek text-[11px] font-bold tracking-wide text-ink-2">{label}</span>
+      <span className="font-typek text-[13px] font-bold tracking-wide text-ink-2">{label}</span>
       {children}
-      {hint && <span className="font-typek text-[11px] text-ink-2">{hint}</span>}
+      {hint && <span className="font-typek text-[13px] text-ink-2">{hint}</span>}
     </label>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-10 text-center font-typek text-[13px] text-ink-2">{children}</p>;
+  return <p className="py-10 text-center font-typek text-[15px] text-ink-2">{children}</p>;
 }
 
 /** 작은 기록 칸 — 종이 쪽지 위 타자기 숫자 */
