@@ -89,13 +89,13 @@ export function MinutesChart({ rows }: { rows: DayMinutes[] }) {
   return (
     <div>
       <div className="flex">
-        <div aria-hidden className="relative w-7 shrink-0" style={{ height: PLOT_H }}>
+        <div aria-hidden className="relative w-8 shrink-0" style={{ height: PLOT_H }}>
           {ticks.map((t) => (
-            <span key={t} className="tnum absolute right-1.5 text-[9.5px] leading-none text-ink-2" style={{ bottom: (t / top) * PLOT_H - 4 }}>
+            <span key={t} className="tnum absolute right-1.5 text-[11.5px] leading-none text-ink-2" style={{ bottom: (t / top) * PLOT_H - 5 }}>
               {t}
             </span>
           ))}
-          <span className="absolute -top-4 right-1.5 font-typek text-[9.5px] text-ink-2">분</span>
+          <span className="absolute -top-[19px] right-1.5 font-typek text-[11.5px] leading-none text-ink-2">분</span>
         </div>
         <div
           ref={plot}
