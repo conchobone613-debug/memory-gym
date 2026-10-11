@@ -194,11 +194,15 @@ export interface AppSettings {
    * 설정으로 보내지 않고 자산 묶음의 `deleted` 로 따로 보낸다(`sync/engine.ts`).
    */
   syncTombstones?: Record<string, number>;
+  /** 기기 사이에서 함께 쓰는 설정을 마지막으로 고친 때. 동기화는 이것이 늦은 쪽 설정을 통째로 택한다. */
+  settingsUpdatedAt?: number;
+  /** 스승님 기록을 한 번 전부 올렸는지(2026-10-12 전엔 올리지 않았다). 기기마다 다른 값. */
+  coachLogsSynced?: boolean;
   /**
    * AI 이름 후보를 받을 때 쓰는 Anthropic 키.
    *
-   * **이 브라우저 안에만 둔다.** 코드에 넣지 않고(저장소가 공개다) 기기 동기화에서도 뺀다
-   * (`sync/engine.ts` 의 collectAssets). 비어 있으면 사전 후보만 쓴다.
+   * 코드에 넣지 않는다(저장소가 공개다). 백업 파일에서는 빼고, **기기 동기화로는 보낸다**
+   * (2026-10-12 회장 결정 — 기기마다 넣기 번거로움. 동기화 코드를 아는 쪽만 읽는다). 비어 있으면 사전 후보만 쓴다.
    */
   aiKey?: string;
   /** 움직임 줄이기. 없으면 기기 설정(prefers-reduced-motion)을 따른다. */
@@ -287,6 +291,8 @@ export interface CoachLog {
   input: unknown;
   /** 받은 답 원문 */
   output: string;
+  /** 고친 때. 동기화가 기기 사이에서 늦은 쪽을 고르는 기준(없으면 at). 2026-10-12 */
+  updatedAt?: number;
   /** 코스를 실제로 따라 했는가 — 스승님과 규칙 코치를 견주는 근거 */
   followed?: boolean;
   inputTokens?: number;
@@ -457,9 +463,24 @@ export async function getSettings(): Promise<AppSettings> {
   return { ...DEFAULT_SETTINGS, ...stored, key: 'app' };
 }
 
+/**
+ * 기기마다 다른 설정. 이것만 바꾸면 '설정을 고쳤다'로 치지 않고 동기화에도 보내지 않는다.
+ * 나머지(AI 키 포함, 2026-10-12 회장 결정)는 모든 기기가 같이 쓴다.
+ */
+export const LOCAL_SETTING_KEYS = [
+  'key', 'lastBackupAt', 'lastSyncAt', 'recallCellsSynced', 'coachLogsSynced',
+  'syncCode', 'syncTombstones', 'settingsUpdatedAt',
+] as const;
+const LOCAL_SET = new Set<string>(LOCAL_SETTING_KEYS);
+
+/** 함께 쓰는 설정이 바뀌면 부른다(자동 동기화가 단다). */
+export const settingsEvents = { onSharedChange: () => {} };
+
 export async function saveSettings(patch: Partial<AppSettings>): Promise<void> {
   const cur = await getSettings();
-  await db.settings.put({ ...cur, ...patch, key: 'app' });
+  const shared = Object.keys(patch).some((k) => !LOCAL_SET.has(k));
+  await db.settings.put({ ...cur, ...patch, ...(shared ? { settingsUpdatedAt: Date.now() } : {}), key: 'app' });
+  if (shared) settingsEvents.onSharedChange();
 }
 
 /** 지운 자산의 id 를 남긴다. 동기화가 다른 기기 것과 합칠 때 되살리지 않게 한다. */

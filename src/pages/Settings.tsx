@@ -45,7 +45,10 @@ export default function Settings() {
     else setMsg({ t: '주소에 담긴 동기화 코드 형식이 올바르지 않습니다.', ok: false });
   }, [params, setParams]);
 
-  useEffect(() => { if (stored && !s) setS(stored); }, [stored]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* 처음 한 번, 그리고 다른 기기에서 고친 설정이 들어오면(고친 때가 달라지면) 다시 채운다 */
+  useEffect(() => {
+    if (stored && (!s || stored.settingsUpdatedAt !== s.settingsUpdatedAt)) setS(stored);
+  }, [stored]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* 종목 화면의 '규정 바꾸기' 로 오면 그 칸으로 내려 준다 */
   const at = params.get('at');
@@ -216,7 +219,7 @@ export default function Settings() {
         <div className="flex flex-col gap-3">
           <Field
             label="Anthropic API 키"
-            hint="이 브라우저에만 저장됩니다. 기기 동기화와 백업 파일에도 들어가지 않습니다."
+            hint="기기 동기화를 켜 두시면 다른 기기에도 함께 들어갑니다. 백업 파일에는 들어가지 않습니다."
           >
             <input
               type="password"
@@ -236,7 +239,7 @@ export default function Settings() {
             {s.aiKey && (
               <ConfirmBtn
                 label="키 지우기"
-                confirmLabel="이 브라우저에서 키를 지웁니다"
+                confirmLabel="키를 지웁니다 (동기화를 켜 두셨으면 다른 기기에서도)"
                 onConfirm={async () => { setS({ ...s, aiKey: undefined }); await commit({ aiKey: undefined }); setAiMsg(null); }}
               />
             )}

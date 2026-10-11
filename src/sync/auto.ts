@@ -1,11 +1,11 @@
-import { db, getSettings } from '../db/db';
+import { db, getSettings, settingsEvents } from '../db/db';
 import { syncOnce, type SyncResult } from './engine';
 
 /**
  * 자동 동기화 (2026-10-06).
  *
  * 동기화 코드가 있으면 '지금 맞추기'를 누르지 않아도 앱이 스스로 맞춘다.
- *  - 이 기기에서 이미지·궁전·기록이 바뀌면 잠시 뒤(LOCAL_DELAY) 올린다.
+ *  - 이 기기에서 이미지·궁전·기록·설정(AI 키 포함)·규정·스승님 기록이 바뀌면 잠시 뒤(LOCAL_DELAY) 올린다.
  *  - 다른 기기가 올리면 Firestore 가 바로 알려 주고(onSnapshot), 그때 받는다.
  *  - 앱을 열 때, 창으로 돌아올 때, 인터넷이 다시 붙을 때도 한 번 맞춘다.
  *
@@ -16,6 +16,7 @@ const WATCHED = [
   'imageSets', 'images', 'palaces', 'loci',
   'drillSessions', 'drillAttempts', 'recallSessions', 'recallCells',
   'mappingSessions', 'mappingAttempts', 'calcSessions', 'calcItems',
+  'rulesets', 'targets', 'coachLogs',
 ] as const;
 
 const LOCAL_DELAY = 2_000;
@@ -82,10 +83,12 @@ function stopWatching() {
 
 /** 앱이 뜰 때 한 번 부른다. */
 export function startAutoSync() {
+  /* 맞추는 중이면 끝난 뒤 한 번 더 — 받아 넣은 것뿐이면 그 판은 할 일 없이 끝난다 */
+  const touched = () => { if (running) again = true; else scheduleSync(LOCAL_DELAY); };
+  /* 설정 표는 훅을 달지 않는다 — 동기화 자신이 '마지막 동기화' 시각을 적을 때마다 깨어나 돈다 */
+  settingsEvents.onSharedChange = touched;
   for (const name of WATCHED) {
     const t = db.table(name);
-    /* 맞추는 중이면 끝난 뒤 한 번 더 — 받아 넣은 것뿐이면 그 판은 할 일 없이 끝난다 */
-    const touched = () => { if (running) again = true; else scheduleSync(LOCAL_DELAY); };
     t.hook('creating', touched);
     t.hook('updating', touched);
     t.hook('deleting', touched);

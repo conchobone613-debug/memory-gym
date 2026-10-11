@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { blankImage, db, markDeleted } from '../db/db';
+import { blankImage, db, getSettings, markDeleted, saveSettings } from '../db/db';
 import { mergeAssets, sameAssets, syncOnce, type Remote } from './engine';
 
 /*
@@ -20,7 +20,7 @@ const locus = (id: string, palaceId: string, order: number, name = id, updatedAt
   ({ id, palaceId, order, name, note: '', updatedAt });
 
 const bundle = (p: Partial<Bundle>): Bundle =>
-  ({ imageSets: [], images: [], palaces: [], loci: [], settings: {} as Bundle['settings'], deleted: {}, ...p });
+  ({ imageSets: [], images: [], palaces: [], loci: [], rulesets: [], targets: [], settings: {}, settingsAt: 0, deleted: {}, ...p });
 
 /** Firestore 대신 메모리. 자산을 몇 번 썼는지 센다. */
 function memoryRemote(initial: Bundle | null) {
@@ -36,7 +36,10 @@ function memoryRemote(initial: Bundle | null) {
 }
 
 beforeEach(async () => {
-  await Promise.all([db.imageSets.clear(), db.images.clear(), db.palaces.clear(), db.loci.clear(), db.settings.clear()]);
+  await Promise.all([
+    db.imageSets.clear(), db.images.clear(), db.palaces.clear(), db.loci.clear(), db.settings.clear(),
+    db.rulesets.clear(), db.coachLogs.clear(),
+  ]);
 });
 
 describe('자산 합치기 — 두 기기가 같은 결과로 모인다', () => {
@@ -123,5 +126,94 @@ describe('자동 동기화 — 바뀐 게 없으면 쓰지 않는다', () => {
     expect(await db.imageSets.count()).toBe(0);
     expect(r.assets()!.imageSets).toEqual([]);
     expect(r.assets()!.deleted.s).toBeGreaterThan(0);
+  });
+});
+
+/** 기록 묶음까지 담는 창구 — 두 기기가 한 방을 쓰는 것을 흉내 낸다 */
+function fullRemote() {
+  let assets: { bundle: Bundle; updatedAt: number } | null = null;
+  const batches: { id: string; createdAt: number; rows: Record<string, unknown[]> }[] = [];
+  const remote: Remote = {
+    async getAssets() { return assets && JSON.parse(JSON.stringify(assets)); },
+    async putAssets(b, t) { assets = JSON.parse(JSON.stringify({ bundle: b, updatedAt: t })); },
+    async listBatches(after) { return JSON.parse(JSON.stringify(batches.filter((b) => b.createdAt > after))); },
+    async putBatch(id, createdAt, rows) { batches.push(JSON.parse(JSON.stringify({ id, createdAt, rows }))); },
+  };
+  return { remote, assets: () => assets?.bundle };
+}
+
+/** 이 기기를 갓 켠 기기로 비운다(같은 방에 새 기기가 들어온 셈) */
+async function wipe() {
+  await Promise.all([
+    db.imageSets.clear(), db.images.clear(), db.palaces.clear(), db.loci.clear(), db.settings.clear(),
+    db.rulesets.clear(), db.coachLogs.clear(),
+  ]);
+}
+
+describe('완전한 동기화 — 설정·AI 키·규정·스승님 기록 (2026-10-12)', () => {
+  it('AI 키와 설정이 다른 기기로 가고, 동기화 코드·마지막 동기화 같은 기기 값은 안 간다', async () => {
+    const r = fullRemote();
+    await saveSettings({ syncCode: 'a'.repeat(32), aiKey: 'sk-test', dailyMinutes: 40 });
+    await syncOnce(r.remote);
+    expect(r.assets()!.settings.aiKey).toBe('sk-test');
+    expect(r.assets()!.settings.syncCode).toBeUndefined();
+    expect(r.assets()!.settings.lastSyncAt).toBeUndefined();
+
+    await wipe();
+    await saveSettings({ syncCode: 'b'.repeat(32) });
+    await syncOnce(r.remote);
+    const st = await getSettings();
+    expect(st.aiKey).toBe('sk-test');
+    expect(st.dailyMinutes).toBe(40);
+    expect(st.syncCode).toBe('b'.repeat(32));
+  });
+
+  it('다른 기기에서 AI 키를 지우면 이 기기에서도 지워진다', async () => {
+    const r = fullRemote();
+    await saveSettings({ aiKey: 'sk-test' });
+    await syncOnce(r.remote);
+    const b = r.assets()!;
+    const { aiKey: _k, ...rest } = b.settings;
+    await r.remote.putAssets({ ...b, settings: rest, settingsAt: Date.now() + 1000 }, 2);
+    await syncOnce(r.remote);
+    expect((await getSettings()).aiKey).toBeUndefined();
+  });
+
+  it('늦게 고친 설정이 이긴다 — 이 기기가 더 늦으면 저쪽 것을 덮는다', async () => {
+    const r = fullRemote();
+    await saveSettings({ dailyMinutes: 20 });
+    await syncOnce(r.remote);
+    await r.remote.putAssets({ ...r.assets()!, settings: { ...r.assets()!.settings, dailyMinutes: 30 }, settingsAt: 1 }, 2);
+    await syncOnce(r.remote);
+    expect((await getSettings()).dailyMinutes).toBe(20);
+    expect(r.assets()!.settings.dailyMinutes).toBe(20);
+  });
+
+  it('규정을 되돌리면(지우면) 저쪽 것이 되살리지 않는다', async () => {
+    const r = fullRemote();
+    await db.rulesets.put({ id: 'add:default', disciplineId: 'add', name: '내 규정', values: {}, isDefault: true, updatedAt: 5 });
+    await syncOnce(r.remote);
+    expect(r.assets()!.rulesets).toHaveLength(1);
+    await db.rulesets.delete('add:default');
+    await markDeleted(['add:default']);
+    await syncOnce(r.remote);
+    expect(await db.rulesets.count()).toBe(0);
+    expect(r.assets()!.rulesets).toEqual([]);
+  });
+
+  it('스승님 기록이 가고, 나중에 고친 것(따라 한 항목)도 덮어쓴다', async () => {
+    const r = fullRemote();
+    const t = Date.now() - 60_000;
+    await db.coachLogs.add({ id: 'c1', kind: 'course', at: t, input: null, output: '', followed: false, updatedAt: t });
+    await syncOnce(r.remote);
+
+    await wipe();
+    await syncOnce(r.remote);
+    expect((await db.coachLogs.get('c1'))?.followed).toBe(false);
+
+    /* 다른 기기에서 고친 것이 묶음으로 온다 */
+    await r.remote.putBatch('x', Date.now(), { coachLogs: [{ id: 'c1', kind: 'course', at: t, input: null, output: '', followed: true, updatedAt: Date.now() }] });
+    await syncOnce(r.remote);
+    expect((await db.coachLogs.get('c1'))?.followed).toBe(true);
   });
 });

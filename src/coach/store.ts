@@ -73,7 +73,7 @@ export async function saveCourse(a: SaveCourse): Promise<CoachLog> {
     ...(a.usage ? { inputTokens: a.usage.input, outputTokens: a.usage.output } : {}),
     ...(a.aiError ? { aiError: a.aiError } : {}),
   };
-  await db.coachLogs.put(row);
+  await db.coachLogs.put({ ...row, updatedAt: Date.now() });
   return row;
 }
 
@@ -89,7 +89,7 @@ export async function markStep(logId: string, index: number, sessionId: string, 
     const done = row.course.items.map((_, i) => row.done?.[i] ?? null);
     done[index] = sessionId;
     const followed = done.every((d) => d != null);
-    await db.coachLogs.update(logId, { done, followed });
+    await db.coachLogs.update(logId, { done, followed, updatedAt: Date.now() });
     return { ...row, done, followed };
   });
 }

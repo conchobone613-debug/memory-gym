@@ -1,4 +1,4 @@
-import { db, getSettings, saveSettings } from '../db/db';
+import { db, getSettings, saveSettings, DEFAULT_SETTINGS, LOCAL_SETTING_KEYS, type AppSettings } from '../db/db';
 import { rebuildAll } from '../db/rebuild';
 
 /**
@@ -27,21 +27,34 @@ const LOG_TABLES = [
   'recallSessions', 'recallCells',
   'mappingSessions', 'mappingAttempts',
   'calcSessions', 'calcItems',
+  /* 스승님 기록은 고쳐지기도 한다(따라 한 항목·갈아 끼움) — 받을 때 updatedAt 이 늦은 쪽을 남긴다 */
+  'coachLogs',
 ] as const;
 type LogTable = (typeof LOG_TABLES)[number];
 
+/** 기기 사이에서 같이 쓰는 설정 — AI 키도 들어간다(2026-10-12 회장 결정: "완전한 동기화 서비스를 원해"). */
+export type SharedSettings = Partial<AppSettings>;
+
+/** 설정에서 기기마다 다른 값을 뺀다. */
+function sharedPart(settings: AppSettings): SharedSettings {
+  const out: Record<string, unknown> = { ...settings };
+  for (const k of LOCAL_SETTING_KEYS) delete out[k];
+  return out as SharedSettings;
+}
+
 async function collectAssets() {
-  const [imageSets, images, palaces, loci, settings] = await Promise.all([
-    db.imageSets.toArray(), db.images.toArray(), db.palaces.toArray(), db.loci.toArray(), getSettings(),
+  const [imageSets, images, palaces, loci, rulesets, targets, settings] = await Promise.all([
+    db.imageSets.toArray(), db.images.toArray(), db.palaces.toArray(), db.loci.toArray(),
+    db.rulesets.toArray(), db.targets.toArray(), getSettings(),
   ]);
-  /*
-   * lastBackupAt·lastSyncAt·recallCellsSynced 는 기기마다 다른 값이라 보내지 않는다.
-   * aiKey 는 **비밀이라** 보내지 않는다 — 기기마다 각자 넣는다.
-   */
-  const { lastBackupAt: _b, lastSyncAt: _s, recallCellsSynced: _r, aiKey: _k, syncTombstones, ...shared } = settings;
-  /* 지운 것의 id → 지운 때. 옛 기기가 올린 묶음엔 없을 수 있다. */
-  const deleted: Record<string, number> = syncTombstones ?? {};
-  return { imageSets, images, palaces, loci, settings: shared, deleted };
+  return {
+    imageSets, images, palaces, loci, rulesets, targets,
+    settings: sharedPart(settings),
+    /* 설정을 마지막으로 고친 때. 0 = 손대지 않은 기본값 */
+    settingsAt: settings.settingsUpdatedAt ?? 0,
+    /* 지운 것의 id → 지운 때 */
+    deleted: settings.syncTombstones ?? {},
+  };
 }
 
 type AssetBundle = Awaited<ReturnType<typeof collectAssets>>;
@@ -92,32 +105,45 @@ export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundl
   const setIds = new Set(imageSets.map((x) => x.id));
   const palaces = pick(local.palaces, remote.palaces);
   const palaceIds = new Set(palaces.map((x) => x.id));
+  /* 설정은 늦게 고친 쪽을 통째로. 같으면 저쪽 것(갓 켠 기기는 0 이라 저쪽 설정을 받는다). 옛 기기 묶음엔 없다. */
+  const remoteAt = remote.settingsAt ?? 0;
+  const useRemote = remote.settings && remoteAt >= (local.settingsAt ?? 0);
   return {
     imageSets,
     images: pick(local.images, remote.images).filter((x) => setIds.has(x.setId)),
     palaces,
     /* 장소도 행마다 고른다(2026-10-06 전엔 '많은 쪽 통째로' — 지운 장소가 되살아났다) */
     loci: pick(local.loci, remote.loci).filter((x) => palaceIds.has(x.palaceId)),
-    settings: local.settings,
+    rulesets: pick(local.rulesets, remote.rulesets ?? []),
+    targets: pick(local.targets, remote.targets ?? []),
+    settings: useRemote ? remote.settings : local.settings,
+    settingsAt: useRemote ? remoteAt : local.settingsAt ?? 0,
     deleted,
   };
 }
 
-/**
- * 설정을 뺀 나머지가 같은지 — 행 순서는 보지 않는다.
- * 설정은 이 기기 것을 보낼 뿐 합치지 않으므로 비교에서 뺀다.
- */
+/** 키 순서와 상관없이 같은 값이면 같은 글자가 되게 적는다. */
+function stable(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
+  if (v && typeof v === 'object') {
+    return `{${Object.keys(v).sort().filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+      .map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v);
+}
+
+/** 두 묶음이 같은지 — 행 순서·키 순서는 보지 않는다. */
 export function sameAssets(a: AssetBundle, b: AssetBundle): boolean {
-  const rows = (l: { id: string }[]) => l.map((r) => JSON.stringify(r)).sort();
-  const body = (x: AssetBundle) => JSON.stringify([
-    rows(x.imageSets), rows(x.images), rows(x.palaces), rows(x.loci),
-    Object.entries(x.deleted ?? {}).sort(),
+  const rows = (l: unknown[] | undefined) => (l ?? []).map(stable).sort();
+  const body = (x: AssetBundle) => stable([
+    rows(x.imageSets), rows(x.images), rows(x.palaces), rows(x.loci), rows(x.rulesets), rows(x.targets),
+    x.settings ?? null, x.settingsAt ?? 0, x.deleted ?? {},
   ]);
   return body(a) === body(b);
 }
 
 async function applyAssets(b: AssetBundle) {
-  await db.transaction('rw', db.imageSets, db.images, db.imageStats, db.palaces, db.loci, async () => {
+  await db.transaction('rw', [db.imageSets, db.images, db.imageStats, db.palaces, db.loci, db.rulesets, db.targets], async () => {
     /* 합친 결과에 없는 것은 이 기기에서도 치운다 (갓 켠 기기의 빈 기본 세트, 다른 기기에서 지운 것) */
     const keepSets = new Set(b.imageSets.map((s) => s.id));
     const keepImages = new Set(b.images.map((i) => i.id));
@@ -132,8 +158,21 @@ async function applyAssets(b: AssetBundle) {
     if (b.palaces.length) await db.palaces.bulkPut(b.palaces);
     await db.loci.clear();
     if (b.loci.length) await db.loci.bulkAdd(b.loci);
+    for (const [name, rows] of [['rulesets', b.rulesets], ['targets', b.targets]] as const) {
+      const t = db.table<{ id: string }, string>(name);
+      const keep = new Set(rows.map((r) => r.id));
+      await t.bulkDelete((await t.toArray()).filter((r) => !keep.has(r.id)).map((r) => r.id));
+      await t.bulkPut(rows);
+    }
   });
-  await saveSettings({ syncTombstones: b.deleted });
+  /*
+   * 함께 쓰는 설정은 받은 것으로 통째로 바꾼다(저쪽에서 지운 AI 키도 지워지게). 이 기기만의 값(코드·마지막 동기화 등)은 그대로.
+   */
+  const cur = await getSettings();
+  const mine = Object.fromEntries(LOCAL_SETTING_KEYS.map((k) => [k, cur[k]]));
+  await db.settings.put({
+    ...DEFAULT_SETTINGS, ...b.settings, ...mine, key: 'app', settingsUpdatedAt: b.settingsAt, syncTombstones: b.deleted,
+  });
 }
 
 /* ── 기록 ───────────────────────────────────────── */
@@ -141,7 +180,7 @@ async function applyAssets(b: AssetBundle) {
 /**
  * `allCells` 는 회상 칸을 시각과 상관없이 전부 올린다 — 칸을 한 번도 올리지 않은 기기의 되채우기.
  */
-async function collectLogsSince(since: number, allCells = false) {
+async function collectLogsSince(since: number, allCells = false, allCoach = false) {
   const out: Partial<Record<LogTable, unknown[]>> = {};
   let count = 0;
   const put = (name: LogTable, rows: unknown[]) => {
@@ -149,10 +188,8 @@ async function collectLogsSince(since: number, allCells = false) {
   };
   for (const name of LOG_TABLES) {
     if (name === 'recallCells') continue;
-    put(name, (await db.table(name).toArray()).filter((r: Record<string, unknown>) => {
-      const t = (r.shownAt ?? r.startedAt ?? 0) as number;
-      return t > since;
-    }));
+    if (name === 'coachLogs' && allCoach) { put(name, await db.coachLogs.toArray()); continue; }
+    put(name, (await db.table(name).toArray()).filter((r: Record<string, unknown>) => stamp(r) > since));
   }
   /*
    * 회상 칸에는 시각이 없다. 그래서 칸은 **판을 따라** 간다 — 이번에 올리는 판의 칸만.
@@ -167,6 +204,11 @@ async function collectLogsSince(since: number, allCells = false) {
 }
 
 type LogRows = Partial<Record<LogTable, unknown[]>>;
+
+/** 기록 한 행의 시각 — 고친 때가 있으면 그것, 없으면 만든 때. */
+function stamp(r: Record<string, unknown>): number {
+  return Math.max((r.updatedAt as number) ?? 0, ((r.shownAt ?? r.startedAt ?? r.at ?? 0) as number));
+}
 
 /** 묶음 하나의 JSON 크기 상한. Firestore 문서 한도가 1MiB 라 여유를 둔다. */
 export const BATCH_BYTES = 700_000;
@@ -207,7 +249,8 @@ async function applyLogs(rows: Partial<Record<LogTable, unknown[]>>): Promise<nu
     if (!list?.length) continue;
     /* 이미 가진 기록은 세지 않는다 — 겹쳐 받는 구간(PULL_OVERLAP)이 있어서다 */
     const have = await db.table(name).bulkGet(list.map((r) => r.id));
-    const fresh = list.filter((_, i) => !have[i]);
+    /* 없던 것, 또는 저쪽이 더 늦게 고친 것(스승님 기록) */
+    const fresh = list.filter((r, i) => !have[i] || stamp(r as never) > stamp(have[i]));
     if (fresh.length) await db.table(name).bulkPut(fresh as never[]);
     n += fresh.length;
   }
@@ -267,7 +310,7 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
    * 첫 동기화·되채우기는 Firestore 문서 한도(1MiB)를 넘을 수 있어 묶음을 나눠 올린다.
    * 중간에 실패하면 lastSyncAt 이 그대로라 다음번에 전부 다시 올린다 — 받는 쪽 bulkPut 은 겹쳐도 같다.
    */
-  const mine = await collectLogsSince(since, !settings.recallCellsSynced);
+  const mine = await collectLogsSince(since, !settings.recallCellsSynced, !settings.coachLogsSynced);
   const tag = Math.random().toString(36).slice(2, 8);
   for (const [i, rows] of splitRows(mine.rows).entries()) {
     await remote.putBatch(`${now}-${tag}-${i}`, now, rows);
@@ -276,6 +319,6 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   /* 4. 통계는 받은 게 아니라 여기서 다시 만든다 */
   if (pulled > 0) await rebuildAll();
 
-  await saveSettings({ lastSyncAt: now, recallCellsSynced: true });
+  await saveSettings({ lastSyncAt: now, recallCellsSynced: true, coachLogsSynced: true });
   return { pushed: mine.count, pulled, assets, at: now };
 }

@@ -145,7 +145,7 @@ export default function SyncPanel() {
 
       <p className="mt-3 font-typek text-[14px] leading-relaxed text-ink-2">
         기록은 코드를 아는 사람만 읽을 수 있습니다. 코드는 128비트 난수라 찍어서 맞힐 수 없고,
-        목록으로 훑는 것도 막아 두었습니다. 올라가는 것은 이미지 이름과 반응시간뿐이며 신원 정보는 없습니다.
+        목록으로 훑는 것도 막아 두었습니다. 올라가는 것은 이미지·궁전·훈련 기록·설정이고, AI 키도 함께 갑니다. 코드는 남에게 알리지 마십시오.
       </p>
     </Folder>
   );

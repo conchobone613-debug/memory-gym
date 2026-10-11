@@ -68,10 +68,10 @@ export function startCourseJob(
     const r = await makeCourse({ minutes, useAi, claimId: claimId ?? undefined });
     if (!base || r.id === base.id) return r;
     if (opened?.id === base.id && opened.at >= t) {
-      await db.coachLogs.update(r.id, { at: base.at - 1, superseded: true });
+      await db.coachLogs.update(r.id, { at: base.at - 1, superseded: true, updatedAt: Date.now() });
       return base;
     }
-    await db.coachLogs.update(base.id, { superseded: true });
+    await db.coachLogs.update(base.id, { superseded: true, updatedAt: Date.now() });
     return r;
   })().finally(() => { job = null; });
   job = { promise, minutes, ai: useAi };

@@ -1,4 +1,4 @@
-import { db, type RuleValues } from '../db/db';
+import { db, markDeleted, type RuleValues } from '../db/db';
 import type { CalcEvent, RuleField } from '../data/events';
 
 /** 등록부의 기본값. 저장된 규정이 없을 때 쓴다. */
@@ -47,4 +47,5 @@ export async function saveRules(ev: CalcEvent, values: RuleValues): Promise<void
 
 export async function resetRules(ev: CalcEvent): Promise<void> {
   await db.rulesets.delete(rulesetId(ev.id));
+  await markDeleted([rulesetId(ev.id)]);
 }
