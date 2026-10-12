@@ -217,3 +217,35 @@ describe('완전한 동기화 — 설정·AI 키·규정·스승님 기록 (2026
     expect((await db.coachLogs.get('c1'))?.followed).toBe(true);
   });
 });
+
+describe('2026-10-12 진료실 PC 에서 본 두 구멍', () => {
+  const builtin = (id: string, domain: string) =>
+    ({ id, name: id, domain, builtin: true, createdAt: 1, updatedAt: 1 }) as Bundle['imageSets'][number];
+
+  it('저쪽에서 온 빈 기본 세트도 버린다 — 세트가 두 벌이 되지 않는다', () => {
+    const home = bundle({ imageSets: [builtin('h', 'digit2')], images: [img('h1', 'h', '이름', 5)] });
+    const clinic = bundle({ imageSets: [builtin('c', 'digit2')], images: [img('c1', 'c', '', 1)] });
+    for (const m of [mergeAssets(home, clinic), mergeAssets(clinic, home)]) {
+      expect(m.imageSets.map((x) => x.id)).toEqual(['h']);
+      expect(m.images.map((x) => x.id)).toEqual(['h1']);
+    }
+  });
+
+  it('둘 다 빈 기본 세트면 양쪽이 같은 하나를 남긴다', () => {
+    const a = bundle({ imageSets: [builtin('a', 'digit2')] });
+    const b = bundle({ imageSets: [builtin('b', 'digit2')] });
+    expect(mergeAssets(a, b).imageSets.map((x) => x.id)).toEqual(['a']);
+    expect(mergeAssets(b, a).imageSets.map((x) => x.id)).toEqual(['a']);
+  });
+
+  it('고친 때가 같으면(새 버전 전 설정) 키를 가진 쪽이 키를 잃지 않고, 결국 양쪽에 키가 간다', () => {
+    const home = bundle({ settings: { aiKey: 'sk-home', dailyMinutes: 15 }, settingsAt: 0 });
+    const clinic = bundle({ settings: { dailyMinutes: 20 }, settingsAt: 0 });
+    const atHome = mergeAssets(home, clinic);
+    expect(atHome.settings.aiKey).toBe('sk-home');
+    /* 집이 올린 것을 진료실이 받는다 */
+    const atClinic = mergeAssets(clinic, atHome);
+    expect(atClinic.settings.aiKey).toBe('sk-home');
+    expect(sameAssets(atClinic, atHome)).toBe(true);
+  });
+});

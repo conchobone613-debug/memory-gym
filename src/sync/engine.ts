@@ -64,25 +64,31 @@ type AssetBundle = Awaited<ReturnType<typeof collectAssets>>;
  *
  * 다만 갓 켠 기기에는 첫 실행 때 만들어진 **빈 기본 세트**가 있다. 그걸 그대로 합치면
  * 같은 종류의 세트가 두 벌이 되어 통계가 갈라진다. 그래서 '한 칸도 안 채운 기본 세트'는
- * 같은 종류가 저쪽에 있으면 버린다. 회장이 손댄 세트는 절대 버리지 않는다.
+ * 같은 종류가 따로 있으면 버린다(아래). 회장이 손댄 세트는 절대 버리지 않는다.
  */
 export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundle {
-  const namedBySet = new Map<string, number>();
-  for (const img of local.images) {
-    if (img.name.trim()) namedBySet.set(img.setId, (namedBySet.get(img.setId) ?? 0) + 1);
+  /*
+   * 빈 기본 세트는 **양쪽 모두에서** 고른다(2026-10-12 — 전엔 이 기기 것만 봐서, 저쪽의 빈 세트를 받아
+   * 세트가 두 벌이 됐다). 같은 종류에 이름이 든 세트가 있으면 빈 기본 세트는 버리고,
+   * 그 종류가 다 비었으면 id 가 가장 작은 하나만 남긴다 — 두 기기가 같은 것을 고른다.
+   */
+  const named = new Set([...local.images, ...remote.images].filter((i) => i.name.trim()).map((i) => i.setId));
+  const allSets = [...new Map([...local.imageSets, ...remote.imageSets].map((x) => [x.id, x])).values()];
+  const dropped = new Set<string>();
+  for (const domain of new Set(allSets.map((x) => x.domain))) {
+    const same = allSets.filter((x) => x.domain === domain);
+    const empty = same.filter((x) => x.builtin && !named.has(x.id)).sort((a, b) => (a.id < b.id ? -1 : 1));
+    const keepOne = same.length === empty.length;
+    for (const x of keepOne ? empty.slice(1) : empty) dropped.add(x.id);
   }
-  const remoteDomains = new Set(remote.imageSets.map((s) => s.domain));
-  const dropped = new Set(
-    local.imageSets
-      .filter((s) => s.builtin && !namedBySet.get(s.id) && remoteDomains.has(s.domain))
-      .map((s) => s.id),
-  );
   if (dropped.size) {
-    local = {
-      ...local,
-      imageSets: local.imageSets.filter((s) => !dropped.has(s.id)),
-      images: local.images.filter((i) => !dropped.has(i.setId)),
-    };
+    const cut = (b: AssetBundle): AssetBundle => ({
+      ...b,
+      imageSets: b.imageSets.filter((x) => !dropped.has(x.id)),
+      images: b.images.filter((i) => !dropped.has(i.setId)),
+    });
+    local = cut(local);
+    remote = cut(remote);
   }
 
   /* 지운 표시는 양쪽 것을 합친다. 지운 뒤 다시 고친 행(updatedAt 이 더 늦음)은 살린다. */
@@ -106,8 +112,17 @@ export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundl
   const palaces = pick(local.palaces, remote.palaces);
   const palaceIds = new Set(palaces.map((x) => x.id));
   /* 설정은 늦게 고친 쪽을 통째로. 같으면 저쪽 것(갓 켠 기기는 0 이라 저쪽 설정을 받는다). 옛 기기 묶음엔 없다. */
+  /*
+   * 둘 다 고친 때가 같으면(대개 0 — 새 버전 전에 저장한 설정) 저쪽 것에 **이쪽에만 있는 칸을 채워** 합친다.
+   * 그냥 저쪽 것을 택하면, 키를 넣어 둔 기기가 키 없는 저쪽 설정을 받아 키를 잃는다(2026-10-12 진료실 PC 에서 발견).
+   */
   const remoteAt = remote.settingsAt ?? 0;
-  const useRemote = remote.settings && remoteAt >= (local.settingsAt ?? 0);
+  const localAt = local.settingsAt ?? 0;
+  const tie = remote.settings && remoteAt === localAt;
+  const useRemote = remote.settings && remoteAt > localAt;
+  const settings = tie
+    ? { ...local.settings, ...Object.fromEntries(Object.entries(remote.settings).filter(([, v]) => v !== undefined)) }
+    : useRemote ? remote.settings : local.settings;
   return {
     imageSets,
     images: pick(local.images, remote.images).filter((x) => setIds.has(x.setId)),
@@ -116,8 +131,8 @@ export function mergeAssets(local: AssetBundle, remote: AssetBundle): AssetBundl
     loci: pick(local.loci, remote.loci).filter((x) => palaceIds.has(x.palaceId)),
     rulesets: pick(local.rulesets, remote.rulesets ?? []),
     targets: pick(local.targets, remote.targets ?? []),
-    settings: useRemote ? remote.settings : local.settings,
-    settingsAt: useRemote ? remoteAt : local.settingsAt ?? 0,
+    settings,
+    settingsAt: useRemote ? remoteAt : localAt,
     deleted,
   };
 }
